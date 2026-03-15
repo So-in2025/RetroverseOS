@@ -1,0 +1,21 @@
+{
+  "name": "RetroOS - Retro Gaming Platform",
+  "short_name": "RetroOS",
+  "description": "The ultimate retro gaming platform in your browser.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "theme_color": "#00f2ff",
+  "icons": [
+    {
+      "src": "https://picsum.photos/seed/retroos/192/192",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://picsum.photos/seed/retroos/512/512",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

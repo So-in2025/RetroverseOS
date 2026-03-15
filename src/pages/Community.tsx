@@ -1,0 +1,350 @@
+import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
+import { MessageSquare, Users, Calendar, Trophy, Medal, Crown, Swords, ArrowRight } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { AudioEngine } from '../services/audioEngine';
+import { haptics } from '../services/haptics';
+import TournamentBracket from '../components/community/TournamentBracket';
+
+export default function Community() {
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState<'feed' | 'tournaments' | 'leaderboards'>('feed');
+  const [selectedTournament, setSelectedTournament] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (location.pathname.includes('tournaments')) {
+      setActiveTab('tournaments');
+    } else {
+      setActiveTab('feed');
+    }
+  }, [location]);
+
+  const tournaments = [
+    {
+      id: 1,
+      title: "Dominion Winter Championship",
+      game: "Street Fighter II",
+      date: "Mar 15 • 8:00 PM EST",
+      prize: "50,000 CR",
+      participants: "128/256",
+      status: "REGISTRATION OPEN",
+      image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=800&h=400"
+    },
+    {
+      id: 2,
+      title: "Speedrun Sunday: Sonic",
+      game: "Sonic the Hedgehog",
+      date: "Mar 18 • 2:00 PM EST",
+      prize: "10,000 CR",
+      participants: "42/100",
+      status: "UPCOMING",
+      image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=800&h=400"
+    },
+    {
+      id: 3,
+      title: "Tetris Grand Prix",
+      game: "Tetris",
+      date: "Mar 20 • 6:00 PM EST",
+      prize: "25,000 CR",
+      participants: "Full",
+      status: "CLOSED",
+      image: "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=800&h=400"
+    }
+  ];
+
+  const leaderboard = [
+    { rank: 1, name: "NEXUS_ONE", rating: 2850, winRate: "72%", main: "Strategist" },
+    { rank: 2, name: "CyberKai", rating: 2810, winRate: "68%", main: "Aggro" },
+    { rank: 3, name: "PixelQueen", rating: 2795, winRate: "70%", main: "Tactician" },
+    { rank: 4, name: "GlitchRunner", rating: 2750, winRate: "65%", main: "Speed" },
+    { rank: 5, name: "RetroKing", rating: 2720, winRate: "62%", main: "Balanced" },
+  ];
+
+  return (
+    <div className="fixed inset-0 lg:static lg:inset-auto w-full bg-zinc-950 text-white font-sans z-40 overflow-y-auto lg:overflow-visible scrollbar-hide">
+      {/* Native Header */}
+      <div className="pt-14 pb-4 px-4 md:pt-10 md:px-8 bg-zinc-950">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="text-3xl font-black italic uppercase tracking-tighter mb-1">Centro de la Comunidad</h1>
+          <p className="text-zinc-400 text-sm font-medium">Conecta. Compite. Domina.</p>
+        </div>
+      </div>
+
+      {/* Sticky Tabs - Native Feel */}
+      <div className="sticky top-0 z-30 bg-zinc-950/95 backdrop-blur-xl border-b border-white/5 mb-6">
+        <div className="max-w-7xl mx-auto flex overflow-x-auto px-4 py-3 gap-3 [&::-webkit-scrollbar]:hidden md:px-8">
+          {[
+            { id: 'feed', label: 'ACTIVIDAD', icon: MessageSquare },
+            { id: 'tournaments', label: 'TORNEOS', icon: Swords },
+            { id: 'leaderboards', label: 'CLASIFICACIÓN', icon: Trophy },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id as any);
+                AudioEngine.playSelectSound();
+                haptics.light();
+              }}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-black text-xs tracking-wider transition-all whitespace-nowrap flex-none ${
+                activeTab === tab.id 
+                  ? 'bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
+                  : 'bg-zinc-900 text-zinc-500 border border-white/5'
+              }`}
+            >
+              <tab.icon className="w-3.5 h-3.5" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 md:px-8 pb-40 lg:pb-12">
+        <AnimatePresence mode="wait">
+          
+          {/* FEED TAB */}
+          {activeTab === 'feed' && (
+            <motion.div 
+              key="feed"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 w-full"
+            >
+              {/* Main Feed */}
+              <div className="lg:col-span-2 space-y-4 md:space-y-6">
+                <div className="bg-zinc-900 border border-white/5 rounded-xl p-4 md:p-6">
+                  <div className="flex gap-3 md:gap-4">
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-emerald-600 flex-shrink-0 flex items-center justify-center font-bold text-xs md:text-sm">NX</div>
+                    <div className="flex-1 min-w-0">
+                      <textarea 
+                        placeholder="Comparte tu última puntuación más alta..." 
+                        className="w-full bg-zinc-950 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition-colors resize-none h-20 md:h-24 text-sm"
+                      />
+                      <div className="flex justify-end mt-2">
+                        <button className="px-3 py-1.5 md:px-4 md:py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium text-xs md:text-sm transition-colors shadow-lg shadow-emerald-900/20">
+                          Publicar Actualización
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Feed Items */}
+                {[
+                  { user: 'CyberKai', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop' },
+                  { user: 'PixelQueen', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop' },
+                  { user: 'GlitchRunner', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop' }
+                ].map((item, i) => (
+                  <div key={i} className="bg-zinc-900 border border-white/5 rounded-xl p-4 md:p-6 hover:border-white/10 transition-colors">
+                    <div className="flex items-center gap-3 mb-3">
+                      <img src={item.avatar} className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover" alt={item.user} />
+                      <div>
+                        <p className="font-bold text-white text-sm md:text-base">{item.user}</p>
+                        <p className="text-[10px] md:text-xs text-zinc-500">{i + 1} horas atrás</p>
+                      </div>
+                    </div>
+                    <p className="text-zinc-300 mb-4 leading-relaxed text-sm md:text-base">¡Acabo de superar mi récord personal en Tetris! ¿Quién quiere desafiarme? #Dominion #Tetris</p>
+                    <div className="flex gap-4 md:gap-6 text-zinc-500 text-xs md:text-sm">
+                      <button className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors"><MessageSquare className="w-3 h-3 md:w-4 md:h-4" /> 12</button>
+                      <button className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors">Me gusta</button>
+                      <button className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors">Compartir</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Sidebar */}
+              <div className="space-y-6">
+                <div className="bg-zinc-900 border border-white/5 rounded-xl p-4 md:p-6">
+                  <h3 className="font-bold mb-4 flex items-center gap-2 text-emerald-400 uppercase text-xs md:text-sm tracking-wider">
+                    <Users className="w-4 h-4" />
+                    Conectados Ahora
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop',
+                      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
+                      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop',
+                      'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop',
+                      'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop',
+                      'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=100&h=100&fit=crop',
+                      'https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=100&h=100&fit=crop',
+                      'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=100&h=100&fit=crop'
+                    ].map((url, i) => (
+                      <img key={i} src={url} className="w-8 h-8 rounded-full bg-zinc-800 border-2 border-zinc-900 hover:border-emerald-500 transition-colors cursor-pointer object-cover" title={`Jugador ${i}`} />
+                    ))}
+                    <div className="w-8 h-8 rounded-full bg-zinc-800 border-2 border-zinc-900 flex items-center justify-center text-xs text-zinc-500 font-bold">
+                      +42
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* TOURNAMENTS TAB */}
+          {activeTab === 'tournaments' && (
+            <motion.div 
+              key="tournaments"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="grid grid-cols-1 gap-4 md:gap-6 w-full"
+            >
+              {tournaments.map((t) => (
+                <div key={t.id} className="group relative bg-zinc-900 border border-white/5 rounded-2xl overflow-hidden hover:border-emerald-500/50 transition-all hover:shadow-2xl hover:shadow-emerald-900/10">
+                    <div className="absolute inset-0 z-0">
+                      <img src={t.image} alt={t.title} className="w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity group-hover:scale-105 duration-700" referrerPolicy="no-referrer" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/90 to-transparent" />
+                    </div>
+                    
+                    <div className="relative z-10 p-5 md:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 md:gap-6">
+                      <div className="space-y-2 w-full">
+                        <div className="flex items-center gap-3 mb-2">
+                          <span className={`px-2 py-1 rounded text-[10px] md:text-xs font-bold tracking-wider border ${
+                            t.status === 'REGISTRATION OPEN' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/20' : 
+                            t.status === 'CLOSED' ? 'bg-red-500/20 text-red-400 border-red-500/20' : 
+                            'bg-blue-500/20 text-blue-400 border-blue-500/20'
+                          }`}>
+                            {t.status === 'REGISTRATION OPEN' ? 'INSCRIPCIÓN ABIERTA' : t.status === 'CLOSED' ? 'CERRADO' : 'PRÓXIMO'}
+                          </span>
+                          <span className="text-zinc-400 text-xs md:text-sm flex items-center gap-1">
+                            <Calendar className="w-3 h-3" /> {t.date}
+                          </span>
+                        </div>
+                        <h2 className="text-xl md:text-3xl font-bold text-white group-hover:text-emerald-400 transition-colors line-clamp-1">{t.title}</h2>
+                        <p className="text-zinc-400 flex items-center gap-2 text-sm">
+                          <Swords className="w-4 h-4" /> {t.game}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between w-full md:w-auto gap-4 md:gap-8 mt-2 md:mt-0">
+                        <div className="text-left md:text-right">
+                          <p className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Pozo de Premios</p>
+                          <p className="text-lg md:text-2xl font-mono text-emerald-400 font-bold">{t.prize}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setSelectedTournament(t.title)}
+                            className="px-4 py-3 bg-zinc-800 text-white font-bold rounded-xl hover:bg-zinc-700 transition-all text-sm"
+                          >
+                            Cuadro
+                          </button>
+                          <button className="px-6 py-3 bg-white text-black font-bold rounded-xl hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-2 text-sm">
+                            Detalles <ArrowRight className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                </div>
+              ))}
+            </motion.div>
+          )}
+
+          {/* LEADERBOARDS TAB */}
+          {activeTab === 'leaderboards' && (
+            <motion.div 
+              key="leaderboards"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="w-full"
+            >
+              <div className="bg-zinc-900 border border-white/5 rounded-2xl overflow-hidden">
+                <div className="p-4 md:p-6 border-b border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-black/20">
+                  <h3 className="font-bold text-lg md:text-xl flex items-center gap-2">
+                    <Crown className="w-5 h-5 text-yellow-500" />
+                    Clasificaciones Globales
+                  </h3>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <button className="flex-1 sm:flex-none px-3 py-1.5 bg-white/10 rounded text-xs md:text-sm hover:bg-white/20 transition-colors">Global</button>
+                    <button className="flex-1 sm:flex-none px-3 py-1.5 bg-transparent text-zinc-500 hover:text-white transition-colors text-xs md:text-sm">Amigos</button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col">
+                  {/* Header Row (Desktop Only) */}
+                  <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 text-zinc-500 text-xs uppercase tracking-wider border-b border-white/5 bg-zinc-950/30">
+                    <div className="col-span-1 font-medium">Rango</div>
+                    <div className="col-span-5 font-medium">Jugador</div>
+                    <div className="col-span-2 font-medium">Puntaje</div>
+                    <div className="col-span-2 font-medium">Tasa de Victorias</div>
+                    <div className="col-span-2 font-medium">Rol Principal</div>
+                  </div>
+
+                  {/* Leaderboard Rows */}
+                  {leaderboard.map((player, i) => (
+                    <div key={player.rank} className="flex flex-col md:grid md:grid-cols-12 gap-3 md:gap-4 p-4 md:px-6 md:py-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors group cursor-pointer relative">
+                      
+                      {/* Mobile Rank Badge */}
+                      <div className="absolute top-4 right-4 md:hidden">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
+                          ${player.rank === 1 ? 'bg-yellow-500/20 text-yellow-500' : 
+                            player.rank === 2 ? 'bg-zinc-400/20 text-zinc-300' : 
+                            player.rank === 3 ? 'bg-amber-700/20 text-amber-600' : 'bg-zinc-800 text-zinc-500'}`}>
+                          #{player.rank}
+                        </div>
+                      </div>
+
+                      {/* Desktop Rank */}
+                      <div className="hidden md:flex col-span-1 items-center">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm
+                          ${player.rank === 1 ? 'bg-yellow-500/20 text-yellow-500' : 
+                            player.rank === 2 ? 'bg-zinc-400/20 text-zinc-300' : 
+                            player.rank === 3 ? 'bg-amber-700/20 text-amber-600' : 'text-zinc-500'}`}>
+                          {player.rank}
+                        </div>
+                      </div>
+
+                      {/* Player Info */}
+                      <div className="col-span-5 flex items-center gap-3">
+                        <img 
+                          src={[
+                            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop',
+                            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop',
+                            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
+                            'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop',
+                            'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=100&h=100&fit=crop'
+                          ][i]} 
+                          className="w-10 h-10 md:w-8 md:h-8 rounded object-cover" 
+                          alt={player.name}
+                        />
+                        <div>
+                          <span className="font-bold text-white group-hover:text-emerald-400 transition-colors block md:inline text-sm md:text-base">{player.name}</span>
+                          <span className="md:hidden text-xs text-zinc-500 block mt-0.5">{player.main}</span>
+                        </div>
+                      </div>
+
+                      {/* Stats Grid (Mobile) / Columns (Desktop) */}
+                      <div className="flex items-center justify-between md:contents mt-2 md:mt-0">
+                        <div className="col-span-2 flex flex-col md:block">
+                          <span className="md:hidden text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Puntaje</span>
+                          <span className="font-mono text-emerald-400 font-bold text-sm md:text-base">{player.rating}</span>
+                        </div>
+                        <div className="col-span-2 flex flex-col md:block text-right md:text-left">
+                          <span className="md:hidden text-[10px] text-zinc-500 uppercase tracking-wider font-bold">Tasa de Victorias</span>
+                          <span className="text-zinc-300 text-sm md:text-base">{player.winRate}</span>
+                        </div>
+                        <div className="hidden md:block col-span-2 text-zinc-400 text-sm">{player.main}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+        </AnimatePresence>
+      </div>
+
+      <AnimatePresence>
+        {selectedTournament && (
+          <TournamentBracket 
+            tournamentTitle={selectedTournament} 
+            onClose={() => setSelectedTournament(null)} 
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
