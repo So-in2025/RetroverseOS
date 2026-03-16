@@ -7,6 +7,7 @@ import { useGameStore } from '../store/gameStore';
 import { useNavigate } from 'react-router-dom';
 import { SentinelEngine } from '../services/gcts';
 import { gameCatalog } from '../services/gameCatalog';
+import { inputManager } from '../services/inputManager';
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -23,9 +24,11 @@ export default function Settings() {
 
   // Engine Configuration State
   const [videoSettings, setVideoSettings] = useState({
+    qualityPreset: 'custom',
     crtFilter: true,
     scanlines: 50,
     bilinearFiltering: false,
+    textureEnhancement: true,
     aspectRatio: '4:3',
     resolution: '1080p',
     vsync: true,
@@ -43,12 +46,14 @@ export default function Settings() {
     down: 'ArrowDown',
     left: 'ArrowLeft',
     right: 'ArrowRight',
-    a: 'Z',
-    b: 'X',
-    x: 'A',
-    y: 'S',
+    a: '2',
+    b: '1',
+    x: '5',
+    y: '4',
+    l: '6',
+    r: '3',
     start: 'Enter',
-    select: 'Shift',
+    select: '+',
   });
 
   const [activeKeyBind, setActiveKeyBind] = useState<string | null>(null);
@@ -58,6 +63,7 @@ export default function Settings() {
       await storage.saveSetting('videoSettings', videoSettings);
       await storage.saveSetting('audioSettings', audioSettings);
       await storage.saveSetting('controls', controls);
+      inputManager.updateKeyMapping(controls);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (e) {
@@ -69,13 +75,13 @@ export default function Settings() {
   useEffect(() => {
     const loadSettings = async () => {
       const savedVideo = await storage.getSetting('videoSettings');
-      if (savedVideo) setVideoSettings(savedVideo);
+      if (savedVideo) setVideoSettings(prev => ({ ...prev, ...savedVideo }));
       
       const savedAudio = await storage.getSetting('audioSettings');
-      if (savedAudio) setAudioSettings(savedAudio);
+      if (savedAudio) setAudioSettings(prev => ({ ...prev, ...savedAudio }));
       
       const savedControls = await storage.getSetting('controls');
-      if (savedControls) setControls(savedControls);
+      if (savedControls) setControls(prev => ({ ...prev, ...savedControls }));
 
       const currentCredits = await storage.getCredits();
       setCredits(currentCredits);
@@ -278,6 +284,44 @@ export default function Settings() {
                     <Monitor className="w-5 h-5 md:w-6 md:h-6 text-emerald-500" /> Configuración de Video
                   </h2>
                   
+                  <div className="mb-8">
+                    <p className="font-black text-xs uppercase tracking-widest text-white mb-3">Perfil de Calidad Visual</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {[
+                        { id: 'potato', label: 'Baja (Potato)', desc: 'Rendimiento Máximo' },
+                        { id: 'retro', label: 'Media (Retro)', desc: 'Fiel al Original' },
+                        { id: 'smooth', label: 'Alta (Suave)', desc: 'Bordes Suavizados' },
+                        { id: 'ultra', label: 'Ultra (HD)', desc: 'Máxima Calidad' },
+                        { id: 'custom', label: 'Personalizada', desc: 'Ajuste Manual' }
+                      ].map((preset) => (
+                        <button
+                          key={preset.id}
+                          onClick={() => {
+                            let newSettings = { ...videoSettings, qualityPreset: preset.id };
+                            if (preset.id === 'potato') {
+                              newSettings = { ...newSettings, crtFilter: false, bilinearFiltering: false, textureEnhancement: false, resolution: 'Nativa', vsync: false };
+                            } else if (preset.id === 'retro') {
+                              newSettings = { ...newSettings, crtFilter: true, bilinearFiltering: false, textureEnhancement: false, resolution: 'Nativa', vsync: true };
+                            } else if (preset.id === 'smooth') {
+                              newSettings = { ...newSettings, crtFilter: false, bilinearFiltering: true, textureEnhancement: true, resolution: '1080p', vsync: true };
+                            } else if (preset.id === 'ultra') {
+                              newSettings = { ...newSettings, crtFilter: true, bilinearFiltering: true, textureEnhancement: true, resolution: '4K', vsync: true };
+                            }
+                            setVideoSettings(newSettings);
+                          }}
+                          className={`p-3 rounded-xl border text-left transition-all ${
+                            videoSettings.qualityPreset === preset.id 
+                              ? 'bg-emerald-500/20 border-emerald-500/50' 
+                              : 'bg-black/20 border-white/5 hover:bg-white/5'
+                          }`}
+                        >
+                          <p className={`font-black text-[10px] uppercase tracking-widest ${videoSettings.qualityPreset === preset.id ? 'text-emerald-400' : 'text-white'}`}>{preset.label}</p>
+                          <p className="text-[9px] text-zinc-500 mt-1">{preset.desc}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
                     {/* Toggles */}
                     <div className="space-y-4">
@@ -287,7 +331,7 @@ export default function Settings() {
                           <p className="text-[10px] text-zinc-500 mt-1">Simular pantalla de televisión clásica</p>
                         </div>
                         <button 
-                          onClick={() => setVideoSettings({...videoSettings, crtFilter: !videoSettings.crtFilter})}
+                          onClick={() => setVideoSettings({...videoSettings, crtFilter: !videoSettings.crtFilter, qualityPreset: 'custom'})}
                           className={`w-10 h-5 md:w-12 md:h-6 rounded-full transition-colors relative shrink-0 ${videoSettings.crtFilter ? 'bg-emerald-500' : 'bg-zinc-700'}`}
                         >
                           <div className={`w-3 h-3 md:w-4 md:h-4 bg-white rounded-full absolute top-1 transition-transform ${videoSettings.crtFilter ? 'left-6 md:left-7' : 'left-1'}`} />
@@ -300,10 +344,23 @@ export default function Settings() {
                           <p className="text-[10px] text-zinc-500 mt-1">Suavizar bordes pixelados</p>
                         </div>
                         <button 
-                          onClick={() => setVideoSettings({...videoSettings, bilinearFiltering: !videoSettings.bilinearFiltering})}
+                          onClick={() => setVideoSettings({...videoSettings, bilinearFiltering: !videoSettings.bilinearFiltering, qualityPreset: 'custom'})}
                           className={`w-10 h-5 md:w-12 md:h-6 rounded-full transition-colors relative shrink-0 ${videoSettings.bilinearFiltering ? 'bg-emerald-500' : 'bg-zinc-700'}`}
                         >
                           <div className={`w-3 h-3 md:w-4 md:h-4 bg-white rounded-full absolute top-1 transition-transform ${videoSettings.bilinearFiltering ? 'left-6 md:left-7' : 'left-1'}`} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/5">
+                        <div className="pr-4">
+                          <p className="font-black text-xs uppercase tracking-widest text-white">Mejora de Texturas (3D)</p>
+                          <p className="text-[10px] text-zinc-500 mt-1">Aplica MSAA 16x y Trilineal (N64/PSX)</p>
+                        </div>
+                        <button 
+                          onClick={() => setVideoSettings({...videoSettings, textureEnhancement: !videoSettings.textureEnhancement, qualityPreset: 'custom'})}
+                          className={`w-10 h-5 md:w-12 md:h-6 rounded-full transition-colors relative shrink-0 ${videoSettings.textureEnhancement ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+                        >
+                          <div className={`w-3 h-3 md:w-4 md:h-4 bg-white rounded-full absolute top-1 transition-transform ${videoSettings.textureEnhancement ? 'left-6 md:left-7' : 'left-1'}`} />
                         </button>
                       </div>
 
@@ -313,7 +370,7 @@ export default function Settings() {
                           <p className="text-[10px] text-zinc-500 mt-1">Prevenir desgarro de pantalla</p>
                         </div>
                         <button 
-                          onClick={() => setVideoSettings({...videoSettings, vsync: !videoSettings.vsync})}
+                          onClick={() => setVideoSettings({...videoSettings, vsync: !videoSettings.vsync, qualityPreset: 'custom'})}
                           className={`w-10 h-5 md:w-12 md:h-6 rounded-full transition-colors relative shrink-0 ${videoSettings.vsync ? 'bg-emerald-500' : 'bg-zinc-700'}`}
                         >
                           <div className={`w-3 h-3 md:w-4 md:h-4 bg-white rounded-full absolute top-1 transition-transform ${videoSettings.vsync ? 'left-6 md:left-7' : 'left-1'}`} />
@@ -332,7 +389,7 @@ export default function Settings() {
                           type="range" 
                           min="0" max="100" 
                           value={videoSettings.scanlines}
-                          onChange={(e) => setVideoSettings({...videoSettings, scanlines: parseInt(e.target.value)})}
+                          onChange={(e) => setVideoSettings({...videoSettings, scanlines: parseInt(e.target.value), qualityPreset: 'custom'})}
                           className="w-full accent-emerald-500 cursor-pointer"
                           disabled={!videoSettings.crtFilter}
                         />
@@ -344,7 +401,7 @@ export default function Settings() {
                           {['4:3', '16:9', 'Original'].map((ratio) => (
                             <button 
                               key={ratio}
-                              onClick={() => setVideoSettings({...videoSettings, aspectRatio: ratio})}
+                              onClick={() => setVideoSettings({...videoSettings, aspectRatio: ratio, qualityPreset: 'custom'})}
                               className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
                                 videoSettings.aspectRatio === ratio 
                                   ? 'bg-emerald-600 text-white' 
@@ -363,7 +420,7 @@ export default function Settings() {
                           {['Nativa', '1080p', '4K'].map((res) => (
                             <button 
                               key={res}
-                              onClick={() => setVideoSettings({...videoSettings, resolution: res})}
+                              onClick={() => setVideoSettings({...videoSettings, resolution: res, qualityPreset: 'custom'})}
                               className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
                                 videoSettings.resolution === res 
                                   ? 'bg-emerald-600 text-white' 
@@ -451,8 +508,19 @@ export default function Settings() {
                     <h2 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter flex items-center gap-2">
                       <Gamepad2 className="w-5 h-5 md:w-6 md:h-6 text-emerald-500" /> Mapeo de Entradas
                     </h2>
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-950 px-3 py-1.5 rounded-lg border border-white/5">
-                      <Keyboard className="w-3.5 h-3.5" /> Teclado Activo
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => setControls({
+                          up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight',
+                          a: '2', b: '1', x: '5', y: '4', l: '6', r: '3', start: 'Enter', select: '+'
+                        })}
+                        className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-emerald-400 bg-zinc-900 hover:bg-zinc-800 px-3 py-1.5 rounded-lg border border-white/5 transition-colors"
+                      >
+                        Restablecer
+                      </button>
+                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-950 px-3 py-1.5 rounded-lg border border-white/5">
+                        <Keyboard className="w-3.5 h-3.5" /> Teclado Activo
+                      </div>
                     </div>
                   </div>
 
@@ -476,9 +544,9 @@ export default function Settings() {
                     <div className="space-y-4">
                       <h3 className="text-emerald-500 font-black text-[10px] uppercase tracking-widest mb-4 text-center">Botones de Acción</h3>
                       <div className="grid grid-cols-3 gap-2 max-w-[200px] mx-auto">
-                        <div />
+                        <KeyBindBtn id="l" label="L" value={controls.l} active={activeKeyBind} set={setActiveKeyBind} />
                         <KeyBindBtn id="x" label="X" value={controls.x} active={activeKeyBind} set={setActiveKeyBind} />
-                        <div />
+                        <KeyBindBtn id="r" label="R" value={controls.r} active={activeKeyBind} set={setActiveKeyBind} />
                         <KeyBindBtn id="y" label="Y" value={controls.y} active={activeKeyBind} set={setActiveKeyBind} />
                         <div />
                         <KeyBindBtn id="a" label="A" value={controls.a} active={activeKeyBind} set={setActiveKeyBind} />

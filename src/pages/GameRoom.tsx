@@ -50,6 +50,7 @@ export default function GameRoom() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [crtEnabled, setCrtEnabled] = useState(true);
+  const [bilinearEnabled, setBilinearEnabled] = useState(false);
   const [credits, setCredits] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -62,7 +63,21 @@ export default function GameRoom() {
     mountedRef.current = true;
     const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     setIsTouchDevice(isTouch);
-    if (isTouch) setCrtEnabled(false); // Disable CRT by default on mobile
+    
+    // Load video settings
+    const loadVideoSettings = async () => {
+      const settings = await storage.getSetting('videoSettings');
+      if (settings) {
+        setCrtEnabled(settings.crtFilter && !isTouch);
+        setBilinearEnabled(settings.bilinearFiltering);
+      } else {
+        // Default to smooth/high quality
+        setCrtEnabled(false);
+        setBilinearEnabled(true);
+      }
+    };
+    loadVideoSettings();
+
     return () => { mountedRef.current = false; };
   }, []);
 
@@ -429,7 +444,7 @@ export default function GameRoom() {
           height={600} 
           className={`w-full h-full object-contain max-w-[100vw] max-h-[100dvh] ${crtEnabled ? 'contrast-125 saturate-150 brightness-110' : ''}`}
           style={{ 
-            imageRendering: crtEnabled ? 'auto' : 'pixelated',
+            imageRendering: (crtEnabled || bilinearEnabled) ? 'auto' : 'pixelated',
             filter: crtEnabled ? 'blur(0.5px)' : 'none'
           }}
         />

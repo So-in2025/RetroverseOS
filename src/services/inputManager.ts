@@ -15,14 +15,14 @@ export class InputManager {
     'ArrowDown': 'down',
     'ArrowLeft': 'left',
     'ArrowRight': 'right',
-    'z': 'a',
-    'x': 'b',
-    'a': 'y',
-    's': 'x',
+    '1': 'b',
+    '2': 'a',
+    '3': 'r',
+    '4': 'y',
+    '5': 'x',
+    '6': 'l',
     'Enter': 'start',
-    'Shift': 'select',
-    'q': 'l',
-    'w': 'r'
+    '+': 'select',
   };
 
   // Standard Gamepad API mapping (Xbox style)

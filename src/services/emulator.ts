@@ -172,10 +172,18 @@ export class EmulatorService {
       
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       const videoSettings = await storage.getSetting('videoSettings') || {
+        qualityPreset: 'smooth',
         aspectRatio: '4:3',
-        crtFilter: !isMobile,
-        bilinearFiltering: false
+        crtFilter: false,
+        bilinearFiltering: true,
+        textureEnhancement: true,
+        resolution: '1080p',
+        vsync: true
       };
+
+      const isHighRes = videoSettings.resolution !== 'Nativa';
+      const isUltraRes = videoSettings.resolution === '4K';
+      const useEnhancements = videoSettings.textureEnhancement ?? false;
 
       const nostalgistOptions: any = {
         element: config.canvas,
@@ -193,9 +201,25 @@ export class EmulatorService {
           directory_system: '/home/web_user/retroarch/system',
           directory_savefile: '/home/web_user/retroarch/saves',
           directory_savestate: '/home/web_user/retroarch/states',
-          video_vsync: false,
+          video_vsync: videoSettings.vsync ?? false,
           video_hard_sync: false,
           threaded_data_runloop_enable: true
+        },
+        retroarchCoreOptions: {
+          // PSX (PCSX ReARMed)
+          'pcsx_rearmed_neon_enhancement_enable': isHighRes ? 'enabled' : 'disabled',
+          'pcsx_rearmed_neon_enhancement_no_main': isHighRes ? 'enabled' : 'disabled',
+          'pcsx_rearmed_dithering': useEnhancements ? 'disabled' : 'enabled', // Removes dot pattern for smoother gradients
+          
+          // N64 (Mupen64Plus)
+          'mupen64plus-next-ResolutionBackground': isUltraRes ? '3840x2160' : (isHighRes ? '1920x1080' : '640x480'),
+          'mupen64plus-next-MultiSampling': useEnhancements ? (isUltraRes ? '16' : '4') : '0',
+          'mupen64plus-next-EnableTrilinearFiltering': useEnhancements ? 'True' : 'False',
+          'mupen64plus-next-TextureFilter': useEnhancements ? 'Trilinear' : 'None',
+          'mupen64plus-next-TextureEnhancement': (useEnhancements && isUltraRes) ? 'HQ2X' : 'None',
+          
+          // GBA (mGBA)
+          'mgba_video_scale': isUltraRes ? '4' : (isHighRes ? '3' : '1'),
         }
       };
 
