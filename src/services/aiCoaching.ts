@@ -1,9 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { storage } from "./storage";
 
-// Initialize Gemini API
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-
 const SYSTEM_INSTRUCTION = `
 Eres el Estratega de Combate del Dominion Engine. 
 Analiza el frame del juego y entrega una instrucción táctica corta, agresiva y competitiva para mejorar el desempeño del jugador en este milisegundo.
@@ -12,8 +9,20 @@ Analiza el frame del juego y entrega una instrucción táctica corta, agresiva y
 export class AICoachingService {
   private modelId = "gemini-3.1-flash-lite-preview"; 
   private historyKey = "dominion_coach_history";
+  private _ai: GoogleGenAI | null = null;
 
   constructor() {}
+
+  private get ai(): GoogleGenAI {
+    if (!this._ai) {
+      const key = process.env.GEMINI_API_KEY;
+      if (!key) {
+        throw new Error("GEMINI_API_KEY environment variable is required");
+      }
+      this._ai = new GoogleGenAI({ apiKey: key });
+    }
+    return this._ai;
+  }
 
   async getGameTips(gameId: string, gameTitle: string): Promise<string> {
     try {
@@ -27,7 +36,7 @@ export class AICoachingService {
       }
 
       // 2. Generate with Gemini if not cached
-      const response = await ai.models.generateContent({
+      const response = await this.ai.models.generateContent({
         model: "gemini-3.1-flash-lite-preview",
         contents: `Eres un experto historiador y estratega de videojuegos retro. 
         Para el juego "${gameTitle}", proporciona la siguiente información en formato Markdown:
@@ -70,7 +79,7 @@ export class AICoachingService {
     try {
       const base64Image = canvas.toDataURL("image/jpeg", 0.7).split(",")[1];
 
-      const response = await ai.models.generateContent({
+      const response = await this.ai.models.generateContent({
         model: this.modelId,
         contents: {
           parts: [
