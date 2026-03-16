@@ -81,8 +81,6 @@ export default function App() {
               <Route element={<Layout />}>
                 <Route path="/" element={<GameLibrary />} />
                 <Route path="/dashboard" element={<Home />} />
-                <Route path="/vault" element={<GameLibrary />} />
-                <Route path="/games" element={<GameLibrary />} />
                 <Route path="/game/:gameId" element={<GameDetail />} />
                 <Route path="/play/:gameId" element={<GameRoom />} />
                 <Route path="/premium" element={<PremiumVault />} />

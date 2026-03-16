@@ -84,10 +84,10 @@ const COLLECTION_TO_SYSTEM: Record<string, string> = {
 };
 
 /**
- * ELITE TOP 15: The face of Retroverse OS.
+ * ELITE TOP 20: The face of Retroverse OS.
  * These identifiers are guaranteed to work and represent the best of each system.
  */
-export const ELITE_TOP_15 = [
+export const ELITE_TOP_20 = [
   'Super Mario World',
   'The Legend of Zelda: A Link to the Past',
   'Mortal Kombat II',
@@ -99,10 +99,15 @@ export const ELITE_TOP_15 = [
   'Crash Bandicoot: Warped',
   'Mario Kart 64',
   'GoldenEye 007',
-  'Super Mario 64',
-  'The Legend of Zelda: Ocarina of Time',
   'Star Fox 64',
-  'Super Smash Bros.'
+  'Donkey Kong Country',
+  'Street Fighter II Turbo',
+  'Mega Man X',
+  'Metroid Fusion',
+  'Final Fantasy VII',
+  'Gran Turismo 2',
+  'Spyro: Year of the Dragon',
+  'Tony Hawk\'s Pro Skater 2'
 ];
 
 export class MetadataNormalizationEngine {

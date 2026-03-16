@@ -14,7 +14,7 @@ export default function MobileNavbar() {
   ];
 
   const isActive = (path: string) => {
-    if (path === '/') return location.pathname === '/' || location.pathname === '/vault';
+    if (path === '/') return location.pathname === '/';
     return location.pathname === path;
   };
 

@@ -53,7 +53,7 @@ export default function GameDetail() {
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Juego no encontrado</h1>
-          <Link to="/games" className="text-emerald-400 hover:text-emerald-300">Volver a la Biblioteca</Link>
+          <Link to="/" className="text-emerald-400 hover:text-emerald-300">Volver al Sistema</Link>
         </div>
       </div>
     );
@@ -139,10 +139,10 @@ export default function GameDetail() {
                   <button 
                     disabled
                     className="flex items-center gap-3 px-8 py-4 bg-zinc-700 text-zinc-400 rounded-xl font-bold text-lg cursor-not-allowed opacity-75"
-                    title="Este título es parte de la biblioteca en la nube y requiere una licencia."
+                    title="Este título es parte de la red en la nube y requiere una licencia."
                   >
                     <Play className="w-6 h-6 fill-current" />
-                    Solo Biblioteca
+                    Solo Sistema
                   </button>
                 )}
                 

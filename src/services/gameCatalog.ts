@@ -1,4 +1,4 @@
-import { GameObject, MetadataNormalizationEngine, ELITE_TOP_15 } from './metadataNormalization';
+import { GameObject, MetadataNormalizationEngine, ELITE_TOP_20 } from './metadataNormalization';
 import { storage } from './storage';
 import { INITIAL_GAMES } from './initialGames';
 import { FULL_CATALOG } from './catalogManager';
@@ -266,6 +266,7 @@ class GameCatalogService {
   }
 
   private listeners: ((games: GameObject[]) => void)[] = [];
+  private notifyTimeout: any = null;
 
   subscribe(listener: (games: GameObject[]) => void) {
     this.listeners.push(listener);
@@ -275,8 +276,12 @@ class GameCatalogService {
   }
 
   private notifyListeners() {
-    const allGames = this.getAllGames();
-    this.listeners.forEach(l => l(allGames));
+    if (this.notifyTimeout) return;
+    this.notifyTimeout = setTimeout(() => {
+      const allGames = this.getAllGames();
+      this.listeners.forEach(l => l(allGames));
+      this.notifyTimeout = null;
+    }, 1000); // Throttled to 1fps (1s) to prevent UI lock during mass ingestion
   }
 
   async toggleFavorite(gameId: string) {
@@ -322,14 +327,14 @@ class GameCatalogService {
     return Array.from(this.games.values());
   }
 
-  getEliteTop15(): GameObject[] {
+  getEliteTop20(): GameObject[] {
     const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
-    const normalizedElite = ELITE_TOP_15.map(normalize);
+    const normalizedElite = ELITE_TOP_20.map(normalize);
     
     // Use FULL_CATALOG as source to ensure we have the legends even before ingestion
     const source = FULL_CATALOG;
-    console.log(`[EliteTop15] Source catalog size: ${source.length}`);
-    console.log(`[EliteTop15] Looking for: ${normalizedElite.join(', ')}`);
+    console.log(`[EliteTop20] Source catalog size: ${source.length}`);
+    console.log(`[EliteTop20] Looking for: ${normalizedElite.join(', ')}`);
 
     const elite = source.filter(g => {
       const titleNorm = normalize(g.title);
@@ -338,13 +343,13 @@ class GameCatalogService {
         titleNorm.includes(eliteTitle) ||
         eliteTitle.includes(titleNorm)
       );
-      if (isMatch) console.log(`[EliteTop15] Found match: ${g.title} (${titleNorm})`);
+      if (isMatch) console.log(`[EliteTop20] Found match: ${g.title} (${titleNorm})`);
       return isMatch;
     });
 
-    console.log(`[EliteTop15] Total matches found: ${elite.length}`);
+    console.log(`[EliteTop20] Total matches found: ${elite.length}`);
 
-    // Deduplicate by title to ensure exactly 15 if possible
+    // Deduplicate by title to ensure exactly 20 if possible
     const uniqueElite = new Map<string, GameObject>();
     elite.forEach(g => {
       const norm = normalize(g.title);
@@ -355,20 +360,20 @@ class GameCatalogService {
     });
 
     const result = Array.from(uniqueElite.values());
-    console.log(`[EliteTop15] Unique matches: ${result.length}`);
+    console.log(`[EliteTop20] Unique matches: ${result.length}`);
 
-    if (result.length < 15) {
-      console.log(`[EliteTop15] Only found ${result.length} matches, filling with others`);
+    if (result.length < 20) {
+      console.log(`[EliteTop20] Only found ${result.length} matches, filling with others`);
       const others = source.filter(g => !result.some(r => r.game_id === g.game_id));
-      result.push(...others.slice(0, 15 - result.length));
+      result.push(...others.slice(0, 20 - result.length));
     }
 
-    // Sort to match the ELITE_TOP_15 order as closely as possible
+    // Sort to match the ELITE_TOP_20 order as closely as possible
     return result.sort((a, b) => {
       const indexA = normalizedElite.findIndex(et => normalize(a.title).includes(et) || et.includes(normalize(a.title)));
       const indexB = normalizedElite.findIndex(et => normalize(b.title).includes(et) || et.includes(normalize(b.title)));
       return indexA - indexB;
-    }).slice(0, 15);
+    }).slice(0, 20);
   }
 
   /**

@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { Search, AlertTriangle, Loader2, Trash2, Coins, Trophy, Play, Star, Disc, Gamepad2, Volume2, VolumeX, Heart, Zap, User, Users, Radio, Download } from 'lucide-react';
 import { gameCatalog } from '../services/gameCatalog';
 import { storage } from '../services/storage';
-import { GameObject, ELITE_TOP_15 } from '../services/metadataNormalization';
+import { GameObject, ELITE_TOP_20 } from '../services/metadataNormalization';
 import { DynamicCover } from '../components/library/DynamicCover';
 import { DownloadButton } from '../components/library/DownloadButton';
 import { AudioEngine } from '../services/audioEngine';
 import { haptics } from '../services/haptics';
 import GameSection from '../components/library/GameSection';
+import { ExpandableTopList } from '../components/library/ExpandableTopList';
+import { LiveRoomsList } from '../components/library/LiveRoomsList';
 import { io } from 'socket.io-client';
 
 const SYSTEM_FILTERS = [
@@ -27,6 +29,7 @@ const SYSTEM_FILTERS = [
 import { LobbyList } from '../components/library/LobbyList';
 
 export default function GameLibrary() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [games, setGames] = useState<GameObject[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -42,11 +45,13 @@ export default function GameLibrary() {
   const [isIngesting, setIsIngesting] = useState(false);
   const [prevGameCount, setPrevGameCount] = useState(0);
   const [visibleMobileCount, setVisibleMobileCount] = useState(24);
-  const [eliteTop15, setEliteTop15] = useState<GameObject[]>([]);
+  const [eliteTop20, setEliteTop20] = useState<GameObject[]>([]);
   const [specialFilter, setSpecialFilter] = useState<null | 'elite' | 'online'>(null);
   const [liveGames, setLiveGames] = useState<{ gameId: string, userId: string, timestamp: number }[]>([]);
   const [cachedGameIds, setCachedGameIds] = useState<Set<string>>(new Set());
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+  const deferredGames = React.useDeferredValue(games);
 
   // Offline detection
   useEffect(() => {
@@ -60,11 +65,11 @@ export default function GameLibrary() {
     };
   }, []);
 
-  // Initialize Elite Top 15
+  // Initialize Elite Top 20
   useEffect(() => {
-    const elite = gameCatalog.getEliteTop15();
-    setEliteTop15(elite);
-  }, [games]);
+    const elite = gameCatalog.getEliteTop20(); // This function returns 20 games
+    setEliteTop20(elite);
+  }, [deferredGames]);
 
   // Initialize Socket for Live Games
   useEffect(() => {
@@ -98,14 +103,14 @@ export default function GameLibrary() {
   const carouselRef = useRef<HTMLDivElement>(null);
 
   const filteredGames = useMemo(() => {
-    let result = games;
+    let result = deferredGames;
 
     // 0. Special Filters (Elite / Online)
     if (specialFilter === 'elite') {
-      return gameCatalog.getEliteTop15();
+      return gameCatalog.getEliteTop20();
     } else if (specialFilter === 'online') {
       // For now, simulate online games with a stable subset
-      return games.filter((_, i) => (i * 7) % 10 > 7);
+      return deferredGames.filter((_, i) => (i * 7) % 10 > 7);
     }
 
     // 1. Filter by Tab (Mobile)
@@ -149,17 +154,57 @@ export default function GameLibrary() {
     return result;
   }, [games, selectedSystem, searchQuery, mobileTab, yearFilter, playersFilter, specialFilter]);
 
-  // Group games by system for the "Systems" view
+  // Optimized games by system grouping
   const gamesBySystem = useMemo(() => {
+    if (!filteredGames.length) return {};
+    
     const grouped: Record<string, GameObject[]> = {};
-    filteredGames.forEach(game => {
-      if (!grouped[game.system]) {
-        grouped[game.system] = [];
-      }
-      grouped[game.system].push(game);
-    });
+    for (let i = 0; i < filteredGames.length; i++) {
+      const game = filteredGames[i];
+      const sysName = game.system || 'OTRAS';
+      if (!grouped[sysName]) grouped[sysName] = [];
+      grouped[sysName].push(game);
+    }
     return grouped;
   }, [filteredGames]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (filteredGames.length === 0) return;
+      
+      if (e.key === 'ArrowRight') {
+        setSelectedIndex(prev => {
+          const next = Math.min(prev + 1, filteredGames.length - 1);
+          if (next !== prev) {
+            AudioEngine.playMoveSound();
+            haptics.light();
+          }
+          return next;
+        });
+      } else if (e.key === 'ArrowLeft') {
+        setSelectedIndex(prev => {
+          const next = Math.max(prev - 1, 0);
+          if (next !== prev) {
+            AudioEngine.playMoveSound();
+            haptics.light();
+          }
+          return next;
+        });
+      } else if (e.key === 'Enter') {
+        const game = filteredGames[selectedIndex];
+        if (game) {
+          AudioEngine.playSelectSound();
+          if (viewMode === 'carousel') {
+            navigate(`/play/${game.game_id}?url=${encodeURIComponent(game.rom_url)}&system=${game.system_id}`);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [filteredGames, viewMode, selectedIndex, navigate]);
 
   useEffect(() => {
     const error = searchParams.get('error');
@@ -228,33 +273,6 @@ export default function GameLibrary() {
     setCollapsedSystems(new Set()); // Reset collapsed state on filter change
     setVisibleMobileCount(24); // Reset mobile pagination
   }, [selectedSystem, searchQuery, mobileTab, specialFilter]);
-
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (filteredGames.length === 0) return;
-      
-      if (e.key === 'ArrowRight') {
-        setSelectedIndex(prev => {
-          const next = Math.min(prev + 1, filteredGames.length - 1);
-          if (next !== prev) AudioEngine.playMoveSound();
-          return next;
-        });
-      } else if (e.key === 'ArrowLeft') {
-        setSelectedIndex(prev => {
-          const next = Math.max(prev - 1, 0);
-          if (next !== prev) AudioEngine.playMoveSound();
-          return next;
-        });
-      } else if (e.key === 'Enter') {
-        AudioEngine.playSelectSound();
-        // The Link component handles the actual navigation, but we play the sound here
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [filteredGames.length]);
 
   const heroGame = filteredGames[selectedIndex] || null;
 
@@ -336,7 +354,7 @@ export default function GameLibrary() {
               initial={{ opacity: 0, scale: 1.2 }}
               animate={{ opacity: 1, scale: 1.05 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
               className="absolute inset-0 bg-cover bg-center"
               style={{ 
                 backgroundImage: `url("${heroGame.artwork_url || heroGame.cover_url}")`,
@@ -381,19 +399,6 @@ export default function GameLibrary() {
               </button>
               <button
                 onClick={() => {
-                  setViewMode('grid');
-                  setSpecialFilter(null);
-                }}
-                className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                  viewMode === 'grid' && !specialFilter
-                    ? 'bg-cyan-electric text-black shadow-[0_0_15px_rgba(0,242,255,0.4)]' 
-                    : 'text-zinc-500 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                BIBLIOTECA
-              </button>
-              <button
-                onClick={() => {
                   setViewMode('carousel');
                   setSpecialFilter(null);
                 }}
@@ -404,19 +409,6 @@ export default function GameLibrary() {
                 }`}
               >
                 PORTADAS
-              </button>
-              <button
-                onClick={() => {
-                  setViewMode('grid');
-                  setSpecialFilter(null);
-                }}
-                className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                  viewMode === 'grid' && !specialFilter
-                    ? 'bg-cyan-electric text-black shadow-[0_0_15px_rgba(0,242,255,0.4)]' 
-                    : 'text-zinc-500 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                BIBLIOTECA
               </button>
               <button
                 onClick={() => {
@@ -727,6 +719,15 @@ export default function GameLibrary() {
                 {/* Desktop: Discover View */}
                 {viewMode === 'discover' && (
                   <div className="hidden md:flex flex-col w-full h-full overflow-y-auto hide-scrollbar pb-32 pt-4 px-4 md:px-8 space-y-12 pointer-events-auto">
+                    
+                    {/* Elite Top 20 Section - FORCED UPDATE */}
+                    <ExpandableTopList 
+                      title={`ELITE TOP 20: SELECCIÓN MAESTRA`} 
+                      games={eliteTop20} 
+                    />
+
+                    <div className="h-px w-full bg-white/5" />
+
                     {/* Live Matchmaking Section */}
                     {liveGames.length > 0 && (
                       <GameSection 
@@ -741,115 +742,134 @@ export default function GameLibrary() {
 
                     <div className="h-px w-full bg-white/5" />
 
-                    {/* Elite Top 15 Section - FORCED UPDATE */}
-                    <GameSection 
-                      title={`ELITE TOP 15: SELECCIÓN MAESTRA (${eliteTop15.length})`} 
-                      games={eliteTop15} 
-                      variant="elite"
-                    />
-                    <div className="h-px w-full bg-white/5" />
-
                     {/* Online Now / Spectate Section */}
-                    <GameSection 
+                    <LiveRoomsList 
                       title="EN LÍNEA AHORA" 
-                      games={games.filter((_, i) => (i * 7) % 10 > 7).slice(0, 20)} 
-                      variant="online"
+                      games={deferredGames} 
                     />
                   </div>
                 )}
 
-                {/* Desktop: Grid View */}
-                {viewMode === 'grid' && (
-                  <div className="hidden md:grid grid-cols-5 gap-4 w-full h-full overflow-y-auto pb-20 pt-4 px-8">
-                    {filteredGames.map((game) => (
-                      <div key={game.game_id} className="w-full group">
-                        <Link to={`/play/${game.game_id}?url=${encodeURIComponent(game.rom_url)}&system=${game.system_id}`}>
-                          <div className="relative aspect-[2/3] rounded-2xl overflow-hidden mb-3 bg-zinc-900 border border-white/5 group-hover:border-cyan-electric/50 transition-all duration-300 group-hover:scale-105">
-                            <DynamicCover 
-                              game_id={game.game_id}
-                              src={game.cover_url || game.artwork_url} 
-                              alt={game.title}
-                              title={game.title}
-                              system={game.system}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                            />
-                          </div>
-                          <h3 className="text-sm font-bold text-zinc-300 group-hover:text-white transition-colors truncate uppercase tracking-tight">
-                            {game.title}
-                          </h3>
-                        </Link>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Desktop: Grid View */}
-                {viewMode === 'grid' && (
-                  <div className="hidden md:flex flex-col w-full h-full min-h-0">
-                    <div className="flex items-center justify-between py-6 shrink-0 border-b border-white/5 px-4 lg:px-0">
-                      <div className="flex items-center gap-4">
-                        <button 
-                          onClick={() => {
-                            setViewMode('discover');
-                            setSpecialFilter(null);
-                          }}
-                          className="p-2 bg-white/5 hover:bg-white/10 rounded-xl text-zinc-400 hover:text-white transition-all"
-                        >
-                          ✕
-                        </button>
-                        <div className="flex flex-col">
-                          <h2 className="text-xl font-black italic text-white uppercase tracking-tighter">
-                            {specialFilter === 'elite' ? 'SELECCIÓN ELITE' : specialFilter === 'online' ? 'EN LÍNEA AHORA' : 'BIBLIOTECA COMPLETA'} <span className="text-cyan-electric">DE TÍTULOS</span>
-                          </h2>
-                          <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">
-                            {filteredGames.length} TÍTULOS DISPONIBLES EN ESTE SECTOR
-                          </span>
-                        </div>
+                {/* Desktop: Carousel View (PORTADAS) */}
+                {viewMode === 'carousel' && (
+                  <div className="hidden md:flex flex-col w-full h-full relative overflow-hidden">
+                    <div 
+                      ref={carouselRef}
+                      className="flex-1 flex items-center justify-center relative perspective-[1200px] transform-style-3d"
+                    >
+                      <div className="relative w-full h-full flex items-center justify-center">
+                        {filteredGames.slice(Math.max(0, selectedIndex - 4), selectedIndex + 5).map((game, i) => {
+                          const actualIndex = Math.max(0, selectedIndex - 4) + i;
+                          const isSelected = actualIndex === selectedIndex;
+                          const distance = Math.abs(actualIndex - selectedIndex);
+                          
+                          return (
+                            <motion.div
+                              key={game.game_id}
+                              initial={false}
+                              animate={{
+                                scale: isSelected ? 1.2 : 0.85 - (distance * 0.1),
+                                x: (actualIndex - selectedIndex) * 260,
+                                z: isSelected ? 100 : -300 - (distance * 150),
+                                rotateY: (actualIndex - selectedIndex) * -25,
+                                opacity: Math.max(0, 1 - (distance * 0.25)),
+                                filter: isSelected ? 'brightness(1.1)' : `brightness(${0.5 - (distance * 0.1)})`,
+                              }}
+                              transition={{ 
+                                type: 'spring', 
+                                stiffness: 800, 
+                                damping: 50,
+                                mass: 0.4
+                              }}
+                              onClick={() => handleGameClick(actualIndex)}
+                              className={`absolute w-60 aspect-[2/3] shrink-0 cursor-pointer rounded-2xl overflow-hidden border-2 transition-all duration-500 ${
+                                isSelected 
+                                  ? 'border-cyan-electric shadow-[0_0_60px_rgba(0,242,255,0.6),inset_0_0_20px_rgba(0,242,255,0.2)] z-50' 
+                                  : 'border-white/5 z-0'
+                              }`}
+                            >
+                              <DynamicCover 
+                                game_id={game.game_id}
+                                src={game.cover_url || game.artwork_url} 
+                                alt={game.title}
+                                title={game.title}
+                                system={game.system}
+                                className="w-full h-full object-cover"
+                              />
+                              
+                              {/* Reflection Effect */}
+                              <div className="absolute inset-0 bg-gradient-to-tr from-white/10 via-transparent to-transparent pointer-events-none" />
+                              
+                              {isSelected && (
+                                <motion.div 
+                                  initial={{ opacity: 0, y: 20 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent flex flex-col justify-end p-8"
+                                >
+                                  <div className="mb-4">
+                                    <span className="text-[10px] font-black text-cyan-electric uppercase tracking-[0.2em] mb-1 block drop-shadow-[0_0_8px_rgba(0,242,255,0.5)]">
+                                      {game.system}
+                                    </span>
+                                    <h3 className="text-2xl font-black text-white uppercase italic leading-tight tracking-tighter line-clamp-2">
+                                      {game.title}
+                                    </h3>
+                                  </div>
+                                  <Link 
+                                    to={`/play/${game.game_id}?url=${encodeURIComponent(game.rom_url)}&system=${game.system_id}`}
+                                    className="w-full py-4 bg-cyan-electric text-black rounded-xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(0,242,255,0.5)] hover:scale-105 active:scale-95 transition-all"
+                                  >
+                                    <Play className="w-5 h-5 fill-current" /> INICIAR ENLACE
+                                  </Link>
+                                </motion.div>
+                              )}
+                            </motion.div>
+                          );
+                        })}
                       </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto pb-32 pt-6 px-4 lg:px-0 hide-scrollbar min-h-0">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 lg:gap-6">
-                        {filteredGames.map((game) => (
-                          <Link 
-                            key={game.game_id}
-                            to={`/play/${game.game_id}?url=${encodeURIComponent(game.rom_url)}&system=${game.system_id}`}
-                            onClick={() => AudioEngine.playSelectSound()}
-                            className="group relative aspect-[2/3] bg-zinc-900 rounded-xl overflow-hidden border border-white/10 hover:border-cyan-electric hover:shadow-[0_0_20px_rgba(0,242,255,0.2)] transition-all"
-                          >
-                            <DynamicCover 
-                               game_id={game.game_id}
-                               src={game.cover_url || game.artwork_url} 
-                               alt={game.title}
-                               title={game.title}
-                               system={game.system}
-                               className="w-full h-full transition-transform duration-500 group-hover:scale-110"
-                             />
-                             <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-4 text-center">
-                                <Play className="w-10 h-10 text-cyan-electric fill-current mb-3 drop-shadow-[0_0_10px_rgba(0,242,255,0.8)] transform scale-90 group-hover:scale-100 transition-transform" />
-                                <h4 className="font-black text-xs uppercase tracking-tight leading-tight text-white mb-2">
-                                  {game.title}
-                                </h4>
-                                <DownloadButton 
-                                  gameId={game.game_id} 
-                                  romUrl={game.rom_url} 
-                                  systemId={game.system_id}
-                                  onStatusChange={(isCached) => {
-                                    if (isCached) {
-                                      setCachedGameIds(prev => new Set([...prev, game.game_id]));
-                                    } else {
-                                      setCachedGameIds(prev => {
-                                        const next = new Set(prev);
-                                        next.delete(game.game_id);
-                                        return next;
-                                      });
-                                    }
-                                  }}
-                                />
-                             </div>
-                          </Link>
-                        ))}
+                    {/* Carousel Navigation Hints & Buttons */}
+                    <div className="absolute bottom-12 left-1/2 -translate-x-1/2 flex items-center gap-8 z-30">
+                      <button 
+                        onClick={() => {
+                          setSelectedIndex(prev => {
+                            const next = Math.max(0, prev - 1);
+                            if (next !== prev) {
+                              AudioEngine.playMoveSound();
+                              haptics.light();
+                            }
+                            return next;
+                          });
+                        }}
+                        className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-white transition-all active:scale-90"
+                      >
+                        <span className="text-xl">←</span>
+                      </button>
+
+                      <div className="flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-md border border-white/10 rounded-full">
+                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">USAR</span>
+                        <div className="flex gap-1">
+                          <span className="px-1.5 py-0.5 bg-white/10 rounded text-[9px] font-mono text-white">←</span>
+                          <span className="px-1.5 py-0.5 bg-white/10 rounded text-[9px] font-mono text-white">→</span>
+                        </div>
+                        <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">PARA NAVEGAR</span>
                       </div>
+
+                      <button 
+                        onClick={() => {
+                          setSelectedIndex(prev => {
+                            const next = Math.min(filteredGames.length - 1, prev + 1);
+                            if (next !== prev) {
+                              AudioEngine.playMoveSound();
+                              haptics.light();
+                            }
+                            return next;
+                          });
+                        }}
+                        className="p-4 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-white transition-all active:scale-90"
+                      >
+                        <span className="text-xl">→</span>
+                      </button>
                     </div>
                   </div>
                 )}

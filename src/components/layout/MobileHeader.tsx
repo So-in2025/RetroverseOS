@@ -31,7 +31,7 @@ export default function MobileHeader() {
             </div>
           </div>
           <span className="text-xs font-black italic uppercase tracking-widest text-white">
-            DOMINION <span className="text-cyan-electric">OS</span>
+            RETROVERSE <span className="text-cyan-electric">OS</span>
           </span>
         </Link>
         

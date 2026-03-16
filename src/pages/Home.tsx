@@ -106,8 +106,8 @@ export default function Home() {
                 <Clock className="w-6 h-6 text-cyan-electric" />
                 Reanudar Rápido
               </h2>
-              <Link to="/vault" className="text-xs font-black text-zinc-500 hover:text-cyan-electric transition-colors uppercase tracking-widest flex items-center gap-2">
-                Ver Todo <ArrowRight className="w-4 h-4" />
+              <Link to="/" className="text-xs font-black text-zinc-500 hover:text-cyan-electric transition-colors uppercase tracking-widest flex items-center gap-2">
+                Ver Sistema <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
             
@@ -156,8 +156,8 @@ export default function Home() {
               <Flame className="w-6 h-6 text-orange-500" />
               Tendencias en la Red
             </h2>
-            <Link to="/vault" className="text-xs font-black text-zinc-500 hover:text-cyan-electric transition-colors uppercase tracking-widest flex items-center gap-2">
-              Explorar Bóveda <ArrowRight className="w-4 h-4" />
+            <Link to="/" className="text-xs font-black text-zinc-500 hover:text-cyan-electric transition-colors uppercase tracking-widest flex items-center gap-2">
+              Explorar Sistema <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
           

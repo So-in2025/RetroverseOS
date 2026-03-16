@@ -19,7 +19,6 @@ export default function Navbar() {
             </Link>
             
             <div className="hidden md:flex items-center gap-1">
-              <Link to="/games" className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('/games')}`}>Biblioteca</Link>
               <Link to="/tournaments" className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('/tournaments')}`}>Torneos</Link>
               <Link to="/marketplace" className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('/marketplace')}`}>Mercado</Link>
               <Link to="/community" className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${isActive('/community')}`}>Comunidad</Link>

@@ -68,6 +68,7 @@ export const DynamicCover: React.FC<DynamicCoverProps> = ({ game_id, title, syst
   }, [targetUrl]);
 
   const handleError = () => {
+    console.warn(`[DynamicCover] Failed to load image: ${targetUrl} (Attempt: ${attempt}) for ${title}`);
     if (attempt === 0 && targetUrl?.includes('Named_Boxarts')) {
       // Fallback 1: Try Title Screen (Libretro)
       console.log(`[Cover Fallback] Trying Title Screen for ${title}`);
