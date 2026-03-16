@@ -53,14 +53,23 @@ export class StorageService {
 
   private initDB(): Promise<void> {
     return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        console.error('[Storage] IndexedDB initialization timed out');
+        // We don't reject here to allow the app to boot without storage if needed
+        // but we log it clearly
+        resolve(); 
+      }, 5000);
+
       const request = indexedDB.open(DB_NAME, DB_VERSION);
 
       request.onerror = () => {
-        console.error('Failed to open IndexedDB');
+        clearTimeout(timeoutId);
+        console.error('[Storage] Failed to open IndexedDB');
         reject(request.error);
       };
 
       request.onsuccess = () => {
+        clearTimeout(timeoutId);
         this.db = request.result;
         resolve();
       };

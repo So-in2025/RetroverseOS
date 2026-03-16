@@ -3,6 +3,22 @@ import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
 
+// Global error handler for boot issues
+window.onerror = (message, source, lineno, colno, error) => {
+  console.error('[Boot Error]:', { message, source, lineno, colno, error });
+  // If we're in a black screen state, try to show something
+  const root = document.getElementById('root');
+  if (root && root.innerHTML === '') {
+    root.innerHTML = `
+      <div style="background: #0a0a0a; color: #ff4444; padding: 20px; font-family: monospace; height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+        <h1 style="margin-bottom: 20px; font-size: 24px; letter-spacing: 2px;">SYSTEM BOOT FAILURE</h1>
+        <p style="color: #666; max-width: 600px; font-size: 14px;">${message}</p>
+        <button onclick="window.location.reload()" style="margin-top: 30px; background: #222; color: #0f0; border: 1px solid #0f0; padding: 10px 20px; font-family: monospace; cursor: pointer; text-transform: uppercase;">REBOOT SYSTEM</button>
+      </div>
+    `;
+  }
+};
+
 // Register Service Worker for Offline Support
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -14,8 +30,11 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  createRoot(rootElement).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+}

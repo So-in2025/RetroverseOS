@@ -16,46 +16,61 @@ class GameCatalogService {
   async init() {
     if (this.isInitialized) return;
     
-    // Load Favorites
-    const savedFavorites = await storage.getSetting('favorites');
-    if (savedFavorites && Array.isArray(savedFavorites)) {
-      this.favorites = new Set(savedFavorites);
-    }
-    
-    // Force refresh for OMEGA SET 50K update
-    const CATALOG_VERSION = '18'; // Bumped version to force re-seed for Elite Top 15 fixes
-    const currentVersion = localStorage.getItem('catalog_version');
-    
-    if (currentVersion !== CATALOG_VERSION) {
-      console.log('[GameCatalog] Detected old catalog version. Purging for Arcade/Atari fixes...');
-      await storage.clearCatalog();
-      // DO NOT clear all ROMs, let LRU eviction handle old files.
-      // This preserves user downloads across catalog updates.
-      localStorage.setItem('catalog_version', CATALOG_VERSION);
-    }
-
-    const storedGames = await storage.getCatalogGames();
-    
-    // Check if catalog has the new 'playable' flag
-    const hasNewData = storedGames.some(g => g.playable !== undefined);
-    
-    // Always inject FULL_CATALOG (The Master Manifest)
-    console.log('[GameCatalog] Injecting MASTER MANIFEST (Verified Legends)...');
-    await this.addGames(FULL_CATALOG);
-
-    if (storedGames && storedGames.length > 0 && hasNewData) {
-      storedGames.forEach(g => this.games.set(g.game_id, g));
-    } else {
-      if (storedGames && storedGames.length > 0) {
-        await storage.clearCatalog();
+    // Safety timeout to prevent blocking the app if storage hangs
+    const timeoutId = setTimeout(() => {
+      if (!this.isInitialized) {
+        console.warn('[GameCatalog] Initialization taking too long. Proceeding with partial state.');
+        this.isInitialized = true;
       }
-      await this.initializeCatalog();
+    }, 10000);
+
+    try {
+      // Load Favorites
+      const savedFavorites = await storage.getSetting('favorites');
+      if (savedFavorites && Array.isArray(savedFavorites)) {
+        this.favorites = new Set(savedFavorites);
+      }
+      
+      // Force refresh for OMEGA SET 50K update
+      const CATALOG_VERSION = '18'; // Bumped version to force re-seed for Elite Top 15 fixes
+      const currentVersion = localStorage.getItem('catalog_version');
+      
+      if (currentVersion !== CATALOG_VERSION) {
+        console.log('[GameCatalog] Detected old catalog version. Purging for Arcade/Atari fixes...');
+        await storage.clearCatalog();
+        // DO NOT clear all ROMs, let LRU eviction handle old files.
+        // This preserves user downloads across catalog updates.
+        localStorage.setItem('catalog_version', CATALOG_VERSION);
+      }
+
+      const storedGames = await storage.getCatalogGames();
+      
+      // Check if catalog has the new 'playable' flag
+      const hasNewData = storedGames.some(g => g.playable !== undefined);
+      
+      // Always inject FULL_CATALOG (The Master Manifest)
+      console.log('[GameCatalog] Injecting MASTER MANIFEST (Verified Legends)...');
+      await this.addGames(FULL_CATALOG);
+
+      if (storedGames && storedGames.length > 0 && hasNewData) {
+        storedGames.forEach(g => this.games.set(g.game_id, g));
+      } else {
+        if (storedGames && storedGames.length > 0) {
+          await storage.clearCatalog();
+        }
+        await this.initializeCatalog();
+      }
+      
+      // ACTIVATE AUTONOMOUS INGESTION ENGINE
+      this.startAutonomousIngestion();
+      
+      this.isInitialized = true;
+    } catch (error) {
+      console.error('[GameCatalog] Initialization error:', error);
+      this.isInitialized = true; // Still mark as initialized to unblock
+    } finally {
+      clearTimeout(timeoutId);
     }
-    
-    // ACTIVATE AUTONOMOUS INGESTION ENGINE
-    this.startAutonomousIngestion();
-    
-    this.isInitialized = true;
   }
 
   private async initializeCatalog() {
