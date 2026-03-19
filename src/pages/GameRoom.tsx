@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import React from 'react';
-import { Share2, Users, MessageSquare, Send, BrainCircuit, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu } from 'lucide-react';
+import { Share2, Users, MessageSquare, Send, BrainCircuit, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video } from 'lucide-react';
 import { emulator } from '../services/emulator';
 import { multiplayer } from '../services/multiplayer';
 import { aiCoach } from '../services/aiCoaching';
@@ -53,11 +53,16 @@ export default function GameRoom() {
   const [bilinearEnabled, setBilinearEnabled] = useState(false);
   const [credits, setCredits] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isRecordingClip, setIsRecordingClip] = useState(false);
+  const [showClipModal, setShowClipModal] = useState(false);
+  const [showGuestModal, setShowGuestModal] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const userId = useRef('user-' + Math.random().toString(36).substr(2, 9));
   const mountedRef = useRef(false);
+
+  const [pendingExit, setPendingExit] = useState(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -384,8 +389,35 @@ export default function GameRoom() {
   };
 
   const handleExit = async () => {
+    if (!user && !pendingExit) {
+      await emulator.pause();
+      setGameState('paused');
+      setPendingExit(true);
+      setShowGuestModal(true);
+      return;
+    }
     await emulator.stop();
     navigate('/');
+  };
+
+  const handleRecordClip = () => {
+    if (!user) {
+      setShowGuestModal(true);
+      return;
+    }
+    setIsRecordingClip(true);
+    setTimeout(() => {
+      setIsRecordingClip(false);
+      setShowClipModal(true);
+    }, 2000); // Simulate processing
+  };
+
+  const handleToggleSavePanel = () => {
+    if (!user) {
+      setShowGuestModal(true);
+      return;
+    }
+    setIsSavePanelOpen(!isSavePanelOpen);
   };
 
   const handleAskCoach = async () => {
@@ -499,8 +531,17 @@ export default function GameRoom() {
           <button 
             onClick={() => setVoiceEnabled(!voiceEnabled)}
             className={`p-2 rounded-xl transition-all ${voiceEnabled ? 'bg-magenta-accent/20 text-magenta-accent' : 'hover:bg-white/10 text-zinc-400 hover:text-white'}`}
+            title="Voice Chat"
           >
             {voiceEnabled ? <Volume2 className="w-4 h-4 md:w-5 md:h-5" /> : <VolumeX className="w-4 h-4 md:w-5 md:h-5" />}
+          </button>
+          <button 
+            onClick={handleRecordClip}
+            className={`p-2 rounded-xl transition-all ${isRecordingClip ? 'bg-red-500/20 text-red-500 animate-pulse' : 'hover:bg-purple-500/20 text-zinc-400 hover:text-purple-400'}`}
+            title="Grabar Clip (30s)"
+            disabled={isRecordingClip}
+          >
+            <Video className="w-4 h-4 md:w-5 md:h-5" />
           </button>
         </div>
 
@@ -568,6 +609,21 @@ export default function GameRoom() {
                    >
                      {isAnalyzing ? <Loader2 className="w-8 h-8 animate-spin" /> : <BrainCircuit className="w-8 h-8" />}
                      <span className="text-xs font-black uppercase tracking-widest">ENTRENADOR IA</span>
+                   </button>
+
+                   <button 
+                     onClick={() => { handleRecordClip(); setIsMobileMenuOpen(false); }}
+                     disabled={isRecordingClip}
+                     className={`p-4 rounded-xl flex flex-col items-center gap-2 border col-span-2 transition-all ${
+                       isRecordingClip 
+                         ? 'bg-red-500/10 border-red-500/50 text-red-500 animate-pulse' 
+                         : 'bg-purple-500/10 border-purple-500/50 text-purple-400'
+                     }`}
+                   >
+                     <Video className="w-8 h-8" />
+                     <span className="text-xs font-black uppercase tracking-widest">
+                       {isRecordingClip ? 'GRABANDO...' : 'GRABAR CLIP (30S)'}
+                     </span>
                    </button>
                 </div>
 
@@ -815,6 +871,83 @@ export default function GameRoom() {
                 </button>
               </div>
             </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Clip Saved Modal */}
+      <AnimatePresence>
+        {showClipModal && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          >
+            <div className="bg-zinc-900 border border-purple-500/30 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+              <div className="w-16 h-16 bg-purple-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Video className="w-8 h-8 text-purple-400" />
+              </div>
+              <h3 className="text-xl font-black italic uppercase tracking-tight text-white mb-2">Clip Guardado</h3>
+              <p className="text-zinc-400 text-sm mb-6">Tus últimos 30 segundos han sido guardados en tu perfil. ¡Compártelo para ganar 50 CR!</p>
+              <div className="flex flex-col gap-3">
+                <button 
+                  onClick={() => { alert('Compartiendo en TikTok...'); setShowClipModal(false); }}
+                  className="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-zinc-200 transition-colors"
+                >
+                  Compartir en TikTok
+                </button>
+                <button 
+                  onClick={() => setShowClipModal(false)}
+                  className="w-full py-3 bg-white/5 text-white font-bold rounded-xl hover:bg-white/10 transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Guest Upsell Modal */}
+      <AnimatePresence>
+        {showGuestModal && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          >
+            <div className="bg-zinc-900 border border-emerald-500/30 rounded-2xl p-6 max-w-md w-full text-center shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
+              
+              <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4 relative z-10">
+                <Users className="w-8 h-8 text-emerald-400" />
+              </div>
+              <h3 className="text-2xl font-black italic uppercase tracking-tight text-white mb-2 relative z-10">¡Únete a Retroverse!</h3>
+              <p className="text-zinc-400 text-sm mb-6 relative z-10">
+                Estás jugando como invitado. Regístrate gratis para guardar tu progreso, grabar clips virales, jugar torneos y ganar <strong className="text-emerald-400">500 CR</strong> de bienvenida.
+              </p>
+              <div className="flex flex-col gap-3 relative z-10">
+                <button 
+                  onClick={() => { navigate('/auth'); setShowGuestModal(false); }}
+                  className="w-full py-3 bg-emerald-500 text-black font-bold rounded-xl hover:bg-emerald-400 transition-colors"
+                >
+                  Crear Cuenta Gratis
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowGuestModal(false);
+                    if (pendingExit) {
+                      handleExit();
+                    }
+                  }}
+                  className="w-full py-3 bg-white/5 text-white font-bold rounded-xl hover:bg-white/10 transition-colors"
+                >
+                  {pendingExit ? 'Salir sin guardar' : 'Seguir como Invitado'}
+                </button>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

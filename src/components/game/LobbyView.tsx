@@ -95,20 +95,39 @@ export default function LobbyView({ gameId, players, onStart, onInvite, status }
             <div className="space-y-4">
                <div className="p-4 bg-black/20 rounded-xl border border-white/5">
                  <h4 className="text-sm font-bold text-white mb-2 flex items-center gap-2">
-                   <Shield className="w-4 h-4 text-blue-400" /> Ajustes de Partida
+                   <Share2 className="w-4 h-4 text-emerald-400" /> Invitar a Jugar
                  </h4>
-                 <ul className="space-y-2 text-sm text-zinc-400">
-                   <li className="flex justify-between"><span>Región</span> <span className="text-white">US East</span></li>
-                   <li className="flex justify-between"><span>Modo</span> <span className="text-white">Clasificatoria</span></li>
-                   <li className="flex justify-between"><span>Retraso de Entrada</span> <span className="text-emerald-400">~12ms</span></li>
-                 </ul>
+                 <p className="text-xs text-zinc-400 mb-4">
+                   Comparte este enlace. Tu amigo no necesita instalar nada ni registrarse para jugar.
+                 </p>
+                 <div className="flex items-center gap-2 mb-4">
+                   <div className="relative flex-1">
+                     <input 
+                       type="text" 
+                       readOnly 
+                       value={`https://retroverse.app/play/${gameId}?room=xyz123`} 
+                       className="w-full bg-zinc-900 border border-white/10 rounded-lg pl-3 pr-10 py-2 text-xs text-zinc-300 font-mono focus:outline-none"
+                     />
+                     <button 
+                       onClick={onInvite}
+                       className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold transition-colors"
+                       title="Copiar Enlace"
+                     >
+                       <Copy className="w-3.5 h-3.5" />
+                     </button>
+                   </div>
+                 </div>
+                 <div className="flex items-center justify-center p-4 bg-white rounded-xl w-32 mx-auto">
+                   {/* Placeholder for QR Code */}
+                   <div className="w-full aspect-square bg-[url('https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=https://retroverse.app/play')] bg-cover" />
+                 </div>
                </div>
             </div>
 
             <div className="space-y-3">
               <button 
                 onClick={onStart}
-                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all shadow-lg shadow-emerald-900/20 hover:scale-105 flex items-center justify-center gap-2"
+                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2"
               >
                 <Swords className="w-5 h-5" />
                 {players.length > 0 ? 'INICIAR PARTIDA' : 'INICIAR (SOLO)'}
@@ -120,13 +139,6 @@ export default function LobbyView({ gameId, players, onStart, onInvite, status }
                   <span className="text-xs font-mono text-emerald-400">{status}</span>
                 </div>
               )}
-              
-              <button 
-                onClick={onInvite}
-                className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                <Share2 className="w-4 h-4" /> Invitar Amigo
-              </button>
             </div>
           </div>
 

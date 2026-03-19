@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Trophy, Activity, Target, TrendingUp, Clock, Map, Shield, Medal, Star, Zap, ChevronRight } from 'lucide-react';
+import { Trophy, Activity, Target, TrendingUp, Clock, Map, Shield, Medal, Star, Zap, ChevronRight, Crown, Video, PlayCircle, Users, Coins } from 'lucide-react';
 import { aiCoach } from '../services/aiCoaching';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
 import { motion } from 'motion/react';
 import { achievements, ACHIEVEMENTS } from '../services/achievements';
+import { economyService } from '../services/economyService';
 
 const iconMap: Record<string, any> = {
   Trophy,
@@ -18,6 +19,7 @@ const iconMap: Record<string, any> = {
 export default function Profile() {
   const [coachInsights, setCoachInsights] = useState<any[]>([]);
   const [unlockedIds, setUnlockedIds] = useState<string[]>([]);
+  const [referralData, setReferralData] = useState({ code: '', count: 0 });
 
   useEffect(() => {
     const history = aiCoach.getHistory();
@@ -37,6 +39,12 @@ export default function Profile() {
       setUnlockedIds(unlocked);
     };
     loadAchievements();
+
+    const loadReferrals = async () => {
+      const data = await economyService.getReferralData();
+      setReferralData(data);
+    };
+    loadReferrals();
   }, []);
 
   const stats = {
@@ -102,13 +110,53 @@ export default function Profile() {
             {/* User Info */}
             <div className="flex-1 pb-2 text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
-                <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20 rounded">Founder Access</span>
+                <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20 rounded flex items-center gap-1">
+                  <Crown className="w-3 h-3" /> Retro Pass Activo
+                </span>
                 <span className="text-zinc-500 text-xs font-mono">ID: 8X-2941</span>
               </div>
-              <h1 className="text-3xl md:text-5xl font-bold tracking-tight mb-1 text-white drop-shadow-lg">NEXUS_ONE</h1>
-              <p className="text-zinc-400 font-medium flex items-center justify-center md:justify-start gap-2 text-sm md:text-base">
+              <div className="flex items-center justify-center md:justify-start gap-3 mb-1">
+                <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white drop-shadow-lg">NEXUS_ONE</h1>
+                <div className="flex items-center gap-1 mt-2">
+                  <div className="p-1.5 bg-blue-500/20 text-blue-400 rounded-md border border-blue-500/30 tooltip-trigger" title="Beta Tester">
+                    <Shield className="w-4 h-4" />
+                  </div>
+                  <div className="p-1.5 bg-yellow-500/20 text-yellow-400 rounded-md border border-yellow-500/30 tooltip-trigger" title="Tournament Winner">
+                    <Trophy className="w-4 h-4" />
+                  </div>
+                </div>
+              </div>
+              <p className="text-zinc-400 font-medium flex items-center justify-center md:justify-start gap-2 text-sm md:text-base mb-4">
                 Especialista Táctico <span className="w-1 h-1 rounded-full bg-zinc-600" /> Norteamérica
               </p>
+              
+              <div className="flex items-center justify-center md:justify-start gap-3 mb-4">
+                <button 
+                  onClick={() => alert('Función de propinas en desarrollo')}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-black font-bold rounded-lg transition-colors text-sm"
+                >
+                  <Coins className="w-4 h-4" />
+                  Enviar Propina
+                </button>
+                <button 
+                  onClick={() => alert('Añadido a amigos')}
+                  className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold rounded-lg transition-colors text-sm"
+                >
+                  <Users className="w-4 h-4" />
+                  Añadir Amigo
+                </button>
+              </div>
+              
+              {/* XP Bar */}
+              <div className="max-w-md mx-auto md:mx-0">
+                <div className="flex justify-between items-end mb-1">
+                  <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Progreso Nivel 100</span>
+                  <span className="text-[10px] text-emerald-400 font-mono">12,450 / 15,000 XP</span>
+                </div>
+                <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 w-[83%] rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
+                </div>
+              </div>
             </div>
 
             {/* Rank Badge */}
@@ -201,12 +249,107 @@ export default function Profile() {
           </motion.div>
         </div>
 
+        {/* Referral Dashboard */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="bg-gradient-to-r from-emerald-900/40 to-zinc-900/50 backdrop-blur-md border border-emerald-500/20 rounded-2xl p-6 md:p-8 relative overflow-hidden group"
+        >
+          <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
+          
+          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            <div className="flex-1">
+              <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-3">
+                <Zap className="w-3 h-3 md:w-4 md:h-4" /> Programa de Embajadores
+              </div>
+              <h3 className="text-2xl md:text-3xl font-bold text-white mb-2">Invita y Gana Packs Premium</h3>
+              <p className="text-zinc-300 text-sm md:text-base mb-6 max-w-xl">
+                Por cada 3 amigos que se registren con tu enlace y jueguen su primera partida, desbloqueas un <strong>Premium Game Pack</strong> gratis.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-md">
+                <div className="relative w-full">
+                  <input 
+                    type="text" 
+                    readOnly 
+                    value={`https://retroverse.app/invite/${referralData.code}`} 
+                    className="w-full bg-black/50 border border-white/10 rounded-xl pl-4 pr-24 py-3 text-sm text-zinc-300 font-mono focus:outline-none"
+                  />
+                  <button 
+                    onClick={() => navigator.clipboard.writeText(`https://retroverse.app/invite/${referralData.code}`)}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-4 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold uppercase tracking-wider transition-colors"
+                  >
+                    Copiar
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="w-full md:w-64 bg-black/40 border border-white/10 rounded-xl p-5 shrink-0">
+              <div className="flex justify-between items-end mb-2">
+                <span className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Progreso</span>
+                <span className="text-emerald-400 font-mono font-bold text-lg">{referralData.count % 3}/3</span>
+              </div>
+              <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden mb-4">
+                <div 
+                  className="h-full bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-500" 
+                  style={{ width: `${((referralData.count % 3) / 3) * 100}%` }}
+                />
+              </div>
+              <p className="text-xs text-zinc-500 text-center">
+                {3 - (referralData.count % 3)} amigo{3 - (referralData.count % 3) !== 1 ? 's' : ''} más para tu próximo pack!
+              </p>
+            </div>
+          </div>
+        </motion.div>
+
         {/* Bottom Grid: Trophies, Matches, AI Coach */}
         <div className="flex flex-col lg:grid lg:grid-cols-3 gap-6 md:gap-8">
           
-          {/* Left Column: Trophies & AI Coach */}
+          {/* Left Column: Trophies, Earnings & AI Coach */}
           <div className="space-y-6 md:space-y-8">
             
+            {/* Tournament Earnings */}
+            <motion.section 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.28 }}
+              className="bg-zinc-900/50 backdrop-blur-md border border-white/5 rounded-2xl p-5 md:p-6"
+            >
+              <div className="flex justify-between items-center mb-4 md:mb-6">
+                <h3 className="text-white font-bold flex items-center gap-2 text-sm md:text-base">
+                  <Coins className="w-4 h-4 md:w-5 md:h-5 text-yellow-500" />
+                  Ganancias de Torneos
+                </h3>
+              </div>
+              
+              <div className="flex flex-col gap-4">
+                <div className="bg-black/40 border border-white/5 rounded-xl p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-yellow-500/20 rounded-lg text-yellow-400">
+                      <Trophy className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Total Ganado</p>
+                      <p className="text-xl font-mono font-bold text-white">125,000 CR</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-black/40 border border-white/5 rounded-xl p-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
+                      <Target className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-zinc-500 font-bold uppercase tracking-wider">Torneos Jugados</p>
+                      <p className="text-xl font-mono font-bold text-white">42</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.section>
+
             {/* Trophy Case */}
             <motion.section 
               initial={{ opacity: 0, y: 20 }}
@@ -261,6 +404,39 @@ export default function Profile() {
                       </span>
                     </div>
                     <p className="text-xs md:text-sm text-zinc-300 leading-relaxed group-hover:text-white transition-colors">{insight.text}</p>
+                  </div>
+                ))}
+              </div>
+            </motion.section>
+            {/* Friend Activity */}
+            <motion.section 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45 }}
+              className="bg-zinc-900/50 backdrop-blur-md border border-white/5 rounded-2xl p-5 md:p-6"
+            >
+              <div className="flex justify-between items-center mb-4 md:mb-6">
+                <h3 className="text-white font-bold flex items-center gap-2 text-sm md:text-base">
+                  <Users className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
+                  Actividad de Amigos
+                </h3>
+                <button className="text-[10px] md:text-xs text-zinc-500 hover:text-white transition-colors">Ver Todos</button>
+              </div>
+              
+              <div className="space-y-4">
+                {[
+                  { id: 1, user: 'RetroKing99', action: 'desbloqueó un logro en', game: 'Super Mario World', time: 'hace 5m', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=RetroKing99' },
+                  { id: 2, user: 'PixelQueen', action: 'compró el pack', game: 'JRPG Golden Era', time: 'hace 2h', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=PixelQueen' },
+                  { id: 3, user: 'ArcadeMaster', action: 'superó tu récord en', game: 'Street Fighter II', time: 'hace 5h', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=ArcadeMaster' }
+                ].map(activity => (
+                  <div key={activity.id} className="flex items-start gap-3 group cursor-pointer">
+                    <img src={activity.avatar} alt={activity.user} className="w-8 h-8 rounded-full bg-zinc-800" />
+                    <div>
+                      <p className="text-xs text-zinc-300 leading-tight">
+                        <span className="font-bold text-white group-hover:text-blue-400 transition-colors">{activity.user}</span> {activity.action} <span className="font-bold text-white">{activity.game}</span>
+                      </p>
+                      <span className="text-[10px] text-zinc-500">{activity.time}</span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -331,6 +507,70 @@ export default function Profile() {
 
                     {/* Desktop Date */}
                     <div className="hidden md:block col-span-2 text-right text-zinc-500 text-xs font-medium">{match.time}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Favorite Games Vitrine */}
+            <section className="bg-zinc-900/50 backdrop-blur-md border border-white/5 rounded-2xl p-5 md:p-6 mt-6 md:mt-8">
+              <div className="flex justify-between items-center mb-4 md:mb-6">
+                <h3 className="text-white font-bold flex items-center gap-2 text-sm md:text-base">
+                  <Star className="w-4 h-4 md:w-5 md:h-5 text-yellow-500" />
+                  Juegos Favoritos
+                </h3>
+                <button className="text-[10px] md:text-xs text-zinc-500 hover:text-white transition-colors">Editar</button>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+                {[
+                  { id: 'smw', title: 'Super Mario World', image: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co1x7d.png' },
+                  { id: 'sf2', title: 'Street Fighter II', image: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co22l7.png' },
+                  { id: 'oot', title: 'Zelda: Ocarina of Time', image: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co1wn0.png' },
+                  { id: 'sotn', title: 'Castlevania: SOTN', image: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co1tq0.png' }
+                ].map(game => (
+                  <div key={game.id} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-white/10 group cursor-pointer">
+                    <img src={game.image} alt={game.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" referrerPolicy="no-referrer" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                      <span className="text-white text-[10px] font-bold leading-tight">{game.title}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Viral Clips */}
+            <section className="bg-zinc-900/50 backdrop-blur-md border border-white/5 rounded-2xl p-5 md:p-6 mt-6 md:mt-8">
+              <div className="flex justify-between items-center mb-4 md:mb-6">
+                <h3 className="text-white font-bold flex items-center gap-2 text-sm md:text-base">
+                  <Video className="w-4 h-4 md:w-5 md:h-5 text-purple-500" />
+                  Clips Virales
+                </h3>
+                <button className="text-[10px] md:text-xs text-zinc-500 hover:text-white transition-colors">Ver Todos</button>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  { id: 1, title: 'Combo Perfecto 99 Hits', game: 'Street Fighter II', views: '12.5K', duration: '0:15', image: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400' },
+                  { id: 2, title: 'Speedrun Glitch Skip', game: 'Super Mario World', views: '8.2K', duration: '0:28', image: 'https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=400' }
+                ].map(clip => (
+                  <div key={clip.id} className="group relative rounded-xl overflow-hidden border border-white/10 cursor-pointer">
+                    <div className="aspect-video relative">
+                      <img src={clip.image} alt={clip.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
+                      <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                        <PlayCircle className="w-10 h-10 text-white opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all drop-shadow-lg" />
+                      </div>
+                      <div className="absolute bottom-2 right-2 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-mono text-white">
+                        {clip.duration}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-zinc-950/80">
+                      <h4 className="text-xs font-bold text-white truncate">{clip.title}</h4>
+                      <div className="flex justify-between items-center mt-1">
+                        <span className="text-[10px] text-zinc-400">{clip.game}</span>
+                        <span className="text-[10px] font-bold text-purple-400">{clip.views} vistas</span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>

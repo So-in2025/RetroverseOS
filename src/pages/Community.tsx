@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { MessageSquare, Users, Calendar, Trophy, Medal, Crown, Swords, ArrowRight } from 'lucide-react';
+import { MessageSquare, Users, Calendar, Trophy, Medal, Crown, Swords, ArrowRight, Activity, ShieldAlert, TrendingUp, Cpu, Server } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AudioEngine } from '../services/audioEngine';
 import { haptics } from '../services/haptics';
@@ -8,7 +8,7 @@ import TournamentBracket from '../components/community/TournamentBracket';
 
 export default function Community() {
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState<'feed' | 'tournaments' | 'leaderboards'>('feed');
+  const [activeTab, setActiveTab] = useState<'feed' | 'tournaments' | 'leaderboards' | 'mission-control'>('feed');
   const [selectedTournament, setSelectedTournament] = useState<string | null>(null);
 
   useEffect(() => {
@@ -77,6 +77,7 @@ export default function Community() {
             { id: 'feed', label: 'ACTIVIDAD', icon: MessageSquare },
             { id: 'tournaments', label: 'TORNEOS', icon: Swords },
             { id: 'leaderboards', label: 'CLASIFICACIÓN', icon: Trophy },
+            { id: 'mission-control', label: 'MISSION CONTROL', icon: Cpu },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -329,6 +330,166 @@ export default function Community() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* MISSION CONTROL TAB */}
+          {activeTab === 'mission-control' && (
+            <motion.div 
+              key="mission-control"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="w-full space-y-6"
+            >
+              <div className="bg-zinc-900 border border-emerald-500/30 rounded-2xl overflow-hidden relative">
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=1200')] bg-cover opacity-5" />
+                <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/20 to-zinc-900/90" />
+                
+                <div className="relative z-10 p-6 md:p-8">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter text-white flex items-center gap-3">
+                        <Cpu className="w-8 h-8 text-emerald-400" />
+                        Mission Control IA
+                      </h2>
+                      <p className="text-zinc-400 mt-2 max-w-2xl">
+                        Supervisión en tiempo real del ecosistema de Agentes IA que gestionan la economía, torneos, tendencias y moderación de Retroverse.
+                      </p>
+                    </div>
+                    <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-full">
+                      <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="text-emerald-400 text-xs font-bold tracking-wider">SISTEMA ONLINE</span>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                    {/* Agent 1: Director de Torneos */}
+                    <div className="bg-black/40 border border-white/5 rounded-xl p-5 hover:border-emerald-500/50 transition-colors group">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
+                            <Trophy className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-sm">Director de Torneos</h3>
+                            <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Agente Operativo</span>
+                          </div>
+                        </div>
+                        <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+                      </div>
+                      <p className="text-xs text-zinc-400 mb-4 h-12">
+                        Analizando picos de jugadores en Street Fighter II. Generando torneo relámpago con buy-in de 50 CR.
+                      </p>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-500">Estado:</span>
+                        <span className="text-blue-400 font-mono">Creando Brackets</span>
+                      </div>
+                    </div>
+
+                    {/* Agent 2: Cazador de Tendencias */}
+                    <div className="bg-black/40 border border-white/5 rounded-xl p-5 hover:border-emerald-500/50 transition-colors group">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400">
+                            <TrendingUp className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-sm">Cazador de Tendencias</h3>
+                            <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Agente Analítico</span>
+                          </div>
+                        </div>
+                        <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+                      </div>
+                      <p className="text-xs text-zinc-400 mb-4 h-12">
+                        Detectada viralidad en TikTok para "Sonic Speedruns". Empaquetando "Sega Sonic Collection" para el Marketplace.
+                      </p>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-500">Estado:</span>
+                        <span className="text-purple-400 font-mono">Actualizando Tienda</span>
+                      </div>
+                    </div>
+
+                    {/* Agent 3: Economista */}
+                    <div className="bg-black/40 border border-white/5 rounded-xl p-5 hover:border-emerald-500/50 transition-colors group">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-amber-500/20 rounded-lg text-amber-400">
+                            <Crown className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-sm">Economista IA</h3>
+                            <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Agente Financiero</span>
+                          </div>
+                        </div>
+                        <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+                      </div>
+                      <p className="text-xs text-zinc-400 mb-4 h-12">
+                        Ajustando precios de Retro Pass por región. Optimizando recompensas de referidos para maximizar retención.
+                      </p>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-500">Estado:</span>
+                        <span className="text-amber-400 font-mono">Balanceando Economía</span>
+                      </div>
+                    </div>
+
+                    {/* Agent 4: Juez y Moderador */}
+                    <div className="bg-black/40 border border-white/5 rounded-xl p-5 hover:border-emerald-500/50 transition-colors group">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-red-500/20 rounded-lg text-red-400">
+                            <ShieldAlert className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-sm">Juez & Moderador</h3>
+                            <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Agente de Seguridad</span>
+                          </div>
+                        </div>
+                        <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+                      </div>
+                      <p className="text-xs text-zinc-400 mb-4 h-12">
+                        Monitoreando inputs en torneos de alto nivel. 0 anomalías detectadas. Chat global limpio de toxicidad.
+                      </p>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-zinc-500">Estado:</span>
+                        <span className="text-emerald-400 font-mono">Vigilancia Activa</span>
+                      </div>
+                    </div>
+
+                    {/* Agent 5: DevOps */}
+                    <div className="bg-black/40 border border-white/5 rounded-xl p-5 hover:border-emerald-500/50 transition-colors group lg:col-span-2">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400">
+                            <Server className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-sm">DevOps Enjambre</h3>
+                            <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Agente de Infraestructura</span>
+                          </div>
+                        </div>
+                        <Activity className="w-4 h-4 text-emerald-400 animate-pulse" />
+                      </div>
+                      <div className="flex flex-col md:flex-row gap-6">
+                        <p className="text-xs text-zinc-400 flex-1">
+                          Escalando nodos en US-East debido a pico de tráfico por torneo de Smash Bros. Latencia promedio mantenida en ~15ms.
+                        </p>
+                        <div className="flex gap-4 flex-1">
+                          <div className="bg-zinc-900/50 rounded p-2 flex-1 text-center">
+                            <div className="text-[10px] text-zinc-500 uppercase">Carga CPU</div>
+                            <div className="text-emerald-400 font-mono text-sm">42%</div>
+                          </div>
+                          <div className="bg-zinc-900/50 rounded p-2 flex-1 text-center">
+                            <div className="text-[10px] text-zinc-500 uppercase">Nodos Activos</div>
+                            <div className="text-emerald-400 font-mono text-sm">128</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
                 </div>
               </div>
             </motion.div>

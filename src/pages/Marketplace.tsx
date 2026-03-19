@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingCart, Sparkles, Zap, Shield, Crown, Star, Search, Filter, Hexagon, Cpu, Check } from 'lucide-react';
+import { ShoppingCart, Sparkles, Zap, Shield, Crown, Star, Search, Filter, Hexagon, Cpu, Check, Gift, Heart } from 'lucide-react';
 import { DynamicCover } from '../components/library/DynamicCover';
 import { storage } from '../services/storage';
 import { achievements } from '../services/achievements';
 import { haptics } from '../services/haptics';
+import { economyService } from '../services/economyService';
 
 export default function Marketplace() {
   const [activeCategory, setActiveCategory] = useState('featured');
@@ -12,6 +13,7 @@ export default function Marketplace() {
   const [purchasedItems, setPurchasedItems] = useState<number[]>([]);
   const [equippedVoice, setEquippedVoice] = useState<string>('Kore');
   const [isProcessing, setIsProcessing] = useState<number | null>(null);
+  const [isSubscribing, setIsSubscribing] = useState(false);
 
   useEffect(() => {
     const loadEconomy = async () => {
@@ -29,12 +31,40 @@ export default function Marketplace() {
 
   const categories = [
     { id: 'featured', label: 'Destacado', icon: Star },
+    { id: 'game-packs', label: 'Premium Packs', icon: ShoppingCart },
     { id: 'cosmetics', label: 'Cosméticos', icon: Sparkles },
     { id: 'ai-voices', label: 'Voces de Entrenador IA', icon: Cpu },
     { id: 'boosts', label: 'Potenciadores', icon: Zap },
   ];
 
   const storeItems = [
+    {
+      id: 7,
+      name: "Fighting Classics Pack",
+      category: "game-packs",
+      rarity: "Epic",
+      price: 2500,
+      image: "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&q=80&w=400&h=400",
+      description: "Colección definitiva: Mortal Kombat 1-3 y Street Fighter II. Propiedad de por vida."
+    },
+    {
+      id: 8,
+      name: "JRPG Golden Era Pack",
+      category: "game-packs",
+      rarity: "Legendary",
+      price: 3500,
+      image: "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=400&h=400",
+      description: "Horas de aventura: Chrono Trigger, Final Fantasy VI y EarthBound."
+    },
+    {
+      id: 9,
+      name: "Sega Sonic Collection",
+      category: "game-packs",
+      rarity: "Rare",
+      price: 1800,
+      image: "https://images.unsplash.com/photo-1580234811497-9df715cb10b4?auto=format&fit=crop&q=80&w=400&h=400",
+      description: "La trilogía original de Sonic the Hedgehog + Sonic & Knuckles."
+    },
     {
       id: 1,
       name: "Cyber-Ronin Avatar Frame",
@@ -102,26 +132,56 @@ export default function Marketplace() {
     setIsProcessing(item.id);
 
     try {
-      // Deduct credits
-      const newBalance = await storage.addCredits(-item.price);
-      setCredits(newBalance);
+      if (item.category === 'game-packs') {
+        const success = await economyService.buyPack(item.id.toString(), item.price);
+        if (success) {
+          const newBalance = await storage.getCredits();
+          setCredits(newBalance);
+          setPurchasedItems([...purchasedItems, item.id]);
+          achievements.unlock('collector');
+        } else {
+          alert("Transaction failed.");
+        }
+      } else {
+        // Deduct credits
+        const newBalance = await storage.addCredits(-item.price);
+        setCredits(newBalance);
 
-      // Add to purchased items
-      const newPurchased = [...purchasedItems, item.id];
-      await storage.saveSetting('purchased_items', newPurchased);
-      setPurchasedItems(newPurchased);
-      achievements.unlock('collector');
+        // Add to purchased items
+        const newPurchased = [...purchasedItems, item.id];
+        await storage.saveSetting('purchased_items', newPurchased);
+        setPurchasedItems(newPurchased);
+        achievements.unlock('collector');
 
-      // If it's a voice, auto-equip it
-      if (item.category === 'ai-voices' && item.voiceId) {
-        await storage.saveSetting('coach_voice', item.voiceId);
-        setEquippedVoice(item.voiceId);
+        // If it's a voice, auto-equip it
+        if (item.category === 'ai-voices' && item.voiceId) {
+          await storage.saveSetting('coach_voice', item.voiceId);
+          setEquippedVoice(item.voiceId);
+        }
       }
     } catch (e) {
       console.error("Purchase failed", e);
       alert("Transaction failed.");
     } finally {
       setIsProcessing(null);
+    }
+  };
+
+  const handleSubscribe = async () => {
+    setIsSubscribing(true);
+    try {
+      const success = await economyService.subscribeRetroPass();
+      if (success) {
+        alert("¡Bienvenido al Retro Pass!");
+        // Update local state if needed
+      } else {
+        alert("Error al suscribirse.");
+      }
+    } catch (e) {
+      console.error("Subscription failed", e);
+      alert("Transaction failed.");
+    } finally {
+      setIsSubscribing(false);
     }
   };
 
@@ -164,56 +224,168 @@ export default function Marketplace() {
           </div>
           
           <div className="flex items-center justify-between w-full sm:w-auto gap-3 md:gap-4 bg-black/40 px-3 md:px-4 py-1.5 md:py-2 rounded-xl border border-white/5">
-            <span className="text-[10px] md:text-sm text-zinc-400 font-medium uppercase tracking-wider">Balance:</span>
-            <div className="flex items-center gap-1.5 md:gap-2">
-              <Hexagon className="w-3 h-3 md:w-4 md:h-4 text-emerald-400 fill-emerald-400/20" />
-              <span className="text-lg md:text-xl font-mono font-bold text-white">{credits.toLocaleString()}</span>
+            <div className="flex items-center gap-3 border-r border-white/10 pr-3">
+              <span className="text-[10px] md:text-sm text-zinc-400 font-medium uppercase tracking-wider">Tickets:</span>
+              <div className="flex items-center gap-1.5 md:gap-2">
+                <Star className="w-3 h-3 md:w-4 md:h-4 text-yellow-400 fill-yellow-400/20" />
+                <span className="text-lg md:text-xl font-mono font-bold text-white">2</span>
+              </div>
             </div>
-            <button 
-              onClick={() => { storage.addCredits(1000).then(setCredits) }}
-              className="ml-1 md:ml-2 px-2 md:px-3 py-0.5 md:py-1 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors rounded text-[9px] md:text-xs font-bold uppercase tracking-wider border border-emerald-500/30"
-            >
-              +1K
-            </button>
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] md:text-sm text-zinc-400 font-medium uppercase tracking-wider">Balance:</span>
+              <div className="flex items-center gap-1.5 md:gap-2">
+                <Hexagon className="w-3 h-3 md:w-4 md:h-4 text-emerald-400 fill-emerald-400/20" />
+                <span className="text-lg md:text-xl font-mono font-bold text-white">{credits.toLocaleString()}</span>
+              </div>
+              <button 
+                onClick={() => { storage.addCredits(1000).then(setCredits) }}
+                className="ml-1 md:ml-2 px-2 md:px-3 py-0.5 md:py-1 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors rounded text-[9px] md:text-xs font-bold uppercase tracking-wider border border-emerald-500/30"
+              >
+                +1K
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 pt-6 md:pt-8 space-y-6 md:space-y-12">
         
-        {/* Featured Bundle Hero */}
+        {/* Retro Pass Hero */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative rounded-2xl md:rounded-3xl overflow-hidden border border-white/10 group"
+          className="relative rounded-2xl md:rounded-3xl overflow-hidden border border-emerald-500/30 group"
         >
-          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=1920&h=600')] bg-cover bg-center transition-transform duration-700 group-hover:scale-105" />
-          <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/80 to-transparent" />
+          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=1920&h=600')] bg-cover bg-center transition-transform duration-700 group-hover:scale-105 opacity-40" />
+          <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/90 to-emerald-900/20" />
           
-          <div className="relative z-10 p-6 md:p-16 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 text-[9px] md:text-xs font-bold uppercase tracking-wider mb-3 md:mb-6">
-              <Crown className="w-3 h-3 md:w-4 md:h-4" /> Paquete Limitado
+          <div className="relative z-10 p-6 md:p-12 flex flex-col md:flex-row items-center justify-between gap-8">
+            <div className="max-w-xl">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-4 md:mb-6">
+                <Crown className="w-3 h-3 md:w-4 md:h-4" /> Suscripción Premium
+              </div>
+              <h2 className="text-3xl md:text-5xl font-bold mb-3 md:mb-4 leading-tight text-white">Retro Pass<br/><span className="text-emerald-400">Acceso Total</span></h2>
+              <p className="text-zinc-300 text-sm md:text-base mb-6 md:mb-8 leading-relaxed">
+                Cloud Saves ilimitados, cero anuncios, servidores VIP sin lag y entrada gratuita a 2 torneos premium al mes. La experiencia definitiva.
+              </p>
+              
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <button 
+                  onClick={handleSubscribe}
+                  disabled={isSubscribing}
+                  className="w-full sm:w-auto px-8 py-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-sm md:text-base transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2"
+                >
+                  <Zap className="w-5 h-5" />
+                  {isSubscribing ? 'Procesando...' : 'Suscribirse por $2.99/mes'}
+                </button>
+                <span className="text-zinc-400 text-xs md:text-sm font-medium">Cancela cuando quieras.</span>
+              </div>
             </div>
-            <h2 className="text-2xl md:text-5xl font-bold mb-3 md:mb-4 leading-tight">Paquete Fundador<br/>Protocolo Nexus</h2>
-            <p className="text-zinc-300 text-xs md:text-lg mb-5 md:mb-8 leading-relaxed">
-              Desbloquea la voz exclusiva 'Nexus', banner animado y prioridad premium.
-            </p>
-            
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 md:gap-6">
-              <button className="w-full sm:w-auto px-6 md:px-8 py-3 md:py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm md:text-base transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2 md:gap-3">
-                <ShoppingCart className="w-4 h-4 md:w-5 md:h-5" />
-                Comprar
-              </button>
-              <div className="flex items-center gap-2">
-                <span className="text-zinc-500 line-through font-mono text-base md:text-lg">3,500</span>
-                <div className="flex items-center gap-1.5">
-                  <Hexagon className="w-4 h-4 md:w-5 md:h-5 text-emerald-400 fill-emerald-400/20" />
-                  <span className="text-2xl md:text-3xl font-mono font-bold text-white">2,800</span>
+
+            {/* Benefits List */}
+            <div className="w-full md:w-auto bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-6">
+              <h3 className="text-white font-bold mb-4 uppercase tracking-wider text-sm">Beneficios Exclusivos</h3>
+              <ul className="space-y-3">
+                {[
+                  'Servidores Multiplayer VIP (Sin Lag)',
+                  'Cloud Saves Ilimitados',
+                  'Cero Anuncios',
+                  '2 Entradas a Torneos Premium/mes',
+                  'Insignia de Fundador'
+                ].map((benefit, i) => (
+                  <li key={i} className="flex items-center gap-3 text-zinc-300 text-sm">
+                    <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                      <Check className="w-3 h-3 text-emerald-400" />
+                    </div>
+                    {benefit}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Daily Deals Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg md:text-xl font-bold flex items-center gap-2">
+              <Zap className="w-5 h-5 text-yellow-500" />
+              Ofertas Diarias
+            </h3>
+            <span className="text-xs text-zinc-400 font-mono bg-zinc-900 px-3 py-1 rounded-full border border-white/5">Termina en 04:23:11</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-gradient-to-br from-purple-900/40 to-zinc-900/50 border border-purple-500/30 rounded-2xl p-4 flex items-center gap-4 group cursor-pointer hover:border-purple-500/50 transition-colors">
+              <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 relative">
+                <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=200&h=200" alt="Neon Nights Pack" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                <div className="absolute inset-0 bg-black/20" />
+                <div className="absolute top-1 left-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">-50%</div>
+              </div>
+              <div className="flex-1">
+                <h4 className="font-bold text-sm md:text-base text-white mb-1">Neon Nights Theme Pack</h4>
+                <p className="text-xs text-zinc-400 mb-2 line-clamp-1">Fondos dinámicos y música synthwave para tu lobby.</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-500 line-through">1200</span>
+                  <div className="flex items-center gap-1 text-emerald-400 font-mono font-bold text-sm">
+                    <Hexagon className="w-3 h-3 fill-emerald-400/20" />
+                    600
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gradient-to-br from-blue-900/40 to-zinc-900/50 border border-blue-500/30 rounded-2xl p-4 flex items-center gap-4 group cursor-pointer hover:border-blue-500/50 transition-colors">
+              <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 relative">
+                <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=200&h=200" alt="XP Boost" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                <div className="absolute inset-0 bg-black/20" />
+                <div className="absolute top-1 left-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">-30%</div>
+              </div>
+              <div className="flex-1">
+                <h4 className="font-bold text-sm md:text-base text-white mb-1">XP Boost x2 (24h)</h4>
+                <p className="text-xs text-zinc-400 mb-2 line-clamp-1">Doble experiencia en todas las partidas rankeadas.</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-500 line-through">500</span>
+                  <div className="flex items-center gap-1 text-emerald-400 font-mono font-bold text-sm">
+                    <Hexagon className="w-3 h-3 fill-emerald-400/20" />
+                    350
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </motion.div>
+        </div>
+
+        {/* Mystery Box Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg md:text-xl font-bold flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-500" />
+              Cajas Sorpresa
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { id: 'box-1', name: 'Caja Básica', price: 100, color: 'from-zinc-800 to-zinc-900', border: 'border-zinc-700', icon: <Hexagon className="w-8 h-8 text-zinc-400" /> },
+              { id: 'box-2', name: 'Caja Rara', price: 500, color: 'from-blue-900/40 to-blue-950/50', border: 'border-blue-500/30', icon: <Star className="w-8 h-8 text-blue-400" /> },
+              { id: 'box-3', name: 'Caja Épica', price: 1500, color: 'from-purple-900/40 to-purple-950/50', border: 'border-purple-500/30', icon: <Crown className="w-8 h-8 text-purple-400" /> },
+            ].map((box) => (
+              <div key={box.id} className={`bg-gradient-to-br ${box.color} border ${box.border} rounded-2xl p-6 flex flex-col items-center justify-center text-center group cursor-pointer hover:scale-[1.02] transition-transform relative overflow-hidden`}>
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400&h=400')] bg-cover opacity-5 group-hover:opacity-10 transition-opacity" />
+                <div className="relative z-10 mb-4 transform group-hover:-translate-y-2 transition-transform duration-300">
+                  {box.icon}
+                </div>
+                <h4 className="font-bold text-white mb-1 relative z-10">{box.name}</h4>
+                <p className="text-xs text-zinc-400 mb-4 relative z-10">Contiene 1 ítem aleatorio.</p>
+                <button 
+                  onClick={() => alert(`Comprando ${box.name}...`)}
+                  className="px-6 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold transition-colors relative z-10 flex items-center gap-2"
+                >
+                  <Hexagon className="w-3 h-3 fill-emerald-400/20 text-emerald-400" />
+                  {box.price}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* Store Navigation */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-white/5 pb-4">
@@ -307,17 +479,33 @@ export default function Marketplace() {
                             <Hexagon className="w-4 h-4 text-emerald-400 fill-emerald-400/20" />
                             <span className="text-lg font-mono font-bold text-white">{item.price}</span>
                           </div>
-                          <button 
-                            onClick={() => handleBuy(item)}
-                            disabled={isProcessing === item.id || credits < item.price}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
-                              credits >= item.price
-                                ? 'bg-white/5 hover:bg-emerald-500 hover:text-white text-zinc-300'
-                                : 'bg-red-500/10 text-red-400 cursor-not-allowed'
-                            }`}
-                          >
-                            {isProcessing === item.id ? 'Processing...' : 'Buy'}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button 
+                              onClick={() => alert('Añadido a la lista de deseos')}
+                              className="p-2 rounded-lg bg-white/5 hover:bg-pink-500 hover:text-white text-zinc-400 transition-colors tooltip-trigger"
+                              title="Añadir a lista de deseos"
+                            >
+                              <Heart className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => alert('Función de regalo en desarrollo')}
+                              className="p-2 rounded-lg bg-white/5 hover:bg-purple-500 hover:text-white text-zinc-400 transition-colors tooltip-trigger"
+                              title="Regalar a un amigo"
+                            >
+                              <Gift className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleBuy(item)}
+                              disabled={isProcessing === item.id || credits < item.price}
+                              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+                                credits >= item.price
+                                  ? 'bg-white/5 hover:bg-emerald-500 hover:text-white text-zinc-300'
+                                  : 'bg-red-500/10 text-red-400 cursor-not-allowed'
+                              }`}
+                            >
+                              {isProcessing === item.id ? 'Procesando...' : 'Comprar'}
+                            </button>
+                          </div>
                         </>
                       ) : (
                         <div className="w-full flex justify-end">
@@ -330,11 +518,11 @@ export default function Marketplace() {
                                   : 'bg-white/10 hover:bg-white/20 text-white'
                               }`}
                             >
-                              {isEquipped ? 'Equipped' : 'Equip Voice'}
+                              {isEquipped ? 'Equipada' : 'Equipar Voz'}
                             </button>
                           ) : (
                             <button disabled className="px-4 py-2 rounded-lg text-sm font-bold bg-zinc-800 text-zinc-500 w-full cursor-not-allowed">
-                              In Inventory
+                              En Inventario
                             </button>
                           )}
                         </div>
