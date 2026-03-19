@@ -25,7 +25,7 @@ import MobileHeader from './components/layout/MobileHeader';
 import SearchModal from './components/layout/SearchModal';
 
 import { useUIStore } from './store/uiStore';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { SentinelEngine } from './services/gcts';
 
 function Layout() {
@@ -66,15 +66,16 @@ function Layout() {
   );
 }
 
-import { AuthProvider } from './services/AuthContext';
+import { AuthProvider, useAuth } from './services/AuthContext';
 import { storage } from './services/storage';
 import OnboardingFlow from './components/onboarding/OnboardingFlow';
 import { recommendationEngine } from './services/recommendationEngine';
-import { useState } from 'react';
 import { AnimatePresence } from 'motion/react';
 
-export default function App() {
+function AppContent() {
+  const { user } = useAuth();
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     const checkOnboarding = async () => {
@@ -82,47 +83,57 @@ export default function App() {
       if (!completed) {
         setShowOnboarding(true);
       } else {
-        await recommendationEngine.init();
+        await recommendationEngine.init(user?.id);
+        setInitialized(true);
       }
     };
     checkOnboarding();
-  }, []);
+  }, [user]);
 
   const handleOnboardingComplete = async () => {
     setShowOnboarding(false);
-    await recommendationEngine.init();
+    await recommendationEngine.init(user?.id);
+    setInitialized(true);
     // Force a re-render or notify components that recommendations are ready
     window.dispatchEvent(new CustomEvent('recommendations_updated'));
   };
 
   return (
+    <>
+      <AnimatePresence>
+        {showOnboarding && (
+          <OnboardingFlow onComplete={handleOnboardingComplete} />
+        )}
+      </AnimatePresence>
+      <NotificationSystem />
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        
+        <Route element={<ProtectedRoute />}>
+          <Route element={<Layout />}>
+            <Route path="/" element={<GameLibrary />} />
+            <Route path="/dashboard" element={<Home />} />
+            <Route path="/game/:gameId" element={<GameDetail />} />
+            <Route path="/play/:gameId" element={<GameRoom />} />
+            <Route path="/premium" element={<PremiumVault />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/marketplace" element={<Marketplace />} />
+            <Route path="/community" element={<Community />} />
+            <Route path="/tournaments" element={<Community />} />
+            <Route path="/settings" element={<Settings />} />
+          </Route>
+        </Route>
+      </Routes>
+    </>
+  );
+}
+
+export default function App() {
+  return (
     <AuthProvider>
       <Router>
         <div className="min-h-screen bg-carbon text-white font-sans">
-          <AnimatePresence>
-            {showOnboarding && (
-              <OnboardingFlow onComplete={handleOnboardingComplete} />
-            )}
-          </AnimatePresence>
-          <NotificationSystem />
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            
-            <Route element={<ProtectedRoute />}>
-              <Route element={<Layout />}>
-                <Route path="/" element={<GameLibrary />} />
-                <Route path="/dashboard" element={<Home />} />
-                <Route path="/game/:gameId" element={<GameDetail />} />
-                <Route path="/play/:gameId" element={<GameRoom />} />
-                <Route path="/premium" element={<PremiumVault />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/marketplace" element={<Marketplace />} />
-                <Route path="/community" element={<Community />} />
-                <Route path="/tournaments" element={<Community />} />
-                <Route path="/settings" element={<Settings />} />
-              </Route>
-            </Route>
-          </Routes>
+          <AppContent />
         </div>
       </Router>
     </AuthProvider>

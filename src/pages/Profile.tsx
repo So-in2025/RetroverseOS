@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { motion } from 'motion/react';
 import { achievements, ACHIEVEMENTS } from '../services/achievements';
 import { economyService } from '../services/economyService';
+import { useAuth } from '../services/AuthContext';
 
 const iconMap: Record<string, any> = {
   Trophy,
@@ -17,6 +18,7 @@ const iconMap: Record<string, any> = {
 };
 
 export default function Profile() {
+  const { user } = useAuth();
   const [coachInsights, setCoachInsights] = useState<any[]>([]);
   const [unlockedIds, setUnlockedIds] = useState<string[]>([]);
   const [referralData, setReferralData] = useState({ code: '', invites: 0, claimedRewards: [] as string[] });
@@ -41,11 +43,11 @@ export default function Profile() {
     loadAchievements();
 
     const loadReferrals = async () => {
-      const data = await economyService.getReferralData();
+      const data = await economyService.getReferralData(user?.id);
       setReferralData(data);
     };
     loadReferrals();
-  }, []);
+  }, [user?.id]);
 
   const stats = {
     rank: "DIAMANTE II",
@@ -300,8 +302,8 @@ export default function Profile() {
               {referralData.invites >= 3 && (referralData.invites % 3) === 0 ? (
                 <button 
                   onClick={async () => {
-                    await economyService.claimReferralReward('pack_1', 3);
-                    const data = await economyService.getReferralData();
+                    await economyService.claimReferralReward(user?.id, 'pack_1', 3);
+                    const data = await economyService.getReferralData(user?.id);
                     setReferralData(data);
                     alert('¡Recompensa reclamada! Revisa tu inventario.');
                   }}

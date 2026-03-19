@@ -3,14 +3,17 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Monitor, Volume2, Gamepad2, Cpu, Save, RotateCcw, Check, Keyboard, LogOut, Trash2, Zap, User, Coins, ShieldCheck, Activity, AlertTriangle } from 'lucide-react';
 import { storage } from '../services/storage';
 import { useAuthStore } from '../store/authStore';
+import { useAuth } from '../services/AuthContext';
 import { useGameStore } from '../store/gameStore';
 import { useNavigate } from 'react-router-dom';
 import { SentinelEngine } from '../services/gcts';
 import { gameCatalog } from '../services/gameCatalog';
 import { inputManager } from '../services/inputManager';
+import { economyService } from '../services/economyService';
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const logout = useAuthStore((state) => state.logout);
   const sentinelStats = useGameStore((state) => state.sentinelStats);
   const [activeTab, setActiveTab] = useState<'video' | 'audio' | 'controls' | 'system' | 'sentinel' | 'storage'>('video');
@@ -60,9 +63,9 @@ export default function Settings() {
 
   const handleSave = async () => {
     try {
-      await storage.saveSetting('videoSettings', videoSettings);
-      await storage.saveSetting('audioSettings', audioSettings);
-      await storage.saveSetting('controls', controls);
+      await economyService.saveVideoSettings(user?.id, videoSettings);
+      await economyService.saveAudioSettings(user?.id, audioSettings);
+      await economyService.saveControls(user?.id, controls);
       inputManager.updateKeyMapping(controls);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -74,16 +77,16 @@ export default function Settings() {
   // Load settings on mount
   useEffect(() => {
     const loadSettings = async () => {
-      const savedVideo = await storage.getSetting('videoSettings');
+      const savedVideo = await economyService.getVideoSettings(user?.id);
       if (savedVideo) setVideoSettings(prev => ({ ...prev, ...savedVideo }));
       
-      const savedAudio = await storage.getSetting('audioSettings');
+      const savedAudio = await economyService.getAudioSettings(user?.id);
       if (savedAudio) setAudioSettings(prev => ({ ...prev, ...savedAudio }));
       
-      const savedControls = await storage.getSetting('controls');
+      const savedControls = await economyService.getControls(user?.id);
       if (savedControls) setControls(prev => ({ ...prev, ...savedControls }));
 
-      const currentCredits = await storage.getCredits();
+      const currentCredits = await economyService.getCredits(user?.id);
       setCredits(currentCredits);
 
       // Load Storage Stats

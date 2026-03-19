@@ -8,8 +8,10 @@ import { achievements } from '../services/achievements';
 import { haptics } from '../services/haptics';
 import { economyService } from '../services/economyService';
 import { AudioEngine } from '../services/audioEngine';
+import { useAuth } from '../services/AuthContext';
 
 export default function Marketplace() {
+  const { user } = useAuth();
   const [activeCategory, setActiveCategory] = useState('featured');
   const [credits, setCredits] = useState(0);
   const [purchasedItems, setPurchasedItems] = useState<number[]>([]);
@@ -23,17 +25,17 @@ export default function Marketplace() {
 
   useEffect(() => {
     const loadEconomy = async () => {
-      const currentCredits = await storage.getCredits();
+      const currentCredits = await economyService.getCredits(user?.id);
       setCredits(currentCredits);
       
-      const purchased = await storage.getSetting('purchased_items') || [];
+      const purchased = await economyService.getPurchasedItems(user?.id);
       setPurchasedItems(purchased);
 
-      const voice = await storage.getSetting('coach_voice') || 'Kore';
+      const voice = await economyService.getCoachVoice(user?.id);
       setEquippedVoice(voice);
     };
     loadEconomy();
-  }, []);
+  }, [user]);
 
   const categories = [
     { id: 'featured', label: 'Destacado', icon: Star },
@@ -139,9 +141,9 @@ export default function Marketplace() {
 
     try {
       if (item.category === 'game-packs') {
-        const success = await economyService.buyPack(item.id.toString(), item.price);
+        const success = await economyService.buyPack(user?.id, item.id.toString(), item.price);
         if (success) {
-          const newBalance = await storage.getCredits();
+          const newBalance = await economyService.getCredits(user?.id);
           setCredits(newBalance);
           setPurchasedItems([...purchasedItems, item.id]);
           achievements.unlock('collector');
@@ -150,18 +152,18 @@ export default function Marketplace() {
         }
       } else {
         // Deduct credits
-        const newBalance = await storage.addCredits(-item.price);
+        const newBalance = await economyService.addCredits(user?.id, -item.price);
         setCredits(newBalance);
 
         // Add to purchased items
         const newPurchased = [...purchasedItems, item.id];
-        await storage.saveSetting('purchased_items', newPurchased);
+        await economyService.savePurchasedItems(user?.id, newPurchased);
         setPurchasedItems(newPurchased);
         achievements.unlock('collector');
 
         // If it's a voice, auto-equip it
         if (item.category === 'ai-voices' && item.voiceId) {
-          await storage.saveSetting('coach_voice', item.voiceId);
+          await economyService.saveCoachVoice(user?.id, item.voiceId);
           setEquippedVoice(item.voiceId);
         }
       }
@@ -176,7 +178,7 @@ export default function Marketplace() {
   const handleSubscribe = async () => {
     setIsSubscribing(true);
     try {
-      const success = await economyService.subscribeRetroPass();
+      const success = await economyService.subscribeRetroPass(user?.id);
       if (success) {
         alert("¡Bienvenido al Retro Pass!");
         // Update local state if needed
@@ -192,7 +194,7 @@ export default function Marketplace() {
   };
 
   const handleEquipVoice = async (voiceId: string) => {
-    await storage.saveSetting('coach_voice', voiceId);
+    await economyService.saveCoachVoice(user?.id, voiceId);
     setEquippedVoice(voiceId);
   };
 
@@ -204,7 +206,7 @@ export default function Marketplace() {
     }
 
     // Deduct credits
-    const newBalance = await storage.addCredits(-box.price);
+    const newBalance = await economyService.addCredits(user?.id, -box.price);
     setCredits(newBalance);
     
     setSelectedBox(box);

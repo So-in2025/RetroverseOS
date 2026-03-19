@@ -14,7 +14,7 @@ export class ROMFetchService {
     if (cached) return cached;
 
     console.log(`[BIOS Fetch] Downloading ${filename}...`);
-    onProgress?.(`Downloading BIOS: ${filename}...`);
+    onProgress?.('Preparando descarga...');
     
     const response = await this.fetchWithProgress(url, onProgress);
     const blob = await response.blob();
@@ -52,7 +52,7 @@ export class ROMFetchService {
       const header = await cachedRom.blob.slice(0, 100).text();
       if (!header.trim().toLowerCase().startsWith('<') && !header.toLowerCase().includes('<!doctype html>')) {
         console.log(`[ROM Fetch] Cache hit for ${gameId} (${(cachedRom.blob.size / 1024).toFixed(2)} KB)`);
-        onProgress?.('Loading from cache...');
+        onProgress?.('Cargando desde caché...');
         await storage.updateRomAccessTime(gameId);
         return cachedRom.blob;
       } else {
@@ -63,7 +63,7 @@ export class ROMFetchService {
     }
 
     console.log(`[ROM Fetch] Cache miss for ${gameId}. Downloading...`);
-    onProgress?.('Initializing download...');
+    onProgress?.('Iniciando descarga...');
     
     // 2. Define Validator for Zip Integrity and HTML errors
     const blobValidator = async (blob: Blob) => {
@@ -99,7 +99,7 @@ export class ROMFetchService {
     const isZip = url.toLowerCase().endsWith('.zip') || magic.startsWith('PK');
 
     if (isZip && system !== 'mame' && system !== 'neogeo') {
-      onProgress?.('Extracting main ROM file...');
+      onProgress?.('Extrayendo archivo principal...');
       blob = await this.extractMainFileFromZip(blob, system);
     }
 

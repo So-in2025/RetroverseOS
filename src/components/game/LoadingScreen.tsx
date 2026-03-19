@@ -81,11 +81,11 @@ export default function LoadingScreen({ status, progress, coverUrl, title, syste
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               key={status} // Animate on change
-              className="text-cyan-electric/80 font-mono text-xs uppercase tracking-[0.2em]"
+              className="text-white/80 font-sans text-sm uppercase tracking-wider"
             >
-              {status || `INICIALIZANDO PROTOCOLO [${system || 'DESCONOCIDO'}]...`}
+              {status || `Cargando ${title || 'juego'}...`}
             </motion.span>
-            <span className="text-zinc-600 font-mono text-xs">{progress}%</span>
+            <span className="text-zinc-600 font-sans text-sm">{progress}%</span>
           </div>
         </div>
       </div>

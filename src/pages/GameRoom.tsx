@@ -552,7 +552,7 @@ export default function GameRoom() {
             </button>
             <div className="w-px h-4 md:h-5 bg-white/10"></div>
             <h2 className="font-black text-white text-xs md:text-sm italic uppercase tracking-tighter hidden md:block">
-              Dominion <span className="text-cyan-electric">OS</span>
+              Retroverse
             </h2>
             <span className="px-2 py-0.5 rounded-lg bg-cyan-electric/10 text-cyan-electric text-[10px] font-black border border-cyan-electric/20 uppercase">
               {players.length + 1} ACTIVOS
@@ -684,14 +684,7 @@ export default function GameRoom() {
                      <span className="text-xs font-black uppercase tracking-widest text-center">QUICK CHAT</span>
                    </button>
 
-                   <button 
-                     onClick={() => { handleAskCoach(); setIsMobileMenuOpen(false); }}
-                     disabled={isAnalyzing}
-                     className="p-4 rounded-xl flex flex-col items-center gap-2 bg-cyan-electric/10 border border-cyan-electric/50 text-cyan-electric"
-                   >
-                     {isAnalyzing ? <Loader2 className="w-8 h-8 animate-spin" /> : <BrainCircuit className="w-8 h-8" />}
-                     <span className="text-xs font-black uppercase tracking-widest">ENTRENADOR IA</span>
-                   </button>
+
 
                    <button 
                      onClick={() => { handleRecordClip(); setIsMobileMenuOpen(false); }}

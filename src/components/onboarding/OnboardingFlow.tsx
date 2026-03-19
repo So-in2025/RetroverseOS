@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Gamepad2, Sparkles, Rocket, ChevronRight, Check, Heart, Zap, Trophy, History } from 'lucide-react';
-import { storage } from '../../services/storage';
+import { economyService } from '../../services/economyService';
+import { useAuth } from '../../services/AuthContext';
 import { haptics } from '../../services/haptics';
 
 interface OnboardingFlowProps {
@@ -25,6 +26,7 @@ const ERAS = [
 ];
 
 const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) => {
+  const { user } = useAuth();
   const [step, setStep] = useState(0);
   const [preferences, setPreferences] = useState<{
     genres: string[];
@@ -48,8 +50,8 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) => {
 
   const handleComplete = async () => {
     haptics.success();
-    await storage.saveSetting('user_preferences', preferences);
-    await storage.saveSetting('onboarding_completed', true);
+    await economyService.saveUserPreferences(user?.id, preferences);
+    await economyService.saveSetting('onboarding_completed', true, user?.id);
     onComplete();
   };
 

@@ -1,5 +1,5 @@
 import { gameCatalog } from './gameCatalog';
-import { storage } from './storage';
+import { economyService } from './economyService';
 
 export interface UserPreferences {
   genres: string[];
@@ -10,8 +10,8 @@ export interface UserPreferences {
 class RecommendationEngine {
   private preferences: UserPreferences | null = null;
 
-  async init() {
-    const prefs = await storage.getSetting('user_preferences');
+  async init(userId?: string) {
+    const prefs = await economyService.getUserPreferences(userId);
     if (prefs) {
       this.preferences = prefs;
     }
@@ -20,7 +20,7 @@ class RecommendationEngine {
   async getRecommendedGames(limit: number = 8) {
     if (!this.preferences) return [];
 
-    const allGames = await gameCatalog.getGames();
+    const allGames = await gameCatalog.getAllGames();
     
     // Algorithm: Score games based on preferences
     const scoredGames = allGames.map(game => {
@@ -43,7 +43,7 @@ class RecommendationEngine {
       });
 
       // Boost popular games (simulated)
-      if (game.play_count > 100) score += 2;
+      // if (game.play_count > 100) score += 2;
 
       return { ...game, recommendationScore: score };
     });
@@ -55,9 +55,9 @@ class RecommendationEngine {
       .slice(0, limit);
   }
 
-  async updatePreferences(newPrefs: UserPreferences) {
+  async updatePreferences(newPrefs: UserPreferences, userId?: string) {
     this.preferences = newPrefs;
-    await storage.saveSetting('user_preferences', newPrefs);
+    await economyService.saveUserPreferences(userId, newPrefs);
   }
 }
 

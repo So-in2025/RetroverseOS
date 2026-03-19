@@ -12,7 +12,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   {
     id: 'first_boot',
     title: 'System Online',
-    description: 'Boot Dominion OS for the first time.',
+    description: 'Boot Retroverse for the first time.',
     icon: 'Power',
     category: 'exploration'
   },
@@ -32,7 +32,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
   {
     id: 'capitalist',
-    title: 'Dominion Capitalist',
+    title: 'Retroverse Capitalist',
     description: 'Earn your first 1000 credits.',
     icon: 'Coins',
     category: 'economy'
