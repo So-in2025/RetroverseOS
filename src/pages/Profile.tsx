@@ -19,7 +19,7 @@ const iconMap: Record<string, any> = {
 export default function Profile() {
   const [coachInsights, setCoachInsights] = useState<any[]>([]);
   const [unlockedIds, setUnlockedIds] = useState<string[]>([]);
-  const [referralData, setReferralData] = useState({ code: '', count: 0 });
+  const [referralData, setReferralData] = useState({ code: '', invites: 0, claimedRewards: [] as string[] });
 
   useEffect(() => {
     const history = aiCoach.getHistory();
@@ -286,20 +286,34 @@ export default function Profile() {
               </div>
             </div>
 
-            <div className="w-full md:w-64 bg-black/40 border border-white/10 rounded-xl p-5 shrink-0">
+            <div className="w-full md:w-64 bg-black/40 border border-white/10 rounded-xl p-5 shrink-0 flex flex-col justify-center">
               <div className="flex justify-between items-end mb-2">
                 <span className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Progreso</span>
-                <span className="text-emerald-400 font-mono font-bold text-lg">{referralData.count % 3}/3</span>
+                <span className="text-emerald-400 font-mono font-bold text-lg">{referralData.invites % 3}/3</span>
               </div>
               <div className="h-2 w-full bg-zinc-800 rounded-full overflow-hidden mb-4">
                 <div 
                   className="h-full bg-emerald-500 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-500" 
-                  style={{ width: `${((referralData.count % 3) / 3) * 100}%` }}
+                  style={{ width: `${((referralData.invites % 3) / 3) * 100}%` }}
                 />
               </div>
-              <p className="text-xs text-zinc-500 text-center">
-                {3 - (referralData.count % 3)} amigo{3 - (referralData.count % 3) !== 1 ? 's' : ''} más para tu próximo pack!
-              </p>
+              {referralData.invites >= 3 && (referralData.invites % 3) === 0 ? (
+                <button 
+                  onClick={async () => {
+                    await economyService.claimReferralReward('pack_1', 3);
+                    const data = await economyService.getReferralData();
+                    setReferralData(data);
+                    alert('¡Recompensa reclamada! Revisa tu inventario.');
+                  }}
+                  className="w-full py-2 bg-emerald-500 text-black font-bold text-xs uppercase tracking-wider rounded-lg hover:bg-emerald-400 transition-colors shadow-[0_0_15px_rgba(16,185,129,0.3)] animate-pulse"
+                >
+                  Reclamar Recompensa
+                </button>
+              ) : (
+                <p className="text-xs text-zinc-500 text-center">
+                  {3 - (referralData.invites % 3)} amigo{3 - (referralData.invites % 3) !== 1 ? 's' : ''} más para tu próximo pack!
+                </p>
+              )}
             </div>
           </div>
         </motion.div>
@@ -566,10 +580,16 @@ export default function Profile() {
                     </div>
                     <div className="p-3 bg-zinc-950/80">
                       <h4 className="text-xs font-bold text-white truncate">{clip.title}</h4>
-                      <div className="flex justify-between items-center mt-1">
+                      <div className="flex justify-between items-center mt-1 mb-2">
                         <span className="text-[10px] text-zinc-400">{clip.game}</span>
                         <span className="text-[10px] font-bold text-purple-400">{clip.views} vistas</span>
                       </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); alert('Compartiendo en TikTok...'); }}
+                        className="w-full py-1.5 bg-white text-black text-[10px] font-bold rounded hover:bg-zinc-200 transition-colors"
+                      >
+                        Compartir en TikTok
+                      </button>
                     </div>
                   </div>
                 ))}

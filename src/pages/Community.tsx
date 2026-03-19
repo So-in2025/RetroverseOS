@@ -1,15 +1,28 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { MessageSquare, Users, Calendar, Trophy, Medal, Crown, Swords, ArrowRight, Activity, ShieldAlert, TrendingUp, Cpu, Server } from 'lucide-react';
+import { MessageSquare, Users, Calendar, Trophy, Medal, Crown, Swords, ArrowRight, Activity, ShieldAlert, TrendingUp, Cpu, Server, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AudioEngine } from '../services/audioEngine';
 import { haptics } from '../services/haptics';
 import TournamentBracket from '../components/community/TournamentBracket';
 
+import { useGameStore } from '../store/gameStore';
+import { GoogleGenAI, Type } from "@google/genai";
+
 export default function Community() {
   const location = useLocation();
+  const { sentinelStats } = useGameStore();
   const [activeTab, setActiveTab] = useState<'feed' | 'tournaments' | 'leaderboards' | 'mission-control'>('feed');
   const [selectedTournament, setSelectedTournament] = useState<string | null>(null);
+  const [isGeneratingTournament, setIsGeneratingTournament] = useState(false);
+  const [showGeneratedTournament, setShowGeneratedTournament] = useState(false);
+  const [generatedTournament, setGeneratedTournament] = useState({
+    title: "Super Smash Bros. Flash Cup",
+    game: "Super Smash Bros.",
+    format: "Eliminación Directa (1v1)",
+    prize: "15,000 CR",
+    startTime: "En 15 minutos"
+  });
 
   useEffect(() => {
     if (location.pathname.includes('tournaments')) {
@@ -59,6 +72,48 @@ export default function Community() {
     { rank: 4, name: "GlitchRunner", rating: 2750, winRate: "65%", main: "Speed" },
     { rank: 5, name: "RetroKing", rating: 2720, winRate: "62%", main: "Balanced" },
   ];
+
+  const handleGenerateTournament = async () => {
+    setIsGeneratingTournament(true);
+    AudioEngine.playSelectSound();
+    haptics.light();
+    
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: "Genera un torneo de videojuegos retro aleatorio. Devuelve un JSON con: title, game, format, prize (en CR), startTime. Sé creativo y usa juegos clásicos.",
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              game: { type: Type.STRING },
+              format: { type: Type.STRING },
+              prize: { type: Type.STRING },
+              startTime: { type: Type.STRING }
+            },
+            required: ["title", "game", "format", "prize", "startTime"]
+          }
+        }
+      });
+      
+      const text = response.text;
+      if (text) {
+        const data = JSON.parse(text);
+        setGeneratedTournament(data);
+      }
+      setShowGeneratedTournament(true);
+      haptics.success();
+    } catch (e) {
+      console.error("AI Generation failed:", e);
+      // Fallback to default values already in state
+      setShowGeneratedTournament(true);
+    } finally {
+      setIsGeneratingTournament(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 lg:static lg:inset-auto w-full bg-zinc-950 text-white font-sans z-40 overflow-y-auto lg:overflow-visible scrollbar-hide">
@@ -190,9 +245,33 @@ export default function Community() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 gap-4 md:gap-6 w-full"
+              className="w-full space-y-6"
             >
-              {tournaments.map((t) => (
+              <div className="flex justify-between items-center bg-zinc-900 border border-white/5 p-4 rounded-2xl">
+                <div>
+                  <h2 className="text-lg font-bold text-white">Torneos Oficiales</h2>
+                  <p className="text-xs text-zinc-400">Compite por premios en créditos y gloria eterna.</p>
+                </div>
+                <button 
+                  onClick={handleGenerateTournament}
+                  disabled={isGeneratingTournament}
+                  className="px-4 py-2 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500 hover:text-black font-bold rounded-xl transition-colors flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGeneratingTournament ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                      Generando...
+                    </>
+                  ) : (
+                    <>
+                      <Cpu className="w-4 h-4" />
+                      Generar Torneo IA
+                    </>
+                  )}
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:gap-6 w-full">
+                {tournaments.map((t) => (
                 <div key={t.id} className="group relative bg-zinc-900 border border-white/5 rounded-2xl overflow-hidden hover:border-emerald-500/50 transition-all hover:shadow-2xl hover:shadow-emerald-900/10">
                     <div className="absolute inset-0 z-0">
                       <img src={t.image} alt={t.title} className="w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity group-hover:scale-105 duration-700" referrerPolicy="no-referrer" />
@@ -239,6 +318,7 @@ export default function Community() {
                     </div>
                 </div>
               ))}
+              </div>
             </motion.div>
           )}
 
@@ -458,7 +538,43 @@ export default function Community() {
                       </div>
                     </div>
 
-                    {/* Agent 5: DevOps */}
+                    {/* Agent 5: Sentinel GCTS */}
+                    <div className="bg-black/40 border border-white/5 rounded-xl p-5 hover:border-emerald-500/50 transition-colors group">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
+                            <Activity className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h3 className="font-bold text-white text-sm">Sentinel GCTS</h3>
+                            <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Agente de Compatibilidad</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                          <Activity className="w-4 h-4 text-emerald-400" />
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center text-[10px] uppercase tracking-wider text-zinc-500">
+                          <span>Testeados Hoy</span>
+                          <span className="text-white font-mono">{sentinelStats.testedToday}</span>
+                        </div>
+                        <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-emerald-500"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(sentinelStats.successful / (sentinelStats.testedToday || 1)) * 100}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between items-center text-[10px] uppercase tracking-wider text-zinc-500">
+                          <span>Éxito / Reparaciones</span>
+                          <span className="text-emerald-400 font-mono">{sentinelStats.successful} / {sentinelStats.repairs}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Agent 6: DevOps */}
                     <div className="bg-black/40 border border-white/5 rounded-xl p-5 hover:border-emerald-500/50 transition-colors group lg:col-span-2">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
@@ -504,6 +620,77 @@ export default function Community() {
             tournamentTitle={selectedTournament} 
             onClose={() => setSelectedTournament(null)} 
           />
+        )}
+        
+        {showGeneratedTournament && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-zinc-900 border border-emerald-500/30 rounded-2xl p-6 max-w-md w-full shadow-2xl shadow-emerald-900/20"
+            >
+              <div className="flex items-center gap-3 mb-4 text-emerald-400">
+                <Cpu className="w-6 h-6" />
+                <h3 className="text-xl font-bold text-white">{generatedTournament.title}</h3>
+              </div>
+              <p className="text-zinc-400 text-sm mb-6">
+                El <strong className="text-emerald-400">Director de Torneos IA</strong> ha analizado la actividad reciente y ha creado un torneo relámpago para maximizar el engagement.
+              </p>
+              
+              <div className="bg-black/50 rounded-xl p-4 mb-6 border border-white/5 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-zinc-500 uppercase">Juego</span>
+                  <span className="text-sm font-bold text-white">{generatedTournament.game}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-zinc-500 uppercase">Formato</span>
+                  <span className="text-sm font-bold text-white">{generatedTournament.format}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-zinc-500 uppercase">Pozo de Premios</span>
+                  <span className="text-sm font-bold text-emerald-400">{generatedTournament.prize}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-zinc-500 uppercase">Inicio</span>
+                  <span className="text-sm font-bold text-white">{generatedTournament.startTime}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowGeneratedTournament(false)}
+                  className="flex-1 px-4 py-3 bg-zinc-800 text-white font-bold rounded-xl hover:bg-zinc-700 transition-colors text-sm"
+                >
+                  Cerrar
+                </button>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(`https://retroverse.app/tournaments/${generatedTournament.title.toLowerCase().replace(/\s+/g, '-')}`);
+                    haptics.success();
+                  }}
+                  className="px-4 py-3 bg-emerald-500/20 text-emerald-500 font-bold rounded-xl hover:bg-emerald-500/30 transition-colors flex items-center justify-center"
+                  title="Compartir Torneo"
+                >
+                  <Share2 className="w-5 h-5" />
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowGeneratedTournament(false);
+                    setSelectedTournament(generatedTournament.title);
+                  }}
+                  className="flex-[2] px-4 py-3 bg-emerald-500 text-black font-bold rounded-xl hover:bg-emerald-400 transition-colors text-sm"
+                >
+                  Ver Cuadro
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

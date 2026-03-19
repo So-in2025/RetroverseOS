@@ -67,12 +67,43 @@ function Layout() {
 }
 
 import { AuthProvider } from './services/AuthContext';
+import { storage } from './services/storage';
+import OnboardingFlow from './components/onboarding/OnboardingFlow';
+import { recommendationEngine } from './services/recommendationEngine';
+import { useState } from 'react';
+import { AnimatePresence } from 'motion/react';
 
 export default function App() {
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    const checkOnboarding = async () => {
+      const completed = await storage.getSetting('onboarding_completed');
+      if (!completed) {
+        setShowOnboarding(true);
+      } else {
+        await recommendationEngine.init();
+      }
+    };
+    checkOnboarding();
+  }, []);
+
+  const handleOnboardingComplete = async () => {
+    setShowOnboarding(false);
+    await recommendationEngine.init();
+    // Force a re-render or notify components that recommendations are ready
+    window.dispatchEvent(new CustomEvent('recommendations_updated'));
+  };
+
   return (
     <AuthProvider>
       <Router>
         <div className="min-h-screen bg-carbon text-white font-sans">
+          <AnimatePresence>
+            {showOnboarding && (
+              <OnboardingFlow onComplete={handleOnboardingComplete} />
+            )}
+          </AnimatePresence>
           <NotificationSystem />
           <Routes>
             <Route path="/login" element={<Login />} />

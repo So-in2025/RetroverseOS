@@ -1,25 +1,26 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import React from 'react';
-import { Share2, Users, MessageSquare, Send, BrainCircuit, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video } from 'lucide-react';
+import { Share2, Users, MessageSquare, Send, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video } from 'lucide-react';
 import { emulator } from '../services/emulator';
 import { multiplayer } from '../services/multiplayer';
-import { aiCoach } from '../services/aiCoaching';
 import { inputManager, RetroButton } from '../services/inputManager';
 import { gameCatalog } from '../services/gameCatalog';
 import { storage } from '../services/storage';
 import { achievements } from '../services/achievements';
 import { AudioEngine } from '../services/audioEngine';
 import { MetadataNormalizationEngine } from '../services/metadataNormalization';
+import { haptics } from '../services/haptics';
 import GameOverlay from '../components/game/GameOverlay';
 import LobbyView from '../components/game/LobbyView';
 import SaveStatePanel from '../components/game/SaveStatePanel';
 import VirtualController from '../components/game/VirtualController';
 import CRTFilter from '../components/game/CRTFilter';
 import LoadingScreen from '../components/game/LoadingScreen';
-import TacticalOverlay from '../components/game/TacticalOverlay';
 import CommunityTipsPanel from '../components/game/CommunityTipsPanel';
+import QuickChatWheel from '../components/game/QuickChatWheel';
 import { motion, AnimatePresence } from 'motion/react';
+import { GoogleGenAI, Type } from "@google/genai";
 
 import { saveService } from '../services/saveService';
 import { useAuth } from '../services/AuthContext';
@@ -41,10 +42,10 @@ export default function GameRoom() {
   const [loadingStatus, setLoadingStatus] = useState('Initializing Systems...');
   const [matchmakingStatus, setMatchmakingStatus] = useState<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
-  const [coachAdvice, setCoachAdvice] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [showQuickChat, setShowQuickChat] = useState(false);
+  const [isVoiceActive, setIsVoiceActive] = useState(false);
   const [isSavePanelOpen, setIsSavePanelOpen] = useState(false);
   const [isTipsPanelOpen, setIsTipsPanelOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -56,6 +57,7 @@ export default function GameRoom() {
   const [isRecordingClip, setIsRecordingClip] = useState(false);
   const [showClipModal, setShowClipModal] = useState(false);
   const [showGuestModal, setShowGuestModal] = useState(false);
+  const [showHypeNotification, setShowHypeNotification] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -63,6 +65,26 @@ export default function GameRoom() {
   const mountedRef = useRef(false);
 
   const [pendingExit, setPendingExit] = useState(false);
+
+  // Simulate AI Hype Detection
+  useEffect(() => {
+    if (gameState !== 'playing') return;
+    
+    const hypeInterval = setInterval(() => {
+      // 10% chance every 30 seconds to detect a "hype moment"
+      if (Math.random() < 0.1) {
+        setShowHypeNotification(true);
+        AudioEngine.playSelectSound();
+        haptics.success();
+        
+        setTimeout(() => {
+          setShowHypeNotification(false);
+        }, 4000);
+      }
+    }, 30000);
+    
+    return () => clearInterval(hypeInterval);
+  }, [gameState]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -87,15 +109,10 @@ export default function GameRoom() {
   }, []);
 
   useEffect(() => {
-    if (coachAdvice && voiceEnabled) {
-      // Auto-speech disabled by default to prevent annoyance
-      // const utterance = new SpeechSynthesisUtterance(coachAdvice);
-      // utterance.rate = 1.1;
-      // utterance.pitch = 1.0;
-      // window.speechSynthesis.cancel();
-      // window.speechSynthesis.speak(utterance);
+    if (voiceEnabled) {
+      // Voice chat logic would go here
     }
-  }, [coachAdvice, voiceEnabled]);
+  }, [voiceEnabled]);
 
   useEffect(() => {
     const loadCredits = async () => {
@@ -361,13 +378,29 @@ export default function GameRoom() {
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !gameId) return;
-
-    const msg = { user: userId.current, text: newMessage };
-    setMessages(prev => [...prev, { user: 'You', text: newMessage }]);
-    multiplayer.sendChatMessage(gameId, msg);
-    achievements.unlock('social_link');
+    handleSendText(newMessage);
     setNewMessage('');
   };
+
+  const handleSendText = (text: string) => {
+    if (!text.trim() || !gameId) return;
+    const msg = { user: userId.current, text };
+    setMessages(prev => [...prev, { user: 'You', text }]);
+    multiplayer.sendChatMessage(gameId, msg);
+    achievements.unlock('social_link');
+    haptics.light();
+  };
+
+  const quickChatOptions = [
+    "¡Buena partida!",
+    "¡GG WP!",
+    "¿Revancha?",
+    "¡Qué suerte!",
+    "¡Impresionante!",
+    "Necesito ayuda...",
+    "¡A por ellos!",
+    "¡LOL!"
+  ];
 
   const startGame = () => {
     setGameState('playing');
@@ -420,27 +453,15 @@ export default function GameRoom() {
     setIsSavePanelOpen(!isSavePanelOpen);
   };
 
-  const handleAskCoach = async () => {
-    if (!canvasRef.current || isAnalyzing) return;
-    
-    setIsAnalyzing(true);
-    try {
-      const advice = await aiCoach.analyzeFrame(canvasRef.current);
-      setCoachAdvice(advice);
-      achievements.unlock('ai_tactician');
-      
-      const newTotal = await storage.addCredits(50);
-      setCredits(newTotal);
-
-      if (newTotal >= 1000) {
-        achievements.unlock('capitalist');
-      }
-
-      setTimeout(() => setCoachAdvice(null), 10000);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsAnalyzing(false);
+  const handleToggleVoice = () => {
+    setVoiceEnabled(!voiceEnabled);
+    if (!voiceEnabled) {
+      haptics.success();
+      setIsVoiceActive(true);
+      setTimeout(() => setIsVoiceActive(false), 2000); // Simulate initial activity
+    } else {
+      haptics.light();
+      setIsVoiceActive(false);
     }
   };
 
@@ -464,6 +485,45 @@ export default function GameRoom() {
         />
       )}
 
+      {/* Quick Chat Wheel */}
+      <QuickChatWheel
+        isOpen={showQuickChat}
+        onClose={() => setShowQuickChat(false)}
+        onSelect={handleSendText}
+        options={quickChatOptions}
+      />
+
+      {/* Voice Activity Overlay */}
+      <AnimatePresence>
+        {voiceEnabled && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2 bg-black/80 border border-cyan-electric/30 rounded-full backdrop-blur-md"
+          >
+            <div className="flex gap-1 items-center h-4">
+              {[1, 2, 3, 4].map((i) => (
+                <motion.div
+                  key={i}
+                  animate={{ 
+                    height: isVoiceActive ? [4, 16, 4] : 4,
+                    opacity: isVoiceActive ? 1 : 0.3
+                  }}
+                  transition={{ 
+                    repeat: Infinity, 
+                    duration: 0.5, 
+                    delay: i * 0.1 
+                  }}
+                  className="w-1 bg-cyan-electric rounded-full"
+                />
+              ))}
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-cyan-electric">Voz Activa</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Full Surface Canvas */}
       <div 
         className={`absolute inset-0 flex items-center justify-center transition-all duration-500 
@@ -482,9 +542,6 @@ export default function GameRoom() {
         />
         <CRTFilter enabled={crtEnabled} />
       </div>
-
-      {/* Tactical AI Overlay */}
-      <TacticalOverlay advice={coachAdvice || ''} isVisible={!!coachAdvice} />
 
       {/* Floating Top Bar */}
       <div className="absolute top-0 left-0 right-0 p-4 md:p-6 flex justify-between items-start z-30 pointer-events-none">
@@ -529,11 +586,21 @@ export default function GameRoom() {
             {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
           </button>
           <button 
-            onClick={() => setVoiceEnabled(!voiceEnabled)}
+            onClick={handleToggleVoice}
             className={`p-2 rounded-xl transition-all ${voiceEnabled ? 'bg-magenta-accent/20 text-magenta-accent' : 'hover:bg-white/10 text-zinc-400 hover:text-white'}`}
             title="Voice Chat"
           >
             {voiceEnabled ? <Volume2 className="w-4 h-4 md:w-5 md:h-5" /> : <VolumeX className="w-4 h-4 md:w-5 md:h-5" />}
+          </button>
+          <button 
+            onClick={() => {
+              navigator.clipboard.writeText(`https://retroverse.app/play/${gameId}?room=xyz123`);
+              alert('¡Enlace de la sala copiado al portapapeles!');
+            }}
+            className="p-2 rounded-xl hover:bg-emerald-500/20 text-zinc-400 hover:text-emerald-400 transition-all"
+            title="Compartir Sala"
+          >
+            <Share2 className="w-4 h-4 md:w-5 md:h-5" />
           </button>
           <button 
             onClick={handleRecordClip}
@@ -542,6 +609,13 @@ export default function GameRoom() {
             disabled={isRecordingClip}
           >
             <Video className="w-4 h-4 md:w-5 md:h-5" />
+          </button>
+          <button 
+            onClick={() => alert('¡Reporte enviado!')}
+            className="p-2 rounded-xl hover:bg-amber-500/20 text-zinc-400 hover:text-amber-500 transition-all"
+            title="Reportar Problema"
+          >
+            <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" />
           </button>
         </div>
 
@@ -603,6 +677,14 @@ export default function GameRoom() {
                    </button>
 
                    <button 
+                     onClick={() => { setShowQuickChat(true); setIsMobileMenuOpen(false); }}
+                     className="p-4 rounded-xl flex flex-col items-center gap-2 bg-white/5 border border-white/10 text-zinc-300"
+                   >
+                     <MessageSquare className="w-8 h-8 text-cyan-electric" />
+                     <span className="text-xs font-black uppercase tracking-widest text-center">QUICK CHAT</span>
+                   </button>
+
+                   <button 
                      onClick={() => { handleAskCoach(); setIsMobileMenuOpen(false); }}
                      disabled={isAnalyzing}
                      className="p-4 rounded-xl flex flex-col items-center gap-2 bg-cyan-electric/10 border border-cyan-electric/50 text-cyan-electric"
@@ -614,16 +696,28 @@ export default function GameRoom() {
                    <button 
                      onClick={() => { handleRecordClip(); setIsMobileMenuOpen(false); }}
                      disabled={isRecordingClip}
-                     className={`p-4 rounded-xl flex flex-col items-center gap-2 border col-span-2 transition-all ${
+                     className={`p-4 rounded-xl flex flex-col items-center gap-2 border transition-all ${
                        isRecordingClip 
                          ? 'bg-red-500/10 border-red-500/50 text-red-500 animate-pulse' 
                          : 'bg-purple-500/10 border-purple-500/50 text-purple-400'
                      }`}
                    >
                      <Video className="w-8 h-8" />
-                     <span className="text-xs font-black uppercase tracking-widest">
-                       {isRecordingClip ? 'GRABANDO...' : 'GRABAR CLIP (30S)'}
+                     <span className="text-xs font-black uppercase tracking-widest text-center">
+                       {isRecordingClip ? 'GRABANDO...' : 'GRABAR CLIP'}
                      </span>
+                   </button>
+
+                   <button 
+                     onClick={() => { 
+                       navigator.clipboard.writeText(`https://retroverse.app/play/${gameId}?room=xyz123`);
+                       alert('¡Enlace copiado!');
+                       setIsMobileMenuOpen(false); 
+                     }}
+                     className="p-4 rounded-xl flex flex-col items-center gap-2 bg-emerald-500/10 border border-emerald-500/50 text-emerald-500"
+                   >
+                     <Share2 className="w-8 h-8" />
+                     <span className="text-xs font-black uppercase tracking-widest text-center">COMPARTIR</span>
                    </button>
                 </div>
 
@@ -653,12 +747,25 @@ export default function GameRoom() {
                         <span className="font-bold uppercase text-sm">Comunicaciones de Voz</span>
                       </div>
                       <button 
-                        onClick={() => setVoiceEnabled(!voiceEnabled)}
+                        onClick={handleToggleVoice}
                         className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
                           voiceEnabled ? 'bg-magenta-accent text-white' : 'bg-white/10 text-zinc-500'
                         }`}
                       >
                         {voiceEnabled ? 'ON' : 'OFF'}
+                      </button>
+                    </div>
+
+                    <div className="flex items-center justify-between p-4">
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle className="w-5 h-5 text-amber-500" />
+                        <span className="font-bold uppercase text-sm text-amber-500">Reportar Problema</span>
+                      </div>
+                      <button 
+                        onClick={() => { alert('¡Reporte enviado!'); setIsMobileMenuOpen(false); }}
+                        className="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all bg-amber-500/20 text-amber-500 hover:bg-amber-500/30"
+                      >
+                        ENVIAR
                       </button>
                     </div>
 
@@ -712,26 +819,6 @@ export default function GameRoom() {
       {/* Floating Bottom Bar (Desktop Only) */}
       <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-4 z-30 pointer-events-none bottom-8">
         <div className="pointer-events-auto flex items-center gap-2 md:gap-3 bg-carbon/60 backdrop-blur-xl border border-white/10 p-2 md:p-3 rounded-3xl shadow-2xl glass origin-top">
-          <motion.button 
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            onClick={handleAskCoach}
-            disabled={isAnalyzing || gameState !== 'playing'}
-            className={`
-              flex items-center gap-2 md:gap-3 px-4 md:px-8 py-2 md:py-4 rounded-2xl font-black italic uppercase tracking-tighter transition-all
-              ${isAnalyzing 
-                ? 'bg-cyan-electric/20 text-cyan-electric/50 cursor-wait' 
-                : 'bg-cyan-electric text-black neon-glow-cyan'
-              }
-              disabled:opacity-50 disabled:cursor-not-allowed
-            `}
-          >
-            {isAnalyzing ? <Loader2 className="w-4 h-4 md:w-6 md:h-6 animate-spin" /> : <BrainCircuit className="w-4 h-4 md:w-6 md:h-6" />}
-            <span className="text-[10px] md:text-base">{isAnalyzing ? 'Analizando...' : 'IA Táctica'}</span>
-          </motion.button>
-
-          <div className="w-px h-6 md:h-10 bg-white/10 mx-1 md:mx-2"></div>
-
           <button 
             onClick={() => setIsSavePanelOpen(true)}
             className="p-2 md:p-4 rounded-2xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all border border-transparent hover:border-white/10"
@@ -826,6 +913,25 @@ export default function GameRoom() {
       />
 
       <AnimatePresence>
+        {showHypeNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            className="absolute top-24 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+          >
+            <div className="bg-gradient-to-r from-purple-600/90 via-fuchsia-500/90 to-purple-600/90 backdrop-blur-md border border-white/20 px-6 py-3 rounded-full shadow-[0_0_30px_rgba(168,85,247,0.5)] flex items-center gap-3">
+              <Video className="w-5 h-5 text-white animate-pulse" />
+              <span className="text-white font-black italic uppercase tracking-widest text-sm md:text-base drop-shadow-md">
+                ¡Momento Épico Detectado!
+              </span>
+              <div className="w-2 h-2 rounded-full bg-white animate-ping" />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {isChatOpen && (
           <motion.div
             initial={{ x: '100%', opacity: 0 }}
@@ -844,13 +950,35 @@ export default function GameRoom() {
             </div>
             
             <div className="flex-1 overflow-y-auto p-6 space-y-6 hide-scrollbar">
+              {messages.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-center opacity-30">
+                  <MessageSquare className="w-12 h-12 mb-4" />
+                  <p className="text-xs font-mono uppercase tracking-widest">Sin transmisiones activas</p>
+                </div>
+              )}
               {messages.map((m, i) => (
-                <div key={i} className="flex flex-col gap-2">
+                <div key={i} className={`flex flex-col gap-2 ${m.user === 'You' ? 'items-end' : 'items-start'}`}>
                   <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">{m.user}</span>
-                  <p className="text-sm text-zinc-300 bg-white/5 p-4 rounded-2xl rounded-tl-none border border-white/5 italic">
+                  <p className={`text-sm p-4 rounded-2xl border italic max-w-[80%] ${
+                    m.user === 'You' 
+                      ? 'bg-cyan-electric/10 border-cyan-electric/20 text-cyan-electric rounded-tr-none' 
+                      : 'bg-white/5 border-white/5 text-zinc-300 rounded-tl-none'
+                  }`}>
                     {m.text}
                   </p>
                 </div>
+              ))}
+            </div>
+
+            <div className="px-6 py-2 flex gap-2 overflow-x-auto scrollbar-hide">
+              {quickChatOptions.slice(0, 4).map((opt, i) => (
+                <button
+                  key={i}
+                  onClick={() => handleSendText(opt)}
+                  className="whitespace-nowrap px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-white/10 transition-all"
+                >
+                  {opt}
+                </button>
               ))}
             </div>
 

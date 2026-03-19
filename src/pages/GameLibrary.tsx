@@ -12,6 +12,7 @@ import { haptics } from '../services/haptics';
 import GameSection from '../components/library/GameSection';
 import { ExpandableTopList } from '../components/library/ExpandableTopList';
 import { LiveRoomsList } from '../components/library/LiveRoomsList';
+import { RecommendedSection } from '../components/library/RecommendedSection';
 import { io } from 'socket.io-client';
 
 const SYSTEM_FILTERS = [
@@ -720,6 +721,9 @@ export default function GameLibrary() {
                 {viewMode === 'discover' && (
                   <div className="hidden md:flex flex-col w-full h-full overflow-y-auto hide-scrollbar pb-32 pt-4 px-4 md:px-8 space-y-12 pointer-events-auto">
                     
+                    {/* Recommended Section - Algoritmo de Descubrimiento */}
+                    <RecommendedSection />
+
                     {/* Elite Top 20 Section - FORCED UPDATE */}
                     <ExpandableTopList 
                       title={`ELITE TOP 20: SELECCIÓN MAESTRA`} 

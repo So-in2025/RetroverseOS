@@ -39,7 +39,7 @@ class EconomyService {
   async buyPack(packId: string, price: number): Promise<boolean> {
     const credits = await storage.getCredits();
     if (credits >= price) {
-      await storage.spendCredits(price);
+      await storage.addCredits(-price);
       const owned = await this.getOwnedPacks();
       if (!owned.includes(packId)) {
         owned.push(packId);

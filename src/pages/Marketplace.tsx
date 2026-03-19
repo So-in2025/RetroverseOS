@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ShoppingCart, Sparkles, Zap, Shield, Crown, Star, Search, Filter, Hexagon, Cpu, Check, Gift, Heart } from 'lucide-react';
 import { DynamicCover } from '../components/library/DynamicCover';
+import { UnboxingModal } from '../components/marketplace/UnboxingModal';
 import { storage } from '../services/storage';
 import { achievements } from '../services/achievements';
 import { haptics } from '../services/haptics';
 import { economyService } from '../services/economyService';
+import { AudioEngine } from '../services/audioEngine';
 
 export default function Marketplace() {
   const [activeCategory, setActiveCategory] = useState('featured');
@@ -14,6 +16,10 @@ export default function Marketplace() {
   const [equippedVoice, setEquippedVoice] = useState<string>('Kore');
   const [isProcessing, setIsProcessing] = useState<number | null>(null);
   const [isSubscribing, setIsSubscribing] = useState(false);
+  
+  // Unboxing state
+  const [isUnboxingOpen, setIsUnboxingOpen] = useState(false);
+  const [selectedBox, setSelectedBox] = useState<{ id: string, name: string, price: number } | null>(null);
 
   useEffect(() => {
     const loadEconomy = async () => {
@@ -188,6 +194,22 @@ export default function Marketplace() {
   const handleEquipVoice = async (voiceId: string) => {
     await storage.saveSetting('coach_voice', voiceId);
     setEquippedVoice(voiceId);
+  };
+
+  const handleOpenBox = async (box: { id: string, name: string, price: number }) => {
+    if (credits < box.price) {
+      haptics.error();
+      alert("Créditos insuficientes para esta caja.");
+      return;
+    }
+
+    // Deduct credits
+    const newBalance = await storage.addCredits(-box.price);
+    setCredits(newBalance);
+    
+    setSelectedBox(box);
+    setIsUnboxingOpen(true);
+    haptics.medium();
   };
 
   const filteredItems = activeCategory === 'featured' 
@@ -376,7 +398,7 @@ export default function Marketplace() {
                 <h4 className="font-bold text-white mb-1 relative z-10">{box.name}</h4>
                 <p className="text-xs text-zinc-400 mb-4 relative z-10">Contiene 1 ítem aleatorio.</p>
                 <button 
-                  onClick={() => alert(`Comprando ${box.name}...`)}
+                  onClick={() => handleOpenBox(box as any)}
                   className="px-6 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold transition-colors relative z-10 flex items-center gap-2"
                 >
                   <Hexagon className="w-3 h-3 fill-emerald-400/20 text-emerald-400" />
@@ -570,6 +592,13 @@ export default function Marketplace() {
         </motion.div>
 
       </div>
+
+      <UnboxingModal
+        isOpen={isUnboxingOpen}
+        onClose={() => setIsUnboxingOpen(false)}
+        boxType={(selectedBox?.id as any) || 'box-1'}
+        boxName={selectedBox?.name || ''}
+      />
     </div>
   );
 }
