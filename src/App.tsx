@@ -74,7 +74,7 @@ import BootAnimation from './components/layout/BootAnimation';
 import { AnimatePresence } from 'motion/react';
 
 function AppContent() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [showBoot, setShowBoot] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [initialized, setInitialized] = useState(false);
@@ -103,8 +103,8 @@ function AppContent() {
   return (
     <>
       <AnimatePresence>
-        {showBoot && <BootAnimation onComplete={() => setShowBoot(false)} />}
-        {!showBoot && showOnboarding && (
+        {(showBoot || loading) && <BootAnimation onComplete={() => setShowBoot(false)} />}
+        {!showBoot && !loading && showOnboarding && (
           <OnboardingFlow onComplete={handleOnboardingComplete} />
         )}
       </AnimatePresence>

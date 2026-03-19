@@ -6,11 +6,7 @@ export default function ProtectedRoute() {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-carbon flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-cyan-electric animate-spin" />
-      </div>
-    );
+    return null;
   }
 
   if (!user) {
