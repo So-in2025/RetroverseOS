@@ -70,10 +70,12 @@ import { AuthProvider, useAuth } from './services/AuthContext';
 import { storage } from './services/storage';
 import OnboardingFlow from './components/onboarding/OnboardingFlow';
 import { recommendationEngine } from './services/recommendationEngine';
+import BootAnimation from './components/layout/BootAnimation';
 import { AnimatePresence } from 'motion/react';
 
 function AppContent() {
   const { user } = useAuth();
+  const [showBoot, setShowBoot] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
@@ -101,7 +103,8 @@ function AppContent() {
   return (
     <>
       <AnimatePresence>
-        {showOnboarding && (
+        {showBoot && <BootAnimation onComplete={() => setShowBoot(false)} />}
+        {!showBoot && showOnboarding && (
           <OnboardingFlow onComplete={handleOnboardingComplete} />
         )}
       </AnimatePresence>
