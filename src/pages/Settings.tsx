@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Monitor, Volume2, Gamepad2, Cpu, Save, RotateCcw, Check, Keyboard, LogOut, Trash2, Zap, User, Coins, ShieldCheck, Activity, AlertTriangle } from 'lucide-react';
+import { Monitor, Volume2, Gamepad2, Cpu, Save, RotateCcw, Check, Keyboard, LogOut, Trash2, Zap, User, Coins, ShieldCheck, Activity, AlertTriangle, Globe, Fingerprint } from 'lucide-react';
 import { storage } from '../services/storage';
 import { useAuthStore } from '../store/authStore';
 import { useAuth } from '../services/AuthContext';
@@ -16,7 +16,7 @@ export default function Settings() {
   const { user } = useAuth();
   const logout = useAuthStore((state) => state.logout);
   const sentinelStats = useGameStore((state) => state.sentinelStats);
-  const [activeTab, setActiveTab] = useState<'video' | 'audio' | 'controls' | 'system' | 'sentinel' | 'storage'>('video');
+  const [activeTab, setActiveTab] = useState<'video' | 'audio' | 'controls' | 'system' | 'sentinel' | 'storage' | 'network'>('video');
   const [saved, setSaved] = useState(false);
   const [credits, setCredits] = useState(0);
   const [isForcingRepair, setIsForcingRepair] = useState(false);
@@ -61,11 +61,19 @@ export default function Settings() {
 
   const [activeKeyBind, setActiveKeyBind] = useState<string | null>(null);
 
+  const [networkSettings, setNetworkSettings] = useState({
+    useProxy: true,
+    useFingerprint: true,
+    proxyMode: 'auto' as 'auto' | 'manual',
+    anonymityLevel: 'high' as 'low' | 'medium' | 'high',
+  });
+
   const handleSave = async () => {
     try {
       await economyService.saveVideoSettings(user?.id, videoSettings);
       await economyService.saveAudioSettings(user?.id, audioSettings);
       await economyService.saveControls(user?.id, controls);
+      await economyService.saveSetting('networkSettings', networkSettings, user?.id);
       inputManager.updateKeyMapping(controls);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -85,6 +93,9 @@ export default function Settings() {
       
       const savedControls = await economyService.getControls(user?.id);
       if (savedControls) setControls(prev => ({ ...prev, ...savedControls }));
+
+      const savedNetwork = await economyService.getSetting('networkSettings', user?.id);
+      if (savedNetwork) setNetworkSettings(prev => ({ ...prev, ...savedNetwork }));
 
       const currentCredits = await economyService.getCredits(user?.id);
       setCredits(currentCredits);
@@ -137,6 +148,7 @@ export default function Settings() {
     { id: 'controls', label: 'Mapeo de Controles', icon: Gamepad2 },
     { id: 'system', label: 'Sistema y Emulación', icon: Cpu },
     { id: 'sentinel', label: 'Motor Sentinel', icon: ShieldCheck },
+    { id: 'network', label: 'Red y Privacidad', icon: Globe },
     { id: 'storage', label: 'Gestión de Almacenamiento', icon: Save },
   ];
 
@@ -722,6 +734,102 @@ export default function Settings() {
                       >
                         {isForcingRepair ? 'Ejecutando Protocolo...' : 'Ejecutar Reparación Global'}
                       </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* NETWORK SETTINGS */}
+              {activeTab === 'network' && (
+                <motion.div 
+                  key="network"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-8"
+                >
+                  <h2 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2 border-b border-white/5 pb-4">
+                    <Globe className="w-5 h-5 md:w-6 md:h-6 text-emerald-500" /> Red y Anonimato
+                  </h2>
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/5">
+                        <div className="pr-4">
+                          <p className="font-black text-xs uppercase tracking-widest text-white flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-emerald-500" /> Sistema de Proxies
+                          </p>
+                          <p className="text-[10px] text-zinc-500 mt-1">Enrutar peticiones IA a través de nodos públicos</p>
+                        </div>
+                        <button 
+                          onClick={() => setNetworkSettings({...networkSettings, useProxy: !networkSettings.useProxy})}
+                          className={`w-10 h-5 md:w-12 md:h-6 rounded-full transition-colors relative shrink-0 ${networkSettings.useProxy ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+                        >
+                          <div className={`w-3 h-3 md:w-4 md:h-4 bg-white rounded-full absolute top-1 transition-transform ${networkSettings.useProxy ? 'left-6 md:left-7' : 'left-1'}`} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/5">
+                        <div className="pr-4">
+                          <p className="font-black text-xs uppercase tracking-widest text-white flex items-center gap-2">
+                            <Fingerprint className="w-4 h-4 text-emerald-500" /> Fingerprint Aleatorio
+                          </p>
+                          <p className="text-[10px] text-zinc-500 mt-1">Ofuscar identidad del navegador en cada petición</p>
+                        </div>
+                        <button 
+                          onClick={() => setNetworkSettings({...networkSettings, useFingerprint: !networkSettings.useFingerprint})}
+                          className={`w-10 h-5 md:w-12 md:h-6 rounded-full transition-colors relative shrink-0 ${networkSettings.useFingerprint ? 'bg-emerald-500' : 'bg-zinc-700'}`}
+                        >
+                          <div className={`w-3 h-3 md:w-4 md:h-4 bg-white rounded-full absolute top-1 transition-transform ${networkSettings.useFingerprint ? 'left-6 md:left-7' : 'left-1'}`} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="p-4 bg-black/20 rounded-xl border border-white/5">
+                        <p className="font-black text-xs uppercase tracking-widest text-white mb-3">Nivel de Anonimato</p>
+                        <div className="flex gap-2">
+                          {[
+                            { id: 'low', label: 'Bajo' },
+                            { id: 'medium', label: 'Medio' },
+                            { id: 'high', label: 'Máximo' }
+                          ].map((level) => (
+                            <button 
+                              key={level.id}
+                              onClick={() => setNetworkSettings({...networkSettings, anonymityLevel: level.id as any})}
+                              className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
+                                networkSettings.anonymityLevel === level.id 
+                                  ? 'bg-emerald-600 text-white' 
+                                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                              }`}
+                            >
+                              {level.label}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="text-[9px] text-zinc-500 mt-3 italic">
+                          {networkSettings.anonymityLevel === 'high' ? 'Rotación agresiva de proxies y headers en cada interacción.' : 
+                           networkSettings.anonymityLevel === 'medium' ? 'Balance entre velocidad y privacidad.' : 
+                           'Conexión directa priorizada.'}
+                        </p>
+                      </div>
+
+                      <div className="p-4 bg-emerald-500/5 rounded-xl border border-emerald-500/10">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Activity className="w-4 h-4 text-emerald-500" />
+                          <p className="font-black text-xs uppercase tracking-widest text-emerald-400">Estado de la Red</p>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-[10px]">
+                            <span className="text-zinc-500 uppercase font-bold">Nodos Disponibles:</span>
+                            <span className="text-emerald-500 font-mono">12 Activos</span>
+                          </div>
+                          <div className="flex justify-between text-[10px]">
+                            <span className="text-zinc-500 uppercase font-bold">Latencia Promedio:</span>
+                            <span className="text-emerald-500 font-mono">142ms</span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </motion.div>

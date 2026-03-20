@@ -93,8 +93,8 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                   <div className="px-3 py-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Juegos Encontrados</div>
                   {results.map((game) => (
                     <button
-                      key={game.id}
-                      onClick={() => handleSelect(`/game/${game.id}`)}
+                      key={game.game_id}
+                      onClick={() => handleSelect(`/game/${game.game_id}`)}
                       className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-all group text-left"
                     >
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-zinc-800 border border-white/10 flex-shrink-0">

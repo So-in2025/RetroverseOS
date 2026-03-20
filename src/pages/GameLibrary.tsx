@@ -115,8 +115,8 @@ export default function GameLibrary() {
     if (specialFilter === 'elite') {
       return gameCatalog.getEliteTop20();
     } else if (specialFilter === 'online') {
-      // For now, simulate online games with a stable subset
-      return deferredGames.filter((_, i) => (i * 7) % 10 > 7);
+      // Real online/multiplayer filter based on metadata
+      return deferredGames.filter(g => g.players && g.players > 1);
     }
 
     // 1. Filter by Tab (Mobile)
@@ -227,7 +227,6 @@ export default function GameLibrary() {
       const c = await storage.getCredits();
       setCredits(c);
 
-      await gameCatalog.init();
       const allGames = gameCatalog.getAllGames();
       setGames(allGames);
       setIsBgmPlaying(AudioEngine.getIsPlayingBGM());
@@ -291,7 +290,6 @@ export default function GameLibrary() {
     try {
       const results = await gameCatalog.search(searchQuery, selectedSystem);
       await gameCatalog.addGames(results);
-      setGames(results);
       setSelectedIndex(0);
     } catch (error) {
       console.error("Error searching library:", error);
@@ -472,6 +470,33 @@ export default function GameLibrary() {
           </form>
 
           <div className="flex items-center gap-2">
+             {/* View Mode Switcher */}
+             <div className="hidden lg:flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5 mr-2">
+                {[
+                  { id: 'discover', icon: Zap, label: 'DESCUBRIR' },
+                  { id: 'carousel', icon: Disc, label: 'PORTADAS' },
+                  { id: 'systems', icon: Gamepad2, label: 'SISTEMAS' },
+                  { id: 'grid', icon: Search, label: 'TODOS' }
+                ].map((mode) => (
+                  <button
+                    key={mode.id}
+                    onClick={() => {
+                      setViewMode(mode.id as any);
+                      haptics.medium();
+                      AudioEngine.playMoveSound();
+                    }}
+                    className={`px-3 py-1.5 rounded-lg flex items-center gap-2 transition-all ${
+                      viewMode === mode.id 
+                        ? 'bg-cyan-electric text-black shadow-[0_0_15px_rgba(0,242,255,0.3)]' 
+                        : 'text-zinc-500 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <mode.icon className="w-3 h-3" />
+                    <span className="text-[9px] font-black uppercase tracking-widest">{mode.label}</span>
+                  </button>
+                ))}
+             </div>
+
              <button onClick={toggleBgm} className="p-2 text-zinc-400 hover:text-cyan-electric transition-colors" title="Toggle BGM">
                {isBgmPlaying ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
              </button>

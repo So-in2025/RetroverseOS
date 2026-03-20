@@ -5,11 +5,10 @@ import { apiPoolService, APIKeyStatus } from '../../services/apiPoolService';
 import { haptics } from '../../services/haptics';
 
 interface DebugPanelProps {
-  isOpen: boolean;
   onClose: () => void;
 }
 
-export default function DebugPanel({ isOpen, onClose }: DebugPanelProps) {
+export default function DebugPanel({ onClose }: DebugPanelProps) {
   const [keys, setKeys] = useState<APIKeyStatus[]>([]);
   const [newKey, setNewKey] = useState('');
   const [isAdding, setIsAdding] = useState(false);
@@ -20,12 +19,10 @@ export default function DebugPanel({ isOpen, onClose }: DebugPanelProps) {
   };
 
   useEffect(() => {
-    if (isOpen) {
-      refreshKeys();
-      const interval = setInterval(refreshKeys, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [isOpen]);
+    refreshKeys();
+    const interval = setInterval(refreshKeys, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleAddKey = async () => {
     if (!newKey.trim()) return;
@@ -42,16 +39,13 @@ export default function DebugPanel({ isOpen, onClose }: DebugPanelProps) {
     haptics.medium();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md font-mono"
-      >
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md font-mono"
+    >
         <motion.div
           initial={{ scale: 0.9, y: 20 }}
           animate={{ scale: 1, y: 0 }}
@@ -183,6 +177,5 @@ export default function DebugPanel({ isOpen, onClose }: DebugPanelProps) {
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
   );
 }

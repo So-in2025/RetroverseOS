@@ -22,6 +22,7 @@ import SaveStatePanel from '../components/game/SaveStatePanel';
 import VirtualController from '../components/game/VirtualController';
 import CRTFilter from '../components/game/CRTFilter';
 import LoadingScreen from '../components/game/LoadingScreen';
+import GameMenu from '../components/game/GameMenu';
 import CommunityTipsPanel from '../components/game/CommunityTipsPanel';
 import QuickChatWheel from '../components/game/QuickChatWheel';
 import TacticalOverlay from '../components/game/TacticalOverlay';
@@ -78,6 +79,7 @@ export default function GameRoom() {
   const [isPremium, setIsPremium] = useState(false);
   
   // Store State
+  const [isUiVisible, setIsUiVisible] = useState(true);
   const [isStoreOpen, setIsStoreOpen] = useState(false);
   const [purchasedItems, setPurchasedItems] = useState<string[]>(['filter-classic', 'skin-default']);
   const [activeFilter, setActiveFilter] = useState('classic');
@@ -259,7 +261,7 @@ export default function GameRoom() {
         } else {
           if (!mountedRef.current) return;
           setGameState('error');
-          setErrorMessage('No se pudo resolver el enlace de la ROM.');
+          setErrorMessage('No se pudo conectar con el servidor de juegos.');
           return;
         }
       }
@@ -267,7 +269,7 @@ export default function GameRoom() {
       while (retries <= MAX_RETRIES) {
         if (!mountedRef.current) return;
         try {
-          setLoadingStatus(`Inyectando Núcleo (${currentCore})...`);
+          setLoadingStatus('Preparando motor de emulación...');
           await emulator.initialize({
             gameId,
             core: currentCore,
@@ -284,13 +286,13 @@ export default function GameRoom() {
             } else if (status.includes('Launching')) {
               setLoadingProgress(90);
             } else if (status.includes('BIOS')) {
-              setLoadingStatus('Sincronizando BIOS...');
+              setLoadingStatus('Cargando BIOS...');
               setLoadingProgress(40);
             }
           });
           
           if (!mountedRef.current) return;
-          setLoadingStatus('Estableciendo Enlace Táctico con IA...');
+          setLoadingStatus('Iniciando sistema...');
           setLoadingProgress(100);
           
           setTimeout(async () => {
@@ -712,116 +714,37 @@ export default function GameRoom() {
         <CRTFilter enabled={crtEnabled} style={activeFilter as any} />
       </div>
 
-      {/* Floating Top Bar */}
-      <div className="absolute top-0 left-0 right-0 p-4 md:p-6 flex justify-between items-start z-30 pointer-events-none">
-        <div className="flex flex-col gap-2">
-          <div className="pointer-events-auto flex items-center gap-2 md:gap-4 bg-carbon/60 backdrop-blur-xl border border-white/10 px-3 py-2 md:px-5 md:py-2.5 rounded-2xl shadow-2xl glass">
-            <button onClick={handleExit} className="text-zinc-500 hover:text-rose-500 transition-colors">
-              <X className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-            <div className="w-px h-4 md:h-5 bg-white/10"></div>
-            <h2 className="font-black text-white text-xs md:text-sm italic uppercase tracking-tighter hidden md:block">
-              Retroverse
-            </h2>
-            <span className="px-2 py-0.5 rounded-lg bg-cyan-electric/10 text-cyan-electric text-[10px] font-black border border-cyan-electric/20 uppercase">
-              {players.length + 1} ACTIVOS
-            </span>
-          </div>
-          
-          <div className="pointer-events-auto bg-amber-500/10 backdrop-blur-md border border-amber-500/20 px-3 py-1 rounded-xl flex items-center gap-2 w-fit">
-            <Coins className="w-3 h-3 text-amber-500" />
-            <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{balance}</span>
-          </div>
+      {/* Game Menu */}
+      {isUiVisible && (
+        <GameMenu
+          gameState={gameState}
+          crtEnabled={crtEnabled}
+          isFullscreen={isFullscreen}
+          voiceEnabled={voiceEnabled}
+          isRecordingClip={isRecordingClip}
+          balance={balance}
+          onExit={handleExit}
+          onPause={handlePause}
+          onResume={handleResume}
+          onToggleCrt={() => setCrtEnabled(!crtEnabled)}
+          onToggleFullscreen={toggleFullscreen}
+          onToggleVoice={handleToggleVoice}
+          onRecordClip={handleRecordClip}
+          onOpenStore={() => setIsStoreOpen(true)}
+          onTacticalAdvice={requestTacticalAdvice}
+          onShare={handleInvite}
+          onToggleUi={() => setIsUiVisible(false)}
+        />
+      )}
 
-          <button 
-            onClick={() => setIsStoreOpen(true)}
-            className="pointer-events-auto mt-2 bg-indigo-500/20 hover:bg-indigo-500/40 backdrop-blur-md border border-indigo-500/30 px-4 py-2 rounded-xl flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-500/10"
-          >
-            <ShoppingBag className="w-4 h-4 text-indigo-400" />
-            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Store</span>
-          </button>
-        </div>
-
-        {/* Desktop Controls */}
-        <div className="pointer-events-auto hidden lg:flex items-center gap-1 md:gap-2 bg-carbon/60 backdrop-blur-xl border border-white/10 p-1.5 md:p-2 rounded-2xl shadow-2xl glass">
-          <button 
-            onClick={gameState === 'playing' ? handlePause : handleResume}
-            className={`p-2 rounded-xl transition-all ${gameState === 'paused' ? 'bg-amber-500/20 text-amber-400' : 'hover:bg-white/10 text-zinc-400 hover:text-white'}`}
-          >
-            {gameState === 'playing' ? <Pause className="w-4 h-4 md:w-5 md:h-5" /> : <Play className="w-4 h-4 md:w-5 md:h-5" />}
-          </button>
-          <button 
-            onClick={() => setCrtEnabled(!crtEnabled)}
-            className={`p-2 rounded-xl transition-all ${crtEnabled ? 'bg-cyan-electric/20 text-cyan-electric' : 'hover:bg-white/10 text-zinc-400 hover:text-white'}`}
-          >
-            <MonitorPlay className="w-4 h-4 md:w-5 md:h-5" />
-          </button>
-          <button 
-            onClick={toggleFullscreen}
-            className="p-2 rounded-xl hover:bg-white/10 text-zinc-400 hover:text-white transition-all hidden lg:block"
-          >
-            {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-          </button>
-          <button 
-            onClick={() => {
-              achievements.unlock('ai_tactician');
-              alert('AI Coach is analyzing your gameplay... (Simulation)');
-            }}
-            className="p-2 rounded-xl hover:bg-cyan-electric/20 text-zinc-400 hover:text-cyan-electric transition-all"
-            title="Tactical AI"
-          >
-            <Bot className="w-4 h-4 md:w-5 md:h-5" />
-          </button>
-          <button 
-            onClick={handleToggleVoice}
-            className={`p-2 rounded-xl transition-all ${voiceEnabled ? 'bg-magenta-accent/20 text-magenta-accent' : 'hover:bg-white/10 text-zinc-400 hover:text-white'}`}
-            title="Voice Chat"
-          >
-            {voiceEnabled ? <Volume2 className="w-4 h-4 md:w-5 md:h-5" /> : <VolumeX className="w-4 h-4 md:w-5 md:h-5" />}
-          </button>
-          <button 
-            onClick={() => {
-              navigator.clipboard.writeText(`https://retroverse.app/play/${gameId}?room=xyz123`);
-              alert('¡Enlace de la sala copiado al portapapeles!');
-            }}
-            className="p-2 rounded-xl hover:bg-emerald-500/20 text-zinc-400 hover:text-emerald-400 transition-all"
-            title="Compartir Sala"
-          >
-            <Share2 className="w-4 h-4 md:w-5 md:h-5" />
-          </button>
-          <button 
-            onClick={handleRecordClip}
-            className={`p-2 rounded-xl transition-all ${isRecordingClip ? 'bg-red-500/20 text-red-500 animate-pulse' : 'hover:bg-purple-500/20 text-zinc-400 hover:text-purple-400'}`}
-            title="Grabar Clip (30s)"
-            disabled={isRecordingClip}
-          >
-            <Video className="w-4 h-4 md:w-5 md:h-5" />
-          </button>
-          <button 
-            onClick={() => alert('¡Reporte enviado!')}
-            className="p-2 rounded-xl hover:bg-amber-500/20 text-zinc-400 hover:text-amber-500 transition-all"
-            title="Reportar Problema"
-          >
-            <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" />
-          </button>
-        </div>
-
-        {/* Mobile Controls */}
-        <div className="pointer-events-auto lg:hidden flex items-center gap-2">
-            <button 
-              onClick={toggleFullscreen}
-              className="p-3 rounded-xl bg-carbon/60 backdrop-blur-md border border-white/10 text-white shadow-2xl active:bg-white/10 transition-all"
-            >
-              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
-            </button>
-            <button 
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className={`p-3 rounded-xl backdrop-blur-md border shadow-2xl transition-all ${isMobileMenuOpen ? 'bg-cyan-electric text-black border-cyan-electric' : 'bg-carbon/60 text-white border-white/10'}`}
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-        </div>
-      </div>
+      {!isUiVisible && (
+        <button 
+          onClick={() => setIsUiVisible(true)}
+          className="absolute top-4 right-4 z-50 p-2 bg-black/50 rounded-full text-white"
+        >
+          <Menu className="w-6 h-6" />
+        </button>
+      )}
 
       {/* Mobile Menu Overlay (Bottom Sheet Style) */}
       <AnimatePresence>

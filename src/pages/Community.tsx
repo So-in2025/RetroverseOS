@@ -1,77 +1,87 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { MessageSquare, Users, Calendar, Trophy, Medal, Crown, Swords, ArrowRight, Activity, ShieldAlert, TrendingUp, Cpu, Server, Share2 } from 'lucide-react';
+import { MessageSquare, Users, Calendar, Trophy, Medal, Crown, Swords, ArrowRight, Activity, ShieldAlert, TrendingUp, Cpu, Server, Share2, Send, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AudioEngine } from '../services/audioEngine';
 import { haptics } from '../services/haptics';
+import { communityService, FeedItem, Tournament, LeaderboardEntry, AgentLog } from '../services/communityService';
+import { useAuthStore } from '../store/authStore';
 import TournamentBracket from '../components/community/TournamentBracket';
 
 import { useGameStore } from '../store/gameStore';
-import { GoogleGenAI, Type } from "@google/genai";
 
 export default function Community() {
   const location = useLocation();
+  const { user } = useAuthStore();
   const { sentinelStats } = useGameStore();
   const [activeTab, setActiveTab] = useState<'feed' | 'tournaments' | 'leaderboards' | 'mission-control'>('feed');
   const [selectedTournament, setSelectedTournament] = useState<string | null>(null);
   const [isGeneratingTournament, setIsGeneratingTournament] = useState(false);
   const [showGeneratedTournament, setShowGeneratedTournament] = useState(false);
-  const [generatedTournament, setGeneratedTournament] = useState({
-    title: "Super Smash Bros. Flash Cup",
-    game: "Super Smash Bros.",
-    format: "Eliminación Directa (1v1)",
-    prize: "15,000 CR",
-    startTime: "En 15 minutos"
-  });
+  const [generatedTournament, setGeneratedTournament] = useState<Tournament | null>(null);
+  
+  const [feed, setFeed] = useState<FeedItem[]>([]);
+  const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [agentLogs, setAgentLogs] = useState<AgentLog[]>([]);
+  const [postContent, setPostContent] = useState('');
+  const [joinedTournaments, setJoinedTournaments] = useState<string[]>([]);
+
+  useEffect(() => {
+    const loadData = async () => {
+      const [feedData, tournamentsData, agentLogsData] = await Promise.all([
+        communityService.getFeed(),
+        communityService.getTournaments(),
+        Promise.resolve(communityService.getAgentLogs())
+      ]);
+      
+      setFeed(feedData);
+      setTournaments(tournamentsData);
+      setLeaderboard(communityService.getLeaderboard());
+      setAgentLogs(agentLogsData);
+      
+      // Check joined status
+      const joined = await Promise.all(
+        tournamentsData.map(async (t) => {
+          const joined = await communityService.isJoined(t.id);
+          return joined ? t.id : null;
+        })
+      );
+      setJoinedTournaments(joined.filter((id): id is string => id !== null));
+    };
+
+    loadData();
+  }, []);
 
   useEffect(() => {
     if (location.pathname.includes('tournaments')) {
       setActiveTab('tournaments');
-    } else {
-      setActiveTab('feed');
     }
   }, [location]);
 
-  const tournaments = [
-    {
-      id: 1,
-      title: "Dominion Winter Championship",
-      game: "Street Fighter II",
-      date: "Mar 15 • 8:00 PM EST",
-      prize: "50,000 CR",
-      participants: "128/256",
-      status: "REGISTRATION OPEN",
-      image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=800&h=400"
-    },
-    {
-      id: 2,
-      title: "Speedrun Sunday: Sonic",
-      game: "Sonic the Hedgehog",
-      date: "Mar 18 • 2:00 PM EST",
-      prize: "10,000 CR",
-      participants: "42/100",
-      status: "UPCOMING",
-      image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=800&h=400"
-    },
-    {
-      id: 3,
-      title: "Tetris Grand Prix",
-      game: "Tetris",
-      date: "Mar 20 • 6:00 PM EST",
-      prize: "25,000 CR",
-      participants: "Full",
-      status: "CLOSED",
-      image: "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=800&h=400"
-    }
-  ];
+  const handlePost = async () => {
+    if (!postContent.trim() || !user) return;
+    
+    const newItem = await communityService.postToFeed(
+      user.username,
+      `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`,
+      postContent
+    );
+    
+    setFeed([newItem, ...feed]);
+    setPostContent('');
+    AudioEngine.playSelectSound();
+    haptics.success();
+  };
 
-  const leaderboard = [
-    { rank: 1, name: "NEXUS_ONE", rating: 2850, winRate: "72%", main: "Strategist" },
-    { rank: 2, name: "CyberKai", rating: 2810, winRate: "68%", main: "Aggro" },
-    { rank: 3, name: "PixelQueen", rating: 2795, winRate: "70%", main: "Tactician" },
-    { rank: 4, name: "GlitchRunner", rating: 2750, winRate: "65%", main: "Speed" },
-    { rank: 5, name: "RetroKing", rating: 2720, winRate: "62%", main: "Balanced" },
-  ];
+  const handleJoinTournament = async (tournamentId: string) => {
+    const success = await communityService.joinTournament(tournamentId);
+    if (success) {
+      setJoinedTournaments([...joinedTournaments, tournamentId]);
+      AudioEngine.playSelectSound();
+      haptics.success();
+    }
+  };
 
   const handleGenerateTournament = async () => {
     setIsGeneratingTournament(true);
@@ -79,37 +89,15 @@ export default function Community() {
     haptics.light();
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: "Genera un torneo de videojuegos retro aleatorio. Devuelve un JSON con: title, game, format, prize (en CR), startTime. Sé creativo y usa juegos clásicos.",
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              game: { type: Type.STRING },
-              format: { type: Type.STRING },
-              prize: { type: Type.STRING },
-              startTime: { type: Type.STRING }
-            },
-            required: ["title", "game", "format", "prize", "startTime"]
-          }
-        }
-      });
-      
-      const text = response.text;
-      if (text) {
-        const data = JSON.parse(text);
-        setGeneratedTournament(data);
-      }
+      const newTournament = await communityService.generateTournament();
+      setGeneratedTournament(newTournament);
+      const updatedTournaments = await communityService.getTournaments();
+      setTournaments(updatedTournaments);
       setShowGeneratedTournament(true);
       haptics.success();
     } catch (e) {
       console.error("AI Generation failed:", e);
-      // Fallback to default values already in state
-      setShowGeneratedTournament(true);
+      haptics.error();
     } finally {
       setIsGeneratingTournament(false);
     }
@@ -168,16 +156,41 @@ export default function Community() {
             >
               {/* Main Feed */}
               <div className="lg:col-span-2 space-y-4 md:space-y-6">
+                {/* Live Activity Ticker */}
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2 overflow-hidden relative">
+                  <div className="flex items-center gap-3 whitespace-nowrap animate-marquee">
+                    <div className="flex items-center gap-2 text-emerald-400 text-[10px] font-black uppercase tracking-widest">
+                      <Activity className="w-3 h-3" /> LIVE:
+                    </div>
+                    <span className="text-zinc-300 text-[10px] font-medium uppercase tracking-wider">
+                      NEXUS_ONE acaba de ganar el torneo relámpago de Pac-Man • PixelQueen subió a Rango Diamante • Nuevo récord en Donkey Kong por RetroKing • 128 nuevos jugadores se unieron hoy •
+                    </span>
+                    {/* Duplicate for seamless loop */}
+                    <span className="text-zinc-300 text-[10px] font-medium uppercase tracking-wider">
+                      NEXUS_ONE acaba de ganar el torneo relámpago de Pac-Man • PixelQueen subió a Rango Diamante • Nuevo récord en Donkey Kong por RetroKing • 128 nuevos jugadores se unieron hoy •
+                    </span>
+                  </div>
+                </div>
+
                 <div className="bg-zinc-900 border border-white/5 rounded-xl p-4 md:p-6">
                   <div className="flex gap-3 md:gap-4">
-                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-emerald-600 flex-shrink-0 flex items-center justify-center font-bold text-xs md:text-sm">NX</div>
+                    <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-emerald-600 flex-shrink-0 flex items-center justify-center font-bold text-xs md:text-sm uppercase">
+                      {user?.username.substring(0, 2)}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <textarea 
+                        value={postContent}
+                        onChange={(e) => setPostContent(e.target.value)}
                         placeholder="Comparte tu última puntuación más alta..." 
                         className="w-full bg-zinc-950 border border-white/10 rounded-lg p-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition-colors resize-none h-20 md:h-24 text-sm"
                       />
                       <div className="flex justify-end mt-2">
-                        <button className="px-3 py-1.5 md:px-4 md:py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium text-xs md:text-sm transition-colors shadow-lg shadow-emerald-900/20">
+                        <button 
+                          onClick={handlePost}
+                          disabled={!postContent.trim()}
+                          className="px-3 py-1.5 md:px-4 md:py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium text-xs md:text-sm transition-colors shadow-lg shadow-emerald-900/20 flex items-center gap-2"
+                        >
+                          <Send className="w-3.5 h-3.5" />
                           Publicar Actualización
                         </button>
                       </div>
@@ -186,23 +199,23 @@ export default function Community() {
                 </div>
 
                 {/* Feed Items */}
-                {[
-                  { user: 'CyberKai', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop' },
-                  { user: 'PixelQueen', avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop' },
-                  { user: 'GlitchRunner', avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop' }
-                ].map((item, i) => (
-                  <div key={i} className="bg-zinc-900 border border-white/5 rounded-xl p-4 md:p-6 hover:border-white/10 transition-colors">
+                {feed.map((item) => (
+                  <div key={item.id} className="bg-zinc-900 border border-white/5 rounded-xl p-4 md:p-6 hover:border-white/10 transition-colors">
                     <div className="flex items-center gap-3 mb-3">
-                      <img src={item.avatar} className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover" alt={item.user} />
+                      <img src={item.avatar} className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover bg-zinc-800" alt={item.user} referrerPolicy="no-referrer" />
                       <div>
                         <p className="font-bold text-white text-sm md:text-base">{item.user}</p>
-                        <p className="text-[10px] md:text-xs text-zinc-500">{i + 1} horas atrás</p>
+                        <p className="text-[10px] md:text-xs text-zinc-500">{item.timestamp}</p>
                       </div>
                     </div>
-                    <p className="text-zinc-300 mb-4 leading-relaxed text-sm md:text-base">¡Acabo de superar mi récord personal en Tetris! ¿Quién quiere desafiarme? #Dominion #Tetris</p>
+                    <p className="text-zinc-300 mb-4 leading-relaxed text-sm md:text-base">{item.content}</p>
                     <div className="flex gap-4 md:gap-6 text-zinc-500 text-xs md:text-sm">
-                      <button className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors"><MessageSquare className="w-3 h-3 md:w-4 md:h-4" /> 12</button>
-                      <button className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors">Me gusta</button>
+                      <button className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors">
+                        <Heart className="w-3 h-3 md:w-4 md:h-4" /> {item.likes}
+                      </button>
+                      <button className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors">
+                        <MessageSquare className="w-3 h-3 md:w-4 md:h-4" /> {item.comments}
+                      </button>
                       <button className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors">Compartir</button>
                     </div>
                   </div>
@@ -310,9 +323,18 @@ export default function Community() {
                           >
                             Cuadro
                           </button>
-                          <button className="px-6 py-3 bg-white text-black font-bold rounded-xl hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-2 text-sm">
-                            Detalles <ArrowRight className="w-4 h-4" />
-                          </button>
+                          {joinedTournaments.includes(t.id) ? (
+                            <button className="px-6 py-3 bg-emerald-500/20 text-emerald-400 font-bold rounded-xl border border-emerald-500/30 cursor-default flex items-center gap-2 text-sm">
+                              Inscrito <Medal className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button 
+                              onClick={() => handleJoinTournament(t.id)}
+                              className="px-6 py-3 bg-white text-black font-bold rounded-xl hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-2 text-sm"
+                            >
+                              Inscribirse <ArrowRight className="w-4 h-4" />
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -380,15 +402,10 @@ export default function Community() {
                       {/* Player Info */}
                       <div className="col-span-5 flex items-center gap-3">
                         <img 
-                          src={[
-                            'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop',
-                            'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop',
-                            'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
-                            'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=100&h=100&fit=crop',
-                            'https://images.unsplash.com/photo-1552058544-f2b08422138a?w=100&h=100&fit=crop'
-                          ][i]} 
-                          className="w-10 h-10 md:w-8 md:h-8 rounded object-cover" 
+                          src={player.avatar} 
+                          className="w-10 h-10 md:w-8 md:h-8 rounded object-cover bg-zinc-800" 
                           alt={player.name}
+                          referrerPolicy="no-referrer"
                         />
                         <div>
                           <span className="font-bold text-white group-hover:text-emerald-400 transition-colors block md:inline text-sm md:text-base">{player.name}</span>
@@ -604,7 +621,100 @@ export default function Community() {
                         </div>
                       </div>
                     </div>
+                  </div>
 
+                  {/* Agent Logs */}
+                  <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div className="lg:col-span-2">
+                      <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Activity className="w-4 h-4" />
+                        Registros de Actividad de Agentes
+                      </h3>
+                      <div className="bg-black/40 border border-white/5 rounded-xl overflow-hidden">
+                        {agentLogs.map((log) => (
+                          <div key={log.id} className="flex items-center gap-4 p-4 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors">
+                            <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                              log.status === 'success' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' :
+                              log.status === 'warning' ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]' :
+                              log.status === 'critical' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' :
+                              'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]'
+                            }`} />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="font-bold text-xs text-white uppercase tracking-wider">{log.agent}</span>
+                                <span className="text-[10px] text-zinc-600 font-mono">{log.timestamp}</span>
+                              </div>
+                              <p className="text-xs text-zinc-400 truncate">{log.action}</p>
+                            </div>
+                            <div className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border ${
+                              log.status === 'success' ? 'text-emerald-400 border-emerald-400/20 bg-emerald-400/5' :
+                              log.status === 'warning' ? 'text-amber-400 border-amber-400/20 bg-amber-400/5' :
+                              log.status === 'critical' ? 'text-red-400 border-red-400/20 bg-red-400/5' :
+                              'text-blue-400 border-blue-400/20 bg-blue-400/5'
+                            }`}>
+                              {log.status}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Server className="w-4 h-4" />
+                        Estado del Enjambre
+                      </h3>
+                      <div className="bg-zinc-950 border border-white/5 rounded-xl p-4 font-mono text-[10px] space-y-2 overflow-hidden relative group">
+                        <div className="absolute inset-0 bg-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <div className="flex justify-between text-emerald-500/50">
+                          <span>[SYS] AUTH_SERVICE</span>
+                          <span>STABLE</span>
+                        </div>
+                        <div className="flex justify-between text-emerald-500/50">
+                          <span>[SYS] MATCHMAKING_V3</span>
+                          <span>ACTIVE</span>
+                        </div>
+                        <div className="flex justify-between text-emerald-500/50">
+                          <span>[SYS] NEURAL_ENGINE</span>
+                          <span>OPTIMIZING</span>
+                        </div>
+                        <div className="flex justify-between text-amber-500/50">
+                          <span>[SYS] STORAGE_CLUSTER</span>
+                          <span>SYNC_PENDING</span>
+                        </div>
+                        <div className="flex justify-between text-emerald-500/50">
+                          <span>[SYS] CDN_EDGE_GLOBAL</span>
+                          <span>100% UP</span>
+                        </div>
+                        <div className="mt-4 pt-4 border-t border-white/5 text-zinc-600">
+                          {'>'} tail -f /var/log/retroverse.log
+                          <br />
+                          <span className="text-emerald-400/80 animate-pulse">_</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-zinc-900 border border-white/5 rounded-xl p-4">
+                        <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">Distribución de Tráfico</h4>
+                        <div className="space-y-3">
+                          {[
+                            { label: 'Norteamérica', val: 45 },
+                            { label: 'Europa', val: 30 },
+                            { label: 'Latinoamérica', val: 15 },
+                            { label: 'Asia', val: 10 },
+                          ].map((region) => (
+                            <div key={region.label} className="space-y-1">
+                              <div className="flex justify-between text-[10px]">
+                                <span className="text-zinc-400">{region.label}</span>
+                                <span className="text-white font-bold">{region.val}%</span>
+                              </div>
+                              <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-emerald-500" style={{ width: `${region.val}%` }} />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -622,7 +732,7 @@ export default function Community() {
           />
         )}
         
-        {showGeneratedTournament && (
+        {showGeneratedTournament && generatedTournament && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -649,16 +759,12 @@ export default function Community() {
                   <span className="text-sm font-bold text-white">{generatedTournament.game}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-zinc-500 uppercase">Formato</span>
-                  <span className="text-sm font-bold text-white">{generatedTournament.format}</span>
-                </div>
-                <div className="flex justify-between items-center">
                   <span className="text-xs text-zinc-500 uppercase">Pozo de Premios</span>
                   <span className="text-sm font-bold text-emerald-400">{generatedTournament.prize}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-zinc-500 uppercase">Inicio</span>
-                  <span className="text-sm font-bold text-white">{generatedTournament.startTime}</span>
+                  <span className="text-sm font-bold text-white">{generatedTournament.date}</span>
                 </div>
               </div>
 

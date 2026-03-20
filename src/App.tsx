@@ -75,7 +75,9 @@ function Layout() {
       {!isGameRoom && <MobileNavbar />}
       <SearchModal isOpen={searchModalOpen} onClose={() => setSearchModal(false)} />
       <AchievementsModal isOpen={achievementsModalOpen} onClose={() => setAchievementsModal(false)} />
-      <DebugPanel isOpen={debugPanelOpen} onClose={() => setDebugPanel(false)} />
+      <AnimatePresence>
+        {debugPanelOpen && <DebugPanel onClose={() => setDebugPanel(false)} />}
+      </AnimatePresence>
       <main className={`${!isGameRoom ? 'lg:ml-20' : ''} ${!isGameRoom && socialPanelOpen ? 'xl:mr-64' : ''} min-h-screen relative ${!isGameRoom ? 'pt-16 lg:pt-0 pb-24 lg:pb-0' : ''} transition-all duration-300`}>
         <Outlet />
       </main>
@@ -83,6 +85,7 @@ function Layout() {
   );
 }
 
+import { gameCatalog } from './services/gameCatalog';
 import { AuthProvider, useAuth } from './services/AuthContext';
 import { storage } from './services/storage';
 import OnboardingFlow from './components/onboarding/OnboardingFlow';
@@ -103,6 +106,7 @@ function AppContent() {
     const checkOnboarding = async () => {
       await economy.init();
       await customization.init();
+      await gameCatalog.init(); // Initialize game catalog once
       const completed = await storage.getSetting('onboarding_completed');
       if (!completed) {
         setShowOnboarding(true);

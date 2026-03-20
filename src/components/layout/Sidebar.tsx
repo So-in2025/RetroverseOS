@@ -203,15 +203,25 @@ export default function Sidebar() {
           </div>
         </button>
 
-        {/* Hidden Debug Trigger */}
+        {/* Hidden Debug Trigger - Made more accessible for the user */}
         <button 
           onClick={() => {
             setDebugPanel(true);
             haptics.success();
           }}
-          className="w-1 h-1 bg-transparent hover:bg-rose-500/10 transition-colors cursor-default"
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-rose-500/10 transition-all group relative"
           title="Neural Debugger"
-        />
+        >
+          <div className="w-1.5 h-1.5 bg-rose-500/20 rounded-full group-hover:bg-rose-500/50 transition-colors shadow-[0_0_10px_rgba(244,63,94,0.1)] group-hover:shadow-[0_0_15px_rgba(244,63,94,0.3)]" />
+          
+          {/* Tooltip for Debugger */}
+          <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-rose-950/90 border border-rose-500/30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+            <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">
+              NEURAL DEBUGGER
+            </span>
+            <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-rose-950/90" />
+          </div>
+        </button>
       </div>
     </aside>
   );

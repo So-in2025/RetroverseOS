@@ -8,30 +8,44 @@ interface BracketProps {
 }
 
 export default function TournamentBracket({ tournamentTitle, onClose }: BracketProps) {
-  const rounds = [
-    {
-      name: 'Quarter-Finals',
-      matches: [
-        { id: 1, p1: 'NEXUS_ONE', p2: 'CyberKai', s1: 2, s2: 1, winner: 1 },
-        { id: 2, p1: 'PixelQueen', p2: 'GlitchRunner', s1: 0, s2: 2, winner: 2 },
-        { id: 3, p1: 'RetroKing', p2: 'VoidWalker', s1: 2, s2: 0, winner: 1 },
-        { id: 4, p1: 'NeonSamurai', p2: 'BitHunter', s1: 1, s2: 2, winner: 2 },
-      ]
-    },
-    {
-      name: 'Semi-Finals',
-      matches: [
-        { id: 5, p1: 'NEXUS_ONE', p2: 'GlitchRunner', s1: 2, s2: 0, winner: 1 },
-        { id: 6, p1: 'RetroKing', p2: 'BitHunter', s1: 1, s2: 2, winner: 2 },
-      ]
-    },
-    {
-      name: 'Grand Finals',
-      matches: [
-        { id: 7, p1: 'NEXUS_ONE', p2: 'BitHunter', s1: null, s2: null, winner: null },
-      ]
-    }
-  ];
+  // Generate deterministic bracket based on title
+  const generateBracket = (title: string) => {
+    const seed = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const players = [
+      'NEXUS_ONE', 'CyberKai', 'PixelQueen', 'GlitchRunner', 
+      'RetroKing', 'VoidWalker', 'NeonSamurai', 'BitHunter'
+    ];
+    
+    // Shuffle players based on seed
+    const shuffled = [...players].sort(() => {
+      const x = Math.sin(seed) * 10000;
+      return x - Math.floor(x) - 0.5;
+    });
+
+    const qf = [
+      { id: 1, p1: shuffled[0], p2: shuffled[1], s1: 2, s2: 1, winner: 1 },
+      { id: 2, p1: shuffled[2], p2: shuffled[3], s1: 0, s2: 2, winner: 2 },
+      { id: 3, p1: shuffled[4], p2: shuffled[5], s1: 2, s2: 0, winner: 1 },
+      { id: 4, p1: shuffled[6], p2: shuffled[7], s1: 1, s2: 2, winner: 2 },
+    ];
+
+    const sf = [
+      { id: 5, p1: qf[0].p1, p2: qf[1].p2, s1: 2, s2: 0, winner: 1 },
+      { id: 6, p1: qf[2].p1, p2: qf[3].p2, s1: 1, s2: 2, winner: 2 },
+    ];
+
+    const f = [
+      { id: 7, p1: sf[0].p1, p2: sf[1].p2, s1: null, s2: null, winner: null },
+    ];
+
+    return [
+      { name: 'Quarter-Finals', matches: qf },
+      { name: 'Semi-Finals', matches: sf },
+      { name: 'Grand Finals', matches: f }
+    ];
+  };
+
+  const rounds = generateBracket(tournamentTitle);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-8">
