@@ -202,6 +202,18 @@ async function startServer() {
       return res.status(400).json({ error: 'Missing url parameter' });
     }
 
+    // Security: Only allow specific domains to be proxied
+    const allowedDomains = ['archive.org', 'raw.githubusercontent.com', 'cdn.jsdelivr.net'];
+    try {
+      const parsedTarget = new URL(url.startsWith('//') ? 'https:' + url : (url.startsWith('http') ? url : 'https://' + url));
+      if (!allowedDomains.some(domain => parsedTarget.hostname.endsWith(domain))) {
+        console.warn(`[Tunnel] Blocked unauthorized domain: ${parsedTarget.hostname}`);
+        return res.status(403).json({ error: 'Domain not allowed' });
+      }
+    } catch (e) {
+      return res.status(400).json({ error: 'Invalid URL' });
+    }
+
     let targetUrl = url;
     if (targetUrl.startsWith('//')) {
       targetUrl = 'https:' + targetUrl;

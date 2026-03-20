@@ -352,7 +352,7 @@ export default function GameLibrary() {
       {/* Dynamic Background based on Hero Game */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         <AnimatePresence mode="wait">
-          {heroGame && (heroGame.artwork_url || heroGame.cover_url) && (
+          {viewMode === 'carousel' && heroGame && (heroGame.artwork_url || heroGame.cover_url) && (
             <motion.div
               key={heroGame.game_id}
               initial={{ opacity: 0, scale: 1.2 }}
@@ -545,44 +545,46 @@ export default function GameLibrary() {
         </div>
 
         {/* Desktop Hero Info */}
-        <div className="hidden lg:flex flex-col items-center justify-center mb-4 z-20 pointer-events-none h-[160px] w-full shrink-0">
-          <AnimatePresence mode="wait">
-            {heroGame ? (
-              <motion.div 
-                key={heroGame.game_id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3 }}
-                className="text-center space-y-2 w-full px-8"
-              >
-                <div className="flex items-center justify-center gap-3">
-                  <span className="px-3 py-1 bg-white/10 backdrop-blur-md border border-white/20 rounded text-[10px] font-black uppercase tracking-widest text-white shadow-lg">
-                    {heroGame.system}
-                  </span>
-                  <span className="px-3 py-1 bg-cyan-electric/10 border border-cyan-electric/20 rounded text-[10px] font-black uppercase tracking-widest text-cyan-electric shadow-lg">
-                    {heroGame.year || 'UNKNOWN'}
-                  </span>
-                  {heroGame.players > 1 && (
-                    <span className="px-3 py-1 bg-magenta-accent/10 border border-magenta-accent/20 rounded text-[10px] font-black uppercase tracking-widest text-magenta-accent shadow-lg">
-                      MULTIPLAYER
+        {viewMode === 'carousel' && (
+          <div className="hidden lg:flex flex-col items-center justify-center mb-4 z-20 pointer-events-none h-[160px] w-full shrink-0">
+            <AnimatePresence mode="wait">
+              {heroGame ? (
+                <motion.div 
+                  key={heroGame.game_id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                  className="text-center space-y-2 w-full px-8"
+                >
+                  <div className="flex items-center justify-center gap-3">
+                    <span className="px-3 py-1 bg-white/10 backdrop-blur-md border border-white/20 rounded text-[10px] font-black uppercase tracking-widest text-white shadow-lg">
+                      {heroGame.system}
                     </span>
-                  )}
-                </div>
+                    <span className="px-3 py-1 bg-cyan-electric/10 border border-cyan-electric/20 rounded text-[10px] font-black uppercase tracking-widest text-cyan-electric shadow-lg">
+                      {heroGame.year || 'UNKNOWN'}
+                    </span>
+                    {heroGame.players > 1 && (
+                      <span className="px-3 py-1 bg-magenta-accent/10 border border-magenta-accent/20 rounded text-[10px] font-black uppercase tracking-widest text-magenta-accent shadow-lg">
+                        MULTIPLAYER
+                      </span>
+                    )}
+                  </div>
 
-                <div className="h-24 flex items-center justify-center w-full">
-                  <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-white uppercase italic tracking-tighter leading-none drop-shadow-[0_0_30px_rgba(0,0,0,0.8)] max-w-6xl mx-auto line-clamp-2 text-center px-4 w-full">
-                    {heroGame.title}
-                  </h2>
+                  <div className="h-24 flex items-center justify-center w-full">
+                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-white uppercase italic tracking-tighter leading-none drop-shadow-[0_0_30px_rgba(0,0,0,0.8)] max-w-6xl mx-auto line-clamp-2 text-center px-4 w-full">
+                      {heroGame.title}
+                    </h2>
+                  </div>
+                </motion.div>
+              ) : (
+                <div className="h-24 flex items-center text-zinc-500 font-mono text-sm uppercase tracking-widest">
+                  {isSearching ? "ESCANER ARCHIVOS..." : "SELECCIONA UN CARTUCHO"}
                 </div>
-              </motion.div>
-            ) : (
-              <div className="h-24 flex items-center text-zinc-500 font-mono text-sm uppercase tracking-widest">
-                {isSearching ? "ESCANER ARCHIVOS..." : "SELECCIONA UN CARTUCHO"}
-              </div>
-            )}
-          </AnimatePresence>
-        </div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
 
         {/* Main View Title Overlay - Removed as requested */}
 

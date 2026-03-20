@@ -1,0 +1,59 @@
+{
+  "entities": {
+    "user_profiles": {
+      "title": "User Profile",
+      "description": "Stores user-specific data, credits, and preferences.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string", "description": "The unique ID of the user." },
+        "credits": { "type": "number", "description": "Current balance of Retro Coins." },
+        "has_retro_pass": { "type": "boolean", "description": "Whether the user has a premium pass." },
+        "coach_voice": { "type": "string", "description": "Selected AI coach voice." },
+        "purchased_items": { "type": "array", "description": "List of purchased item IDs." },
+        "video_settings": { "type": "object", "description": "User's video preference settings." }
+      },
+      "required": ["user_id", "credits"]
+    },
+    "game_sessions": {
+      "title": "Game Session",
+      "description": "Represents a multiplayer game session.",
+      "type": "object",
+      "properties": {
+        "game_id": { "type": "string" },
+        "host_id": { "type": "string" },
+        "opponent_id": { "type": "string" },
+        "status": { "type": "string", "enum": ["waiting", "playing", "finished"] },
+        "room_id": { "type": "string" }
+      },
+      "required": ["game_id", "host_id", "status"]
+    },
+    "community_tips": {
+      "title": "Community Tip",
+      "description": "A tip shared by a user for a specific game.",
+      "type": "object",
+      "properties": {
+        "game_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "user_name": { "type": "string" },
+        "content": { "type": "string" },
+        "upvotes": { "type": "number" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["game_id", "user_id", "content"]
+    }
+  },
+  "firestore": {
+    "/user_profiles/{userId}": {
+      "schema": "user_profiles",
+      "description": "User profile data."
+    },
+    "/game_sessions/{sessionId}": {
+      "schema": "game_sessions",
+      "description": "Active and past game sessions."
+    },
+    "/community_tips/{tipId}": {
+      "schema": "community_tips",
+      "description": "Tips shared by the community."
+    }
+  }
+}
