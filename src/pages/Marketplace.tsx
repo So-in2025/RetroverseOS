@@ -1,222 +1,122 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingCart, Sparkles, Zap, Shield, Crown, Star, Search, Filter, Hexagon, Cpu, Check, Gift, Heart } from 'lucide-react';
+import { ShoppingCart, Sparkles, Zap, Shield, Crown, Star, Search, Filter, Hexagon, Cpu, Check, Gift, Heart, Monitor } from 'lucide-react';
 import { DynamicCover } from '../components/library/DynamicCover';
 import { UnboxingModal } from '../components/marketplace/UnboxingModal';
-import { storage } from '../services/storage';
-import { achievements } from '../services/achievements';
 import { haptics } from '../services/haptics';
-import { economyService } from '../services/economyService';
-import { AudioEngine } from '../services/audioEngine';
-import { useAuth } from '../services/AuthContext';
+import { useEconomy } from '../hooks/useEconomy';
+import { useCustomization } from '../hooks/useCustomization';
+import { STORE_ITEMS, ItemCategory, customization } from '../services/customization';
+import { economy } from '../services/economy';
 
 export default function Marketplace() {
-  const { user } = useAuth();
-  const [activeCategory, setActiveCategory] = useState('featured');
-  const [credits, setCredits] = useState(0);
-  const [purchasedItems, setPurchasedItems] = useState<number[]>([]);
-  const [equippedVoice, setEquippedVoice] = useState<string>('Kore');
-  const [isProcessing, setIsProcessing] = useState<number | null>(null);
+  const [activeCategory, setActiveCategory] = useState<ItemCategory | 'featured'>('featured');
+  const { balance } = useEconomy();
+  const { ownedItems, equippedTheme, equippedBezel, equippedAvatar, equippedVoice, buyItem, equipItem } = useCustomization();
+  
+  const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [isSubscribing, setIsSubscribing] = useState(false);
   
   // Unboxing state
   const [isUnboxingOpen, setIsUnboxingOpen] = useState(false);
   const [selectedBox, setSelectedBox] = useState<{ id: string, name: string, price: number } | null>(null);
 
-  useEffect(() => {
-    const loadEconomy = async () => {
-      const currentCredits = await economyService.getCredits(user?.id);
-      setCredits(currentCredits);
-      
-      const purchased = await economyService.getPurchasedItems(user?.id);
-      setPurchasedItems(purchased);
-
-      const voice = await economyService.getCoachVoice(user?.id);
-      setEquippedVoice(voice);
-    };
-    loadEconomy();
-  }, [user]);
-
-  const categories = [
+  const categories: { id: ItemCategory | 'featured', label: string, icon: any }[] = [
     { id: 'featured', label: 'Destacado', icon: Star },
-    { id: 'game-packs', label: 'Premium Packs', icon: ShoppingCart },
-    { id: 'cosmetics', label: 'Cosméticos', icon: Sparkles },
-    { id: 'ai-voices', label: 'Voces de Entrenador IA', icon: Cpu },
-    { id: 'boosts', label: 'Potenciadores', icon: Zap },
+    { id: 'pack', label: 'Premium Packs', icon: ShoppingCart },
+    { id: 'theme', label: 'Temas UI', icon: Sparkles },
+    { id: 'bezel', label: 'Marcos (Bezels)', icon: Monitor },
+    { id: 'avatar', label: 'Avatares', icon: Shield },
+    { id: 'voice', label: 'Voces IA', icon: Cpu },
   ];
 
-  const storeItems = [
-    {
-      id: 7,
-      name: "Fighting Classics Pack",
-      category: "game-packs",
-      rarity: "Epic",
-      price: 2500,
-      image: "https://images.unsplash.com/photo-1552820728-8b83bb6b773f?auto=format&fit=crop&q=80&w=400&h=400",
-      description: "Colección definitiva: Mortal Kombat 1-3 y Street Fighter II. Propiedad de por vida."
-    },
-    {
-      id: 8,
-      name: "JRPG Golden Era Pack",
-      category: "game-packs",
-      rarity: "Legendary",
-      price: 3500,
-      image: "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&q=80&w=400&h=400",
-      description: "Horas de aventura: Chrono Trigger, Final Fantasy VI y EarthBound."
-    },
-    {
-      id: 9,
-      name: "Sega Sonic Collection",
-      category: "game-packs",
-      rarity: "Rare",
-      price: 1800,
-      image: "https://images.unsplash.com/photo-1580234811497-9df715cb10b4?auto=format&fit=crop&q=80&w=400&h=400",
-      description: "La trilogía original de Sonic the Hedgehog + Sonic & Knuckles."
-    },
-    {
-      id: 1,
-      name: "Cyber-Ronin Avatar Frame",
-      category: "cosmetics",
-      rarity: "Legendary",
-      price: 1200,
-      image: "https://images.unsplash.com/photo-1614850523296-d8c1af93d400?auto=format&fit=crop&q=80&w=400&h=400",
-      description: "Animated neon frame with particle effects."
-    },
-    {
-      id: 2,
-      name: "Tactical Commander AI (Zephyr)",
-      category: "ai-voices",
-      voiceId: "Zephyr",
-      rarity: "Epic",
-      price: 850,
-      image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400&h=400",
-      description: "Replaces default AI Coach voice with a stern, tactical commander."
-    },
-    {
-      id: 3,
-      name: "Double XP Token (24h)",
-      category: "boosts",
-      rarity: "Rare",
-      price: 300,
-      image: "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=400&h=400",
-      description: "Earn double account XP for 24 hours."
-    },
-    {
-      id: 4,
-      name: "Neon Slums Profile Banner",
-      category: "cosmetics",
-      rarity: "Epic",
-      price: 600,
-      image: "https://images.unsplash.com/photo-1605142859862-978be7eba909?auto=format&fit=crop&q=80&w=400&h=400",
-      description: "Dynamic profile background featuring a rainy cyberpunk city."
-    },
-    {
-      id: 5,
-      name: "Glitch Emote Pack",
-      category: "cosmetics",
-      rarity: "Rare",
-      price: 450,
-      image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=400&h=400",
-      description: "Set of 5 animated glitch emotes for the lobby chat."
-    },
-    {
-      id: 6,
-      name: "Zenith AI Personality (Fenrir)",
-      category: "ai-voices",
-      voiceId: "Fenrir",
-      rarity: "Legendary",
-      price: 1500,
-      image: "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?auto=format&fit=crop&q=80&w=400&h=400",
-      description: "A calm, analytical AI that focuses on macro-strategy and mental fortitude."
-    }
-  ];
-
-  const handleBuy = async (item: any) => {
-    if (credits < item.price) {
-      alert("Not enough credits!");
+  const handleBuy = async (item: typeof STORE_ITEMS[0]) => {
+    if (balance < item.price) {
+      haptics.error();
+      alert("¡No tienes suficientes RetroCoins!");
       return;
     }
 
     setIsProcessing(item.id);
-
     try {
-      if (item.category === 'game-packs') {
-        const success = await economyService.buyPack(user?.id, item.id.toString(), item.price);
-        if (success) {
-          const newBalance = await economyService.getCredits(user?.id);
-          setCredits(newBalance);
-          setPurchasedItems([...purchasedItems, item.id]);
-          achievements.unlock('collector');
-        } else {
-          alert("Transaction failed.");
-        }
+      const success = await buyItem(item.id);
+      if (success) {
+        haptics.success();
       } else {
-        // Deduct credits
-        const newBalance = await economyService.addCredits(user?.id, -item.price);
-        setCredits(newBalance);
-
-        // Add to purchased items
-        const newPurchased = [...purchasedItems, item.id];
-        await economyService.savePurchasedItems(user?.id, newPurchased);
-        setPurchasedItems(newPurchased);
-        achievements.unlock('collector');
-
-        // If it's a voice, auto-equip it
-        if (item.category === 'ai-voices' && item.voiceId) {
-          await economyService.saveCoachVoice(user?.id, item.voiceId);
-          setEquippedVoice(item.voiceId);
-        }
+        haptics.error();
+        alert("Error en la transacción.");
       }
     } catch (e) {
       console.error("Purchase failed", e);
-      alert("Transaction failed.");
+      alert("Error en la transacción.");
     } finally {
       setIsProcessing(null);
     }
   };
 
-  const handleSubscribe = async () => {
-    setIsSubscribing(true);
-    try {
-      const success = await economyService.subscribeRetroPass(user?.id);
-      if (success) {
-        alert("¡Bienvenido al Retro Pass!");
-        // Update local state if needed
-      } else {
-        alert("Error al suscribirse.");
-      }
-    } catch (e) {
-      console.error("Subscription failed", e);
-      alert("Transaction failed.");
-    } finally {
-      setIsSubscribing(false);
+  const handleEquip = (item: typeof STORE_ITEMS[0]) => {
+    haptics.light();
+    // If already equipped, unequip it
+    const isEquipped = getIsEquipped(item);
+    if (isEquipped) {
+      equipItem(item.category, null);
+    } else {
+      equipItem(item.category, item.id);
     }
   };
 
-  const handleEquipVoice = async (voiceId: string) => {
-    await economyService.saveCoachVoice(user?.id, voiceId);
-    setEquippedVoice(voiceId);
+  const getIsEquipped = (item: typeof STORE_ITEMS[0]) => {
+    switch (item.category) {
+      case 'theme': return equippedTheme === item.id;
+      case 'bezel': return equippedBezel === item.id;
+      case 'avatar': return equippedAvatar === item.id;
+      case 'voice': return equippedVoice === item.id;
+      default: return false;
+    }
+  };
+
+  const handleSubscribe = async () => {
+    setIsSubscribing(true);
+    setTimeout(() => {
+      alert("¡Bienvenido al Retro Pass!");
+      setIsSubscribing(false);
+    }, 1500);
   };
 
   const handleOpenBox = async (box: { id: string, name: string, price: number }) => {
-    if (credits < box.price) {
+    if (balance < box.price) {
       haptics.error();
       alert("Créditos insuficientes para esta caja.");
       return;
     }
-
-    // Deduct credits
-    const newBalance = await economyService.addCredits(user?.id, -box.price);
-    setCredits(newBalance);
     
+    const success = await economy.spendCoins(box.price, `Compró ${box.name}`);
+    if (!success) {
+      haptics.error();
+      alert("Error al procesar la compra.");
+      return;
+    }
+
     setSelectedBox(box);
     setIsUnboxingOpen(true);
     haptics.medium();
   };
 
+  const handleReveal = async (item: any) => {
+    if (item.type === 'coins') {
+      await economy.addCoins(item.value, `Recompensa de ${selectedBox?.name}`);
+    } else if (item.type === 'item') {
+      // Find the item in STORE_ITEMS by its value or id
+      const storeItem = STORE_ITEMS.find(i => i.value === item.value || i.id === item.value);
+      if (storeItem) {
+        await customization.grantItem(storeItem.id);
+      }
+    }
+  };
+
   const filteredItems = activeCategory === 'featured' 
-    ? storeItems.slice(0, 4) 
-    : storeItems.filter(item => item.category === activeCategory);
+    ? STORE_ITEMS.slice(0, 4) 
+    : STORE_ITEMS.filter(item => item.category === activeCategory);
 
   const getRarityColor = (rarity: string) => {
     switch(rarity) {
@@ -259,14 +159,8 @@ export default function Marketplace() {
               <span className="text-[10px] md:text-sm text-zinc-400 font-medium uppercase tracking-wider">Balance:</span>
               <div className="flex items-center gap-1.5 md:gap-2">
                 <Hexagon className="w-3 h-3 md:w-4 md:h-4 text-emerald-400 fill-emerald-400/20" />
-                <span className="text-lg md:text-xl font-mono font-bold text-white">{credits.toLocaleString()}</span>
+                <span className="text-lg md:text-xl font-mono font-bold text-white">{balance.toLocaleString()}</span>
               </div>
-              <button 
-                onClick={() => { storage.addCredits(1000).then(setCredits) }}
-                className="ml-1 md:ml-2 px-2 md:px-3 py-0.5 md:py-1 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 transition-colors rounded text-[9px] md:text-xs font-bold uppercase tracking-wider border border-emerald-500/30"
-              >
-                +1K
-              </button>
             </div>
           </div>
         </div>
@@ -329,88 +223,6 @@ export default function Marketplace() {
           </div>
         </motion.div>
 
-        {/* Daily Deals Section */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg md:text-xl font-bold flex items-center gap-2">
-              <Zap className="w-5 h-5 text-yellow-500" />
-              Ofertas Diarias
-            </h3>
-            <span className="text-xs text-zinc-400 font-mono bg-zinc-900 px-3 py-1 rounded-full border border-white/5">Termina en 04:23:11</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-gradient-to-br from-purple-900/40 to-zinc-900/50 border border-purple-500/30 rounded-2xl p-4 flex items-center gap-4 group cursor-pointer hover:border-purple-500/50 transition-colors">
-              <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 relative">
-                <img src="https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=200&h=200" alt="Neon Nights Pack" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
-                <div className="absolute inset-0 bg-black/20" />
-                <div className="absolute top-1 left-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">-50%</div>
-              </div>
-              <div className="flex-1">
-                <h4 className="font-bold text-sm md:text-base text-white mb-1">Neon Nights Theme Pack</h4>
-                <p className="text-xs text-zinc-400 mb-2 line-clamp-1">Fondos dinámicos y música synthwave para tu lobby.</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-500 line-through">1200</span>
-                  <div className="flex items-center gap-1 text-emerald-400 font-mono font-bold text-sm">
-                    <Hexagon className="w-3 h-3 fill-emerald-400/20" />
-                    600
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-blue-900/40 to-zinc-900/50 border border-blue-500/30 rounded-2xl p-4 flex items-center gap-4 group cursor-pointer hover:border-blue-500/50 transition-colors">
-              <div className="w-20 h-20 rounded-xl overflow-hidden shrink-0 relative">
-                <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=200&h=200" alt="XP Boost" className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
-                <div className="absolute inset-0 bg-black/20" />
-                <div className="absolute top-1 left-1 bg-red-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">-30%</div>
-              </div>
-              <div className="flex-1">
-                <h4 className="font-bold text-sm md:text-base text-white mb-1">XP Boost x2 (24h)</h4>
-                <p className="text-xs text-zinc-400 mb-2 line-clamp-1">Doble experiencia en todas las partidas rankeadas.</p>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-500 line-through">500</span>
-                  <div className="flex items-center gap-1 text-emerald-400 font-mono font-bold text-sm">
-                    <Hexagon className="w-3 h-3 fill-emerald-400/20" />
-                    350
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Mystery Box Section */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg md:text-xl font-bold flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-500" />
-              Cajas Sorpresa
-            </h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { id: 'box-1', name: 'Caja Básica', price: 100, color: 'from-zinc-800 to-zinc-900', border: 'border-zinc-700', icon: <Hexagon className="w-8 h-8 text-zinc-400" /> },
-              { id: 'box-2', name: 'Caja Rara', price: 500, color: 'from-blue-900/40 to-blue-950/50', border: 'border-blue-500/30', icon: <Star className="w-8 h-8 text-blue-400" /> },
-              { id: 'box-3', name: 'Caja Épica', price: 1500, color: 'from-purple-900/40 to-purple-950/50', border: 'border-purple-500/30', icon: <Crown className="w-8 h-8 text-purple-400" /> },
-            ].map((box) => (
-              <div key={box.id} className={`bg-gradient-to-br ${box.color} border ${box.border} rounded-2xl p-6 flex flex-col items-center justify-center text-center group cursor-pointer hover:scale-[1.02] transition-transform relative overflow-hidden`}>
-                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400&h=400')] bg-cover opacity-5 group-hover:opacity-10 transition-opacity" />
-                <div className="relative z-10 mb-4 transform group-hover:-translate-y-2 transition-transform duration-300">
-                  {box.icon}
-                </div>
-                <h4 className="font-bold text-white mb-1 relative z-10">{box.name}</h4>
-                <p className="text-xs text-zinc-400 mb-4 relative z-10">Contiene 1 ítem aleatorio.</p>
-                <button 
-                  onClick={() => handleOpenBox(box as any)}
-                  className="px-6 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold transition-colors relative z-10 flex items-center gap-2"
-                >
-                  <Hexagon className="w-3 h-3 fill-emerald-400/20 text-emerald-400" />
-                  {box.price}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Store Navigation */}
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-white/5 pb-4">
           <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
@@ -455,8 +267,8 @@ export default function Marketplace() {
         >
           <AnimatePresence mode="popLayout">
             {filteredItems.map((item, index) => {
-              const isOwned = purchasedItems.includes(item.id);
-              const isEquipped = item.category === 'ai-voices' && equippedVoice === item.voiceId;
+              const isOwned = ownedItems.includes(item.id);
+              const isEquipped = getIsEquipped(item);
 
               return (
                 <motion.div
@@ -505,24 +317,10 @@ export default function Marketplace() {
                           </div>
                           <div className="flex items-center gap-2">
                             <button 
-                              onClick={() => alert('Añadido a la lista de deseos')}
-                              className="p-2 rounded-lg bg-white/5 hover:bg-pink-500 hover:text-white text-zinc-400 transition-colors tooltip-trigger"
-                              title="Añadir a lista de deseos"
-                            >
-                              <Heart className="w-4 h-4" />
-                            </button>
-                            <button 
-                              onClick={() => alert('Función de regalo en desarrollo')}
-                              className="p-2 rounded-lg bg-white/5 hover:bg-purple-500 hover:text-white text-zinc-400 transition-colors tooltip-trigger"
-                              title="Regalar a un amigo"
-                            >
-                              <Gift className="w-4 h-4" />
-                            </button>
-                            <button 
                               onClick={() => handleBuy(item)}
-                              disabled={isProcessing === item.id || credits < item.price}
+                              disabled={isProcessing === item.id || balance < item.price}
                               className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
-                                credits >= item.price
+                                balance >= item.price
                                   ? 'bg-white/5 hover:bg-emerald-500 hover:text-white text-zinc-300'
                                   : 'bg-red-500/10 text-red-400 cursor-not-allowed'
                               }`}
@@ -533,20 +331,20 @@ export default function Marketplace() {
                         </>
                       ) : (
                         <div className="w-full flex justify-end">
-                          {item.category === 'ai-voices' ? (
+                          {item.category !== 'pack' ? (
                             <button 
-                              onClick={() => handleEquipVoice(item.voiceId!)}
+                              onClick={() => handleEquip(item)}
                               className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors w-full ${
                                 isEquipped
                                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                                   : 'bg-white/10 hover:bg-white/20 text-white'
                               }`}
                             >
-                              {isEquipped ? 'Equipada' : 'Equipar Voz'}
+                              {isEquipped ? 'Equipado' : 'Equipar'}
                             </button>
                           ) : (
                             <button disabled className="px-4 py-2 rounded-lg text-sm font-bold bg-zinc-800 text-zinc-500 w-full cursor-not-allowed">
-                              En Inventario
+                              Desbloqueado
                             </button>
                           )}
                         </div>
@@ -559,47 +357,47 @@ export default function Marketplace() {
           </AnimatePresence>
         </motion.div>
 
-        {/* Battle Pass Teaser */}
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="mt-16 bg-gradient-to-r from-emerald-900/40 to-zinc-900 border border-emerald-500/20 rounded-3xl p-8 md:p-12 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden"
-        >
-          <div className="absolute -right-20 -top-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-          
-          <div className="relative z-10 max-w-xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-4">
-              Temporada 4 Activa
-            </div>
-            <h3 className="text-3xl font-bold mb-3">Pase de Batalla Dominion</h3>
-            <p className="text-zinc-400 mb-6">Desbloquea 100 niveles de recompensas exclusivas, incluyendo el aspecto mítico 'Voidwalker', voces de IA premium y suficientes créditos para comprar el próximo pase.</p>
-            <button className="px-6 py-3 bg-white text-black hover:bg-zinc-200 rounded-xl font-bold transition-colors shadow-lg">
-              Ver Recompensas
-            </button>
+        {/* Mystery Box Section */}
+        <div className="mb-8 pt-8 border-t border-white/5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg md:text-xl font-bold flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-500" />
+              Cajas Sorpresa
+            </h3>
           </div>
-
-          <div className="relative z-10 w-full md:w-auto flex-1 max-w-md">
-            <div className="bg-black/50 border border-white/10 rounded-2xl p-6 backdrop-blur-md">
-              <div className="flex justify-between items-end mb-2">
-                <span className="text-sm font-bold text-zinc-300">Nivel Actual</span>
-                <span className="text-2xl font-mono font-bold text-emerald-400">42 <span className="text-sm text-zinc-500">/ 100</span></span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              { id: 'box-1', name: 'Caja Básica', price: 100, color: 'from-zinc-800 to-zinc-900', border: 'border-zinc-700', icon: <Hexagon className="w-8 h-8 text-zinc-400" /> },
+              { id: 'box-2', name: 'Caja Rara', price: 500, color: 'from-blue-900/40 to-blue-950/50', border: 'border-blue-500/30', icon: <Star className="w-8 h-8 text-blue-400" /> },
+              { id: 'box-3', name: 'Caja Épica', price: 1500, color: 'from-purple-900/40 to-purple-950/50', border: 'border-purple-500/30', icon: <Crown className="w-8 h-8 text-purple-400" /> },
+            ].map((box) => (
+              <div key={box.id} className={`bg-gradient-to-br ${box.color} border ${box.border} rounded-2xl p-6 flex flex-col items-center justify-center text-center group cursor-pointer hover:scale-[1.02] transition-transform relative overflow-hidden`}>
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400&h=400')] bg-cover opacity-5 group-hover:opacity-10 transition-opacity" />
+                <div className="relative z-10 mb-4 transform group-hover:-translate-y-2 transition-transform duration-300">
+                  {box.icon}
+                </div>
+                <h4 className="font-bold text-white mb-1 relative z-10">{box.name}</h4>
+                <p className="text-xs text-zinc-400 mb-4 relative z-10">Contiene 1 ítem aleatorio.</p>
+                <button 
+                  onClick={() => handleOpenBox(box as any)}
+                  className="px-6 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold transition-colors relative z-10 flex items-center gap-2"
+                >
+                  <Hexagon className="w-3 h-3 fill-emerald-400/20 text-emerald-400" />
+                  {box.price}
+                </button>
               </div>
-              <div className="w-full h-3 bg-zinc-800 rounded-full overflow-hidden mb-4">
-                <div className="h-full bg-emerald-500 w-[42%] rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-              </div>
-              <p className="text-xs text-zinc-500 text-center">8,450 XP to next tier</p>
-            </div>
+            ))}
           </div>
-        </motion.div>
+        </div>
 
       </div>
 
       <UnboxingModal
         isOpen={isUnboxingOpen}
         onClose={() => setIsUnboxingOpen(false)}
-        boxType={(selectedBox?.id as any) || 'box-1'}
+        boxType={selectedBox?.id as 'box-1' | 'box-2' | 'box-3' || 'box-1'}
         boxName={selectedBox?.name || ''}
+        onReveal={handleReveal}
       />
     </div>
   );

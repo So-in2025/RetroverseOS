@@ -72,6 +72,11 @@ export default function GameLibrary() {
     setEliteTop20(elite);
   }, [deferredGames]);
 
+  const popularGames = useMemo(() => gameCatalog.getEliteTop20(), [games]);
+  const recentGames = useMemo(() => {
+    return [...games].sort((a, b) => (b.year || 0) - (a.year || 0)).slice(0, 20);
+  }, [games]);
+
   // Initialize Socket for Live Games
   useEffect(() => {
     const socket = io(window.location.origin);
@@ -721,13 +726,18 @@ export default function GameLibrary() {
                 {viewMode === 'discover' && (
                   <div className="hidden md:flex flex-col w-full h-full overflow-y-auto hide-scrollbar pb-32 pt-4 px-4 md:px-8 space-y-12 pointer-events-auto">
                     
-                    {/* Recommended Section - Algoritmo de Descubrimiento */}
-                    <RecommendedSection />
+                    {/* Popular Games Section */}
+                    <GameSection 
+                      title="POPULARES (ELITE)" 
+                      games={popularGames} 
+                      variant="elite"
+                    />
 
-                    {/* Elite Top 20 Section - FORCED UPDATE */}
-                    <ExpandableTopList 
-                      title={`ELITE TOP 20: SELECCIÓN MAESTRA`} 
-                      games={eliteTop20} 
+                    {/* Recent Games Section */}
+                    <GameSection 
+                      title="RECIENTEMENTE AÑADIDOS" 
+                      games={recentGames} 
+                      variant="default"
                     />
 
                     <div className="h-px w-full bg-white/5" />

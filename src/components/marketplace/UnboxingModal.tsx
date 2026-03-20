@@ -9,27 +9,28 @@ interface UnboxingModalProps {
   onClose: () => void;
   boxType: 'box-1' | 'box-2' | 'box-3';
   boxName: string;
+  onReveal?: (item: any) => void;
 }
 
-export const UnboxingModal: React.FC<UnboxingModalProps> = ({ isOpen, onClose, boxType, boxName }) => {
+export const UnboxingModal: React.FC<UnboxingModalProps> = ({ isOpen, onClose, boxType, boxName, onReveal }) => {
   const [step, setStep] = useState<'idle' | 'shaking' | 'reveal'>('idle');
   const [revealedItem, setRevealedItem] = useState<any>(null);
 
   const items = {
     'box-1': [
-      { name: '500 CR', icon: <Hexagon className="w-12 h-12 text-emerald-400" />, rarity: 'Common' },
-      { name: 'Double XP (1h)', icon: <Zap className="w-12 h-12 text-blue-400" />, rarity: 'Rare' },
-      { name: 'Retro Sticker', icon: <Star className="w-12 h-12 text-zinc-400" />, rarity: 'Common' },
+      { id: 'coins_500', type: 'coins', value: 500, name: '500 CR', icon: <Hexagon className="w-12 h-12 text-emerald-400" />, rarity: 'Common' },
+      { id: 'boost_xp', type: 'boost', value: 'double_xp_1h', name: 'Double XP (1h)', icon: <Zap className="w-12 h-12 text-blue-400" />, rarity: 'Rare' },
+      { id: 'sticker_retro', type: 'item', value: 'sticker_retro', name: 'Retro Sticker', icon: <Star className="w-12 h-12 text-zinc-400" />, rarity: 'Common' },
     ],
     'box-2': [
-      { name: '2000 CR', icon: <Hexagon className="w-12 h-12 text-emerald-400" />, rarity: 'Rare' },
-      { name: 'Neon Avatar Frame', icon: <Sparkles className="w-12 h-12 text-purple-400" />, rarity: 'Epic' },
-      { name: 'Elite Badge', icon: <Trophy className="w-12 h-12 text-yellow-400" />, rarity: 'Epic' },
+      { id: 'coins_2000', type: 'coins', value: 2000, name: '2000 CR', icon: <Hexagon className="w-12 h-12 text-emerald-400" />, rarity: 'Rare' },
+      { id: 'avatar_glitch', type: 'item', value: 'avatar_glitch', name: 'Glitch Entity Avatar', icon: <Sparkles className="w-12 h-12 text-purple-400" />, rarity: 'Epic' },
+      { id: 'bezel_arcade', type: 'item', value: 'bezel_arcade', name: 'Classic Arcade Bezel', icon: <Trophy className="w-12 h-12 text-yellow-400" />, rarity: 'Rare' },
     ],
     'box-3': [
-      { name: '5000 CR', icon: <Hexagon className="w-12 h-12 text-emerald-400" />, rarity: 'Epic' },
-      { name: 'Legendary Voice: Fenrir', icon: <Crown className="w-12 h-12 text-yellow-400" />, rarity: 'Legendary' },
-      { name: 'Mythic Skin: Voidwalker', icon: <Sparkles className="w-12 h-12 text-pink-500" />, rarity: 'Legendary' },
+      { id: 'coins_5000', type: 'coins', value: 5000, name: '5000 CR', icon: <Hexagon className="w-12 h-12 text-emerald-400" />, rarity: 'Epic' },
+      { id: 'voice_zephyr', type: 'item', value: 'voice_zephyr', name: 'Tactical Voice: Zephyr', icon: <Crown className="w-12 h-12 text-yellow-400" />, rarity: 'Epic' },
+      { id: 'theme_neon', type: 'item', value: 'theme_neon', name: 'Neon Cyberpunk Theme', icon: <Sparkles className="w-12 h-12 text-pink-500" />, rarity: 'Epic' },
     ]
   };
 
@@ -45,8 +46,10 @@ export const UnboxingModal: React.FC<UnboxingModalProps> = ({ isOpen, onClose, b
         setRevealedItem(randomItem);
         setStep('reveal');
         haptics.success();
-        // Play a "win" sound if available, or just select
         AudioEngine.playSelectSound();
+        if (onReveal) {
+          onReveal(randomItem);
+        }
       }, 2000);
 
       return () => clearTimeout(timer);

@@ -1,19 +1,23 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Gamepad2, ShoppingBag, User, Globe, Settings } from 'lucide-react';
+import { Gamepad2, ShoppingBag, User, Globe, Settings, Trophy } from 'lucide-react';
 import { haptics } from '../../services/haptics';
+import { useUIStore } from '../../store/uiStore';
 
 export default function MobileNavbar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const setAchievementsModal = useUIStore(state => state.setAchievementsModal);
 
   const navItems = [
     { id: 'marketplace', icon: ShoppingBag, label: 'MERCADO', path: '/marketplace' },
     { id: 'community', icon: Globe, label: 'RED', path: '/community' },
+    { id: 'achievements', icon: Trophy, label: 'LOGROS', action: () => setAchievementsModal(true) },
     { id: 'settings', icon: Settings, label: 'SISTEMA', path: '/settings' },
   ];
 
-  const isActive = (path: string) => {
+  const isActive = (path?: string) => {
+    if (!path) return false;
     if (path === '/') return location.pathname === '/';
     return location.pathname === path;
   };
@@ -28,7 +32,11 @@ export default function MobileNavbar() {
               key={item.id}
               onClick={() => {
                 haptics.light();
-                navigate(item.path);
+                if (item.action) {
+                  item.action();
+                } else if (item.path) {
+                  navigate(item.path);
+                }
               }}
               className={`flex flex-col items-center justify-center gap-1 w-full h-full transition-all duration-300 ${
                 active ? 'text-cyan-electric' : 'text-zinc-500'

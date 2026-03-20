@@ -85,6 +85,14 @@ async function startServer() {
       io.to(msg.room).emit("chat-message", msg);
     });
 
+    socket.on("disconnecting", () => {
+      for (const room of socket.rooms) {
+        if (room !== socket.id) {
+          socket.to(room).emit("user-disconnected", socket.id);
+        }
+      }
+    });
+
     socket.on("disconnect", () => {
       console.log(`User disconnected: ${socket.id}`);
       const index = matchmakingQueue.findIndex(p => p.socketId === socket.id);

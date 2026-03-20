@@ -23,6 +23,7 @@ import { useLocation } from 'react-router-dom';
 import MobileNavbar from './components/layout/MobileNavbar';
 import MobileHeader from './components/layout/MobileHeader';
 import SearchModal from './components/layout/SearchModal';
+import AchievementsModal from './components/community/AchievementsModal';
 
 import { useUIStore } from './store/uiStore';
 import { useEffect, useState } from 'react';
@@ -31,7 +32,7 @@ import { SentinelEngine } from './services/gcts';
 function Layout() {
   const location = useLocation();
   const isGameRoom = location.pathname.startsWith('/play/');
-  const { socialPanelOpen, searchModalOpen, setSearchModal } = useUIStore();
+  const { socialPanelOpen, searchModalOpen, setSearchModal, achievementsModalOpen, setAchievementsModal } = useUIStore();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -59,6 +60,7 @@ function Layout() {
       {!isGameRoom && <SocialPanel />}
       {!isGameRoom && <MobileNavbar />}
       <SearchModal isOpen={searchModalOpen} onClose={() => setSearchModal(false)} />
+      <AchievementsModal isOpen={achievementsModalOpen} onClose={() => setAchievementsModal(false)} />
       <main className={`${!isGameRoom ? 'lg:ml-20' : ''} ${!isGameRoom && socialPanelOpen ? 'xl:mr-64' : ''} min-h-screen relative ${!isGameRoom ? 'pt-16 lg:pt-0 pb-24 lg:pb-0' : ''} transition-all duration-300`}>
         <Outlet />
       </main>
@@ -72,6 +74,9 @@ import OnboardingFlow from './components/onboarding/OnboardingFlow';
 import { recommendationEngine } from './services/recommendationEngine';
 import BootAnimation from './components/layout/BootAnimation';
 import { AnimatePresence } from 'motion/react';
+import { economy } from './services/economy';
+import { customization } from './services/customization';
+import { achievements } from './services/achievements';
 
 function AppContent() {
   const { user, loading } = useAuth();
@@ -81,6 +86,8 @@ function AppContent() {
 
   useEffect(() => {
     const checkOnboarding = async () => {
+      await economy.init();
+      await customization.init();
       const completed = await storage.getSetting('onboarding_completed');
       if (!completed) {
         setShowOnboarding(true);

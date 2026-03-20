@@ -1,17 +1,20 @@
 import { motion } from 'motion/react';
 import { Link } from 'react-router-dom';
-import { Play, Users, Zap, Trophy, Clock, Star, ArrowRight, Flame, Globe, Swords } from 'lucide-react';
+import { Play, Users, Zap, Trophy, Clock, Star, ArrowRight, Flame, Globe, Swords, Sparkles } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { storage } from '../services/storage';
 import { gameCatalog } from '../services/gameCatalog';
 import { DynamicCover } from '../components/library/DynamicCover';
 import { AudioEngine } from '../services/audioEngine';
 import { haptics } from '../services/haptics';
+import GameSection from '../components/library/GameSection';
+import { GameObject } from '../services/metadataNormalization';
 
 export default function Home() {
-  const [recentGames, setRecentGames] = useState<any[]>([]);
-  const [featuredGame, setFeaturedGame] = useState<any>(null);
-  const [popularGames, setPopularGames] = useState<any[]>([]);
+  const [recentGames, setRecentGames] = useState<GameObject[]>([]);
+  const [featuredGame, setFeaturedGame] = useState<GameObject | null>(null);
+  const [popularGames, setPopularGames] = useState<GameObject[]>([]);
+  const [newAdditions, setNewAdditions] = useState<GameObject[]>([]);
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -19,17 +22,26 @@ export default function Home() {
       const allGames = gameCatalog.getAllGames();
       
       // Load Recent
-      const recent = await storage.getRecentGames(6);
+      const recent = await storage.getRecentGames(10);
       const recentWithData = recent.map(r => {
         const game = gameCatalog.getGame(r.gameId);
         return game ? { ...game, lastPlayed: r.timestamp } : null;
-      }).filter(Boolean);
+      }).filter(Boolean) as GameObject[];
       setRecentGames(recentWithData);
 
       // Featured (Random or specific)
       if (allGames.length > 0) {
-        setFeaturedGame(allGames[Math.floor(Math.random() * allGames.length)]);
-        setPopularGames(allGames.slice(0, 10)); // Just a slice for now
+        // Pick a random featured game, preferably a verified one
+        const eliteGames = allGames.filter(g => g.compatibility_status === 'verified');
+        const pool = eliteGames.length > 0 ? eliteGames : allGames;
+        setFeaturedGame(pool[Math.floor(Math.random() * pool.length)]);
+        
+        // Popular: For now, just a random slice of elite games
+        const shuffled = [...allGames].sort(() => 0.5 - Math.random());
+        setPopularGames(shuffled.slice(0, 15));
+        
+        // New Additions: Sort by some criteria, or just another slice
+        setNewAdditions(shuffled.slice(15, 30));
       }
     };
     loadDashboard();
@@ -43,6 +55,7 @@ export default function Home() {
         <section className="relative h-[60vh] md:h-[70vh] w-full overflow-hidden">
           <div className="absolute inset-0 z-0">
             <DynamicCover 
+              game_id={featuredGame.game_id}
               src={featuredGame.cover_url || featuredGame.artwork_url} 
               alt="Hero" 
               title={featuredGame.title}
@@ -74,7 +87,7 @@ export default function Home() {
               
               <div className="flex flex-wrap items-center gap-4">
                 <Link 
-                  to={`/play/${featuredGame.game_id}`}
+                  to={`/play/${featuredGame.game_id}?url=${encodeURIComponent(featuredGame.rom_url)}&system=${featuredGame.system_id}`}
                   onClick={() => {
                     AudioEngine.playSelectSound();
                     haptics.medium();
@@ -98,101 +111,20 @@ export default function Home() {
 
       <div className="max-w-7xl mx-auto px-6 md:px-12 space-y-16 -mt-10 relative z-20">
         
-        {/* Continue Playing Section */}
-        {recentGames.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-black italic uppercase tracking-tighter flex items-center gap-3">
-                <Clock className="w-6 h-6 text-cyan-electric" />
-                Reanudar Rápido
-              </h2>
-              <Link to="/" className="text-xs font-black text-zinc-500 hover:text-cyan-electric transition-colors uppercase tracking-widest flex items-center gap-2">
-                Ver Sistema <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-4">
-              {recentGames.map((game, i) => (
-                <motion.div
-                  key={game.game_id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.1 }}
-                  className="group relative aspect-[3/4] rounded-2xl overflow-hidden border border-white/10 bg-zinc-900 shadow-2xl"
-                >
-                  <DynamicCover 
-                    src={game.cover_url || game.artwork_url} 
-                    alt={game.title}
-                    title={game.title}
-                    system={game.system}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-80" />
-                  
-                  <div className="absolute inset-0 p-4 flex flex-col justify-end">
-                    <p className="text-[10px] font-black text-cyan-electric uppercase tracking-widest mb-1">{game.system}</p>
-                    <h3 className="text-sm font-black text-white uppercase italic leading-tight mb-3 line-clamp-2">{game.title}</h3>
-                    <Link 
-                      to={`/play/${game.game_id}`}
-                      onClick={() => {
-                        AudioEngine.playSelectSound();
-                        haptics.light();
-                      }}
-                      className="w-full py-2 bg-white text-black rounded-xl font-black text-[10px] uppercase tracking-widest text-center opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0"
-                    >
-                      Reanudar
-                    </Link>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Popular Section */}
-        <section>
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-black italic uppercase tracking-tighter flex items-center gap-3">
-              <Flame className="w-6 h-6 text-orange-500" />
-              Tendencias en la Red
-            </h2>
-            <Link to="/" className="text-xs font-black text-zinc-500 hover:text-cyan-electric transition-colors uppercase tracking-widest flex items-center gap-2">
-              Explorar Sistema <ArrowRight className="w-4 h-4" />
-            </Link>
-          </div>
+        {/* Smart Carousels */}
+        <div className="space-y-4">
+          {recentGames.length > 0 && (
+            <GameSection title="Reanudar Rápido" games={recentGames} variant="live" />
+          )}
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {popularGames.slice(0, 6).map((game, i) => (
-              <Link 
-                key={game.game_id}
-                to={`/game/${game.game_id}`}
-                className="group flex items-center gap-4 bg-zinc-900/50 border border-white/5 p-4 rounded-2xl hover:bg-zinc-900 hover:border-white/20 transition-all"
-              >
-                <div className="w-20 h-24 rounded-xl overflow-hidden border border-white/10 flex-shrink-0">
-                  <DynamicCover 
-                    src={game.cover_url || game.artwork_url} 
-                    alt={game.title}
-                    title={game.title}
-                    system={game.system}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">{game.system}</span>
-                  <h3 className="text-lg font-black text-white uppercase italic truncate mb-2">{game.title}</h3>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-400">
-                      <Globe className="w-3 h-3" /> 1.2k Jugando
-                    </div>
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-500">
-                      <Star className="w-3 h-3 fill-current" /> 4.8
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
+          {popularGames.length > 0 && (
+            <GameSection title="Tendencias en la Red" games={popularGames} variant="elite" />
+          )}
+
+          {newAdditions.length > 0 && (
+            <GameSection title="Nuevas Adiciones" games={newAdditions} variant="default" />
+          )}
+        </div>
 
         {/* Community & Tournaments Teaser */}
         <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -221,7 +153,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Features Grid (Restored from previous version) */}
+        {/* Features Grid */}
         <section className="py-12 border-t border-white/5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <FeatureCard 

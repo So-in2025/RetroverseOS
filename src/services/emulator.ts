@@ -3,6 +3,7 @@ import { storage, SaveState } from './storage';
 import { RetroButton } from './inputManager';
 import { ROMFetchService } from './romFetcher';
 import { AudioEngine } from './audioEngine';
+import { achievements } from './achievements';
 
 // Track AudioContexts created by Nostalgist/RetroArch to forcefully close them on exit
 const createdAudioContexts: AudioContext[] = [];
@@ -74,6 +75,28 @@ export class EmulatorService {
   private canvas: HTMLCanvasElement | null = null;
 
   constructor() {}
+
+  /**
+   * Prefetches the WASM core files into the browser cache silently.
+   */
+  public async prefetchCore(system: string) {
+    const core = CORE_MAP[(system || '').toLowerCase()];
+    if (!core) return;
+    
+    try {
+      // Nostalgist default core URL pattern (jsDelivr)
+      const baseUrl = 'https://cdn.jsdelivr.net/gh/libretro/RetroArch@master/pkg/emscripten/retroarch/cores';
+      const jsUrl = `${baseUrl}/${core}_libretro.js`;
+      const wasmUrl = `${baseUrl}/${core}_libretro.wasm`;
+      
+      // Fetch to put in browser cache (fire and forget)
+      fetch(jsUrl, { mode: 'no-cors' }).catch(() => {});
+      fetch(wasmUrl, { mode: 'no-cors' }).catch(() => {});
+      console.log(`[Emulator] Prefetching core ${core} in background...`);
+    } catch (e) {
+      // Ignore errors for prefetching
+    }
+  }
 
   async initialize(config: EmulatorConfig, onProgress?: (status: string) => void) {
     if (this.isInitializing) {
@@ -236,7 +259,7 @@ export class EmulatorService {
     }
   }
 
-  async sendInput(button: RetroButton, isPressed: boolean) {
+  async sendInput(button: RetroButton, isPressed: boolean, playerIndex: number = 0) {
     if (!this.nostalgist) return;
 
     // Nostalgist/RetroArch key mapping
@@ -254,7 +277,7 @@ export class EmulatorService {
    * Captures the current frame from the canvas.
    * Note: WebGL canvases might need preserveDrawingBuffer, but we try anyway.
    */
-  private captureScreenshot(): string {
+  public captureScreenshot(): string {
     if (!this.canvas) return '';
     try {
       return this.canvas.toDataURL('image/jpeg', 0.8);
@@ -281,12 +304,15 @@ export class EmulatorService {
 
       await storage.saveState(saveState);
       console.log(`[Emulator] State saved (${type})`);
+      
       return saveState;
     } catch (e) {
       console.error('[Emulator] Failed to save state', e);
       return null;
     }
   }
+
+  private loadCount: number = 0;
 
   async loadState(stateId: string) {
     if (!this.nostalgist || !this.currentGameId) return;
@@ -297,6 +323,11 @@ export class EmulatorService {
       if (targetState) {
         await this.nostalgist.loadState(targetState.stateData);
         console.log('[Emulator] State loaded successfully');
+        
+        this.loadCount++;
+        if (this.loadCount >= 5) {
+          achievements.unlock('save_scummer');
+        }
       } else {
         console.warn('[Emulator] State not found in DB');
       }

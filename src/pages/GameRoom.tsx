@@ -1,13 +1,15 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import React from 'react';
-import { Share2, Users, MessageSquare, Send, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video } from 'lucide-react';
+import { Share2, Users, MessageSquare, Send, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video, Bot, Cloud, Zap, Target, Shield, Cpu } from 'lucide-react';
 import { emulator } from '../services/emulator';
 import { multiplayer } from '../services/multiplayer';
 import { inputManager, RetroButton } from '../services/inputManager';
 import { gameCatalog } from '../services/gameCatalog';
 import { storage } from '../services/storage';
 import { achievements } from '../services/achievements';
+import { economy } from '../services/economy';
+import { useEconomy } from '../hooks/useEconomy';
 import { AudioEngine } from '../services/audioEngine';
 import { MetadataNormalizationEngine } from '../services/metadataNormalization';
 import { haptics } from '../services/haptics';
@@ -19,6 +21,7 @@ import CRTFilter from '../components/game/CRTFilter';
 import LoadingScreen from '../components/game/LoadingScreen';
 import CommunityTipsPanel from '../components/game/CommunityTipsPanel';
 import QuickChatWheel from '../components/game/QuickChatWheel';
+import TacticalOverlay from '../components/game/TacticalOverlay';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -52,12 +55,18 @@ export default function GameRoom() {
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [crtEnabled, setCrtEnabled] = useState(true);
   const [bilinearEnabled, setBilinearEnabled] = useState(false);
-  const [credits, setCredits] = useState(0);
+  const { balance } = useEconomy();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isRecordingClip, setIsRecordingClip] = useState(false);
   const [showClipModal, setShowClipModal] = useState(false);
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [showHypeNotification, setShowHypeNotification] = useState(false);
+  const [isHost, setIsHost] = useState(true);
+  const [showCloudSaveToast, setShowCloudSaveToast] = useState(false);
+  const [isOpponentDisconnected, setIsOpponentDisconnected] = useState(false);
+  const [tacticalAdvice, setTacticalAdvice] = useState('');
+  const [isTacticalLoading, setIsTacticalLoading] = useState(false);
+  const [isTacticalVisible, setIsTacticalVisible] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -115,19 +124,18 @@ export default function GameRoom() {
   }, [voiceEnabled]);
 
   useEffect(() => {
-    const loadCredits = async () => {
-      const c = await storage.getCredits();
-      setCredits(c);
-    };
-    loadCredits();
-  }, []);
-
-  useEffect(() => {
     let interval: NodeJS.Timeout;
     if (gameState === 'playing') {
       interval = setInterval(async () => {
-        const newTotal = await storage.addCredits(100);
-        setCredits(newTotal);
+        await economy.addCoins(100, 'Playtime Reward');
+        
+        const currentPlaytime = (await storage.getSetting('total_playtime_minutes')) || 0;
+        const newPlaytime = currentPlaytime + 5;
+        await storage.saveSetting('total_playtime_minutes', newPlaytime);
+        
+        if (newPlaytime >= 600) { // 10 hours = 600 minutes
+          achievements.unlock('arcade_master');
+        }
       }, 5 * 60 * 1000);
     }
     return () => clearInterval(interval);
@@ -216,8 +224,8 @@ export default function GameRoom() {
                   const cloudSave = await saveService.downloadSave(user.id, gameId);
                   if (cloudSave) {
                     console.log('Cloud save found, preparing for injection...');
-                    // We don't auto-load to avoid overwriting current session if user just restarted
-                    // But we could notify or provide a "Restore" button
+                    setShowCloudSaveToast(true);
+                    setTimeout(() => setShowCloudSaveToast(false), 6000);
                   }
                 } catch (err) {
                   console.error('Error checking cloud save:', err);
@@ -290,10 +298,11 @@ export default function GameRoom() {
     multiplayer.joinMatchmaking(
       gameId, 
       userId.current, 
-      (roomId, opponentId, isHost) => {
-        console.log(`Match found! Room: ${roomId}, Opponent: ${opponentId}, Host: ${isHost}`);
+      (roomId, opponentId, isHostValue) => {
+        console.log(`Match found! Room: ${roomId}, Opponent: ${opponentId}, Host: ${isHostValue}`);
         setPlayers([opponentId]);
         setMatchmakingStatus('Opponent found! Connecting...');
+        setIsHost(isHostValue);
       },
       (status) => {
         setMatchmakingStatus(`Matchmaking: ${status}...`);
@@ -303,14 +312,16 @@ export default function GameRoom() {
     inputManager.start();
     const cleanupInput = inputManager.onInput((button: RetroButton, isPressed: boolean) => {
       if (gameStateRef.current === 'playing') {
-        emulator.sendInput(button, isPressed);
-        multiplayer.sendInput({ button, isPressed });
+        const playerIndex = isHost ? 0 : 1;
+        emulator.sendInput(button, isPressed, playerIndex);
+        multiplayer.sendInput({ button, isPressed, playerIndex });
       }
     });
 
-    multiplayer.onInput((input: { button: RetroButton, isPressed: boolean }) => {
+    multiplayer.onInput((input: { button: RetroButton, isPressed: boolean, playerIndex: number }) => {
       if (gameStateRef.current === 'playing') {
-        emulator.sendInput(input.button, input.isPressed);
+        const remotePlayerIndex = isHost ? 1 : 0;
+        emulator.sendInput(input.button, input.isPressed, remotePlayerIndex);
       }
     });
 
@@ -318,6 +329,12 @@ export default function GameRoom() {
       if (msg.user === userId.current) return;
       const displayUser = `Player ${msg.user.slice(-4)}`;
       setMessages(prev => [...prev, { user: displayUser, text: msg.text }]);
+    });
+
+    multiplayer.onDisconnect(() => {
+      console.log('Opponent disconnected');
+      setIsOpponentDisconnected(true);
+      setTimeout(() => setIsOpponentDisconnected(false), 5000);
     });
 
     const handleFullscreenChange = () => {
@@ -375,6 +392,48 @@ export default function GameRoom() {
     }
   };
 
+  const requestTacticalAdvice = async () => {
+    if (isTacticalLoading || gameState !== 'playing') return;
+    
+    setIsTacticalLoading(true);
+    haptics.impact();
+    AudioEngine.playSelectSound();
+
+    try {
+      const screenshot = emulator.captureScreenshot();
+      if (!screenshot) throw new Error('No screenshot captured');
+
+      const base64Data = screenshot.split(',')[1];
+      
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const response = await ai.models.generateContent({
+        model: "gemini-3-flash-preview",
+        contents: [
+          {
+            parts: [
+              { text: "Eres una IA táctica de combate. Analiza esta captura de pantalla de un videojuego retro y da un consejo estratégico corto (máximo 15 palabras) para el jugador. Sé directo, técnico y un poco futurista. Responde en español." },
+              { inlineData: { mimeType: "image/jpeg", data: base64Data } }
+            ]
+          }
+        ]
+      });
+
+      const advice = response.text || "ANÁLISIS FALLIDO. REINTENTAR ENLACE.";
+      setTacticalAdvice(advice);
+      setIsTacticalVisible(true);
+      
+      // Auto-hide after 8 seconds
+      setTimeout(() => setIsTacticalVisible(false), 8000);
+    } catch (error) {
+      console.error('Tactical AI Error:', error);
+      setTacticalAdvice("ERROR DE ENLACE NEURONAL. INTERFERENCIA DETECTADA.");
+      setIsTacticalVisible(true);
+      setTimeout(() => setIsTacticalVisible(false), 5000);
+    } finally {
+      setIsTacticalLoading(false);
+    }
+  };
+
   const sendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !gameId) return;
@@ -402,13 +461,23 @@ export default function GameRoom() {
     "¡LOL!"
   ];
 
-  const startGame = () => {
+  const startGame = async () => {
     setGameState('playing');
     if (gameId) {
       storage.addRecentGame(gameId);
       storage.incrementPlayCount(gameId);
+      
+      const recentGames = await storage.getRecentGames();
+      if (recentGames.length >= 10) {
+        achievements.unlock('arcade_master');
+      }
     }
     achievements.unlock('first_match');
+    
+    const hour = new Date().getHours();
+    if (hour >= 2 && hour < 5) {
+      achievements.unlock('night_owl');
+    }
   };
   
   const handlePause = async () => {
@@ -561,7 +630,7 @@ export default function GameRoom() {
           
           <div className="pointer-events-auto bg-amber-500/10 backdrop-blur-md border border-amber-500/20 px-3 py-1 rounded-xl flex items-center gap-2 w-fit">
             <Coins className="w-3 h-3 text-amber-500" />
-            <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{credits}</span>
+            <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{balance}</span>
           </div>
         </div>
 
@@ -584,6 +653,16 @@ export default function GameRoom() {
             className="p-2 rounded-xl hover:bg-white/10 text-zinc-400 hover:text-white transition-all hidden lg:block"
           >
             {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+          </button>
+          <button 
+            onClick={() => {
+              achievements.unlock('ai_tactician');
+              alert('AI Coach is analyzing your gameplay... (Simulation)');
+            }}
+            className="p-2 rounded-xl hover:bg-cyan-electric/20 text-zinc-400 hover:text-cyan-electric transition-all"
+            title="Tactical AI"
+          >
+            <Bot className="w-4 h-4 md:w-5 md:h-5" />
           </button>
           <button 
             onClick={handleToggleVoice}
@@ -711,6 +790,18 @@ export default function GameRoom() {
                    >
                      <Share2 className="w-8 h-8" />
                      <span className="text-xs font-black uppercase tracking-widest text-center">COMPARTIR</span>
+                   </button>
+                   
+                   <button 
+                     onClick={() => { 
+                       achievements.unlock('ai_tactician');
+                       alert('AI Coach is analyzing your gameplay... (Simulation)');
+                       setIsMobileMenuOpen(false); 
+                     }}
+                     className="p-4 rounded-xl flex flex-col items-center gap-2 bg-cyan-electric/10 border border-cyan-electric/50 text-cyan-electric col-span-2"
+                   >
+                     <Bot className="w-8 h-8" />
+                     <span className="text-xs font-black uppercase tracking-widest text-center">TACTICAL AI COACH</span>
                    </button>
                 </div>
 
@@ -905,6 +996,34 @@ export default function GameRoom() {
         onClose={() => setIsSavePanelOpen(false)} 
       />
 
+      {/* AI Tactical Link Button */}
+      {gameState === 'playing' && (
+        <motion.button
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          onClick={requestTacticalAdvice}
+          disabled={isTacticalLoading}
+          className={`fixed top-6 left-6 z-50 p-3 rounded-xl border backdrop-blur-md transition-all flex items-center gap-3 group
+            ${isTacticalLoading 
+              ? 'bg-cyan-electric/20 border-cyan-electric/30 cursor-wait' 
+              : 'bg-black/40 border-white/10 hover:border-cyan-electric/50 hover:bg-black/60 active:scale-95'
+            }`}
+        >
+          <div className={`relative ${isTacticalLoading ? 'animate-spin' : ''}`}>
+            <Cpu className={`w-5 h-5 ${isTacticalLoading ? 'text-cyan-electric' : 'text-zinc-400 group-hover:text-cyan-electric'}`} />
+            {isTacticalLoading && (
+              <div className="absolute inset-0 bg-cyan-electric blur-sm opacity-50 animate-pulse" />
+            )}
+          </div>
+          <div className="flex flex-col items-start">
+            <span className="text-[10px] font-black text-white uppercase tracking-widest leading-none mb-1">Tactical Link</span>
+            <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter leading-none">
+              {isTacticalLoading ? 'Analyzing...' : 'Ready for Sync'}
+            </span>
+          </div>
+        </motion.button>
+      )}
+
       <AnimatePresence>
         {showHypeNotification && (
           <motion.div
@@ -923,6 +1042,49 @@ export default function GameRoom() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Cloud Save Notification */}
+      <AnimatePresence>
+        {showCloudSaveToast && (
+          <motion.div
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 100 }}
+            className="fixed top-24 right-6 z-[100] pointer-events-none"
+          >
+            <div className="bg-cyan-electric/90 backdrop-blur-md text-black px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-2xl border border-white/20 flex items-center gap-4">
+              <Cloud className="w-6 h-6 animate-pulse" />
+              <div>
+                <p>Nube Sincronizada</p>
+                <p className="text-[8px] opacity-60">Se encontró un punto de control</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Opponent Disconnected Notification */}
+      <AnimatePresence>
+        {isOpponentDisconnected && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none p-6"
+          >
+            <div className="bg-rose-500/90 backdrop-blur-xl text-white px-8 py-6 rounded-3xl font-black text-sm uppercase tracking-[0.3em] shadow-[0_0_50px_rgba(244,63,94,0.4)] border border-white/20 flex flex-col items-center gap-4 text-center">
+              <AlertTriangle className="w-12 h-12 animate-pulse" />
+              <p>ENLACE TÁCTICO PERDIDO</p>
+              <p className="text-[10px] opacity-70 tracking-widest">El oponente se ha desconectado</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <TacticalOverlay 
+        advice={tacticalAdvice} 
+        isVisible={isTacticalVisible} 
+      />
 
       <AnimatePresence>
         {isChatOpen && (

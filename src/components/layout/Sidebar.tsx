@@ -7,11 +7,14 @@ import {
   Settings, 
   LogOut,
   Search,
-  Database
+  Database,
+  Trophy,
+  Coins
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../services/AuthContext';
 import { useUIStore } from '../../store/uiStore';
+import { useEconomy } from '../../hooks/useEconomy';
 
 import { haptics } from '../../services/haptics';
 
@@ -26,6 +29,7 @@ export default function Sidebar() {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const setSearchModal = useUIStore((state) => state.setSearchModal);
+  const { balance } = useEconomy();
 
   return (
     <aside className="hidden lg:flex fixed left-0 top-0 h-full w-20 flex-col items-center py-6 bg-black border-r border-white/10 z-50">
@@ -63,6 +67,22 @@ export default function Sidebar() {
         </div>
       )}
 
+      {/* RetroCoins Balance */}
+      <div className="mb-6 w-full px-2">
+        <div className="group relative w-full flex justify-center p-2 rounded-xl bg-yellow-400/10 border border-yellow-400/20 cursor-default">
+          <div className="flex flex-col items-center">
+            <Coins className="w-4 h-4 text-yellow-400 mb-1" />
+            <span className="text-[10px] font-black text-yellow-400">{balance}</span>
+          </div>
+          <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-zinc-900 border border-yellow-400/30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+            <span className="text-[10px] font-black uppercase tracking-widest text-yellow-400">
+              RETROCOINS
+            </span>
+            <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900" />
+          </div>
+        </div>
+      </div>
+
       {/* Global Search Button */}
       <div className="mb-6 w-full px-2">
         <button 
@@ -76,6 +96,25 @@ export default function Sidebar() {
           <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-zinc-900 border border-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
             <span className="text-[10px] font-black uppercase tracking-widest text-white">
               BUSCAR EN LA RED
+            </span>
+            <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900" />
+          </div>
+        </button>
+      </div>
+
+      {/* Achievements Button */}
+      <div className="mb-6 w-full px-2">
+        <button 
+          onClick={() => {
+            haptics.medium();
+            useUIStore.getState().setAchievementsModal(true);
+          }}
+          className="group relative w-full flex justify-center p-3 rounded-xl transition-all duration-300 hover:bg-white/5 text-zinc-500 hover:text-yellow-400"
+        >
+          <Trophy className="w-5 h-5" />
+          <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-zinc-900 border border-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+            <span className="text-[10px] font-black uppercase tracking-widest text-white">
+              LOGROS
             </span>
             <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900" />
           </div>

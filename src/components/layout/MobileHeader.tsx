@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Gamepad2, Search, Users, Radio } from 'lucide-react';
+import { Gamepad2, Search, Users, Radio, Coins } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useUIStore } from '../../store/uiStore';
 import { haptics } from '../../services/haptics';
+import { useEconomy } from '../../hooks/useEconomy';
 
 export default function MobileHeader() {
   const { setSearchModal, toggleSocialPanel } = useUIStore();
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const { balance } = useEconomy();
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -45,6 +47,10 @@ export default function MobileHeader() {
 
       {/* Actions */}
       <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 px-2 py-1.5 bg-yellow-400/10 border border-yellow-400/20 rounded-lg mr-1">
+          <Coins className="w-4 h-4 text-yellow-400" />
+          <span className="text-xs font-black text-yellow-400">{balance}</span>
+        </div>
         <button 
           onClick={() => {
             haptics.medium();

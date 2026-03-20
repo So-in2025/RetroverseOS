@@ -28,6 +28,7 @@ export class MultiplayerService {
   public joinMatchmaking(gameId: string, userId: string, onMatchFound: (roomId: string, opponentId: string, isHost: boolean) => void, onStatus: (status: string) => void) {
     if (!this.socket) {
       this.socket = io();
+      this.setupWebRTCListeners();
     }
     
     this.userId = userId;
@@ -46,6 +47,28 @@ export class MultiplayerService {
     this.socket.emit('join-matchmaking', { gameId, userId });
   }
 
+  private setupWebRTCListeners() {
+    this.socket?.on('user-connected', (remoteUserId: string) => {
+      console.log('[Multiplayer] User connected:', remoteUserId);
+      this.initiatePeerConnection(remoteUserId);
+    });
+
+    this.socket?.on('offer', async (payload: SignalPayload) => {
+      console.log('[Multiplayer] Received offer');
+      await this.handleOffer(payload);
+    });
+
+    this.socket?.on('answer', async (payload: SignalPayload) => {
+      console.log('[Multiplayer] Received answer');
+      await this.handleAnswer(payload);
+    });
+
+    this.socket?.on('ice-candidate', async (payload: SignalPayload) => {
+      console.log('[Multiplayer] Received ICE candidate');
+      await this.handleIceCandidate(payload);
+    });
+  }
+
   public leaveMatchmaking() {
     if (this.socket) {
       this.socket.emit('leave-matchmaking');
@@ -57,31 +80,14 @@ export class MultiplayerService {
   connect(roomId: string, userId: string) {
     this.roomId = roomId;
     this.userId = userId;
-    this.socket = io();
+    if (!this.socket) {
+      this.socket = io();
+      this.setupWebRTCListeners();
+    }
 
     this.socket.on('connect', () => {
       console.log('[Multiplayer] Connected to signaling server');
       this.socket?.emit('join-room', roomId, userId);
-    });
-
-    this.socket.on('user-connected', (remoteUserId: string) => {
-      console.log('[Multiplayer] User connected:', remoteUserId);
-      this.initiatePeerConnection(remoteUserId);
-    });
-
-    this.socket.on('offer', async (payload: SignalPayload) => {
-      console.log('[Multiplayer] Received offer');
-      await this.handleOffer(payload);
-    });
-
-    this.socket.on('answer', async (payload: SignalPayload) => {
-      console.log('[Multiplayer] Received answer');
-      await this.handleAnswer(payload);
-    });
-
-    this.socket.on('ice-candidate', async (payload: SignalPayload) => {
-      console.log('[Multiplayer] Received ICE candidate');
-      await this.handleIceCandidate(payload);
     });
   }
 
@@ -162,6 +168,10 @@ export class MultiplayerService {
 
   onChatMessage(callback: (message: { user: string, text: string }) => void) {
     this.socket?.on('chat-message', callback);
+  }
+
+  onDisconnect(callback: () => void) {
+    this.socket?.on('user-disconnected', callback);
   }
 
   private setupDataChannel(channel: RTCDataChannel) {

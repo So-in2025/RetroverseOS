@@ -37,17 +37,63 @@ export default function SaveStatePanel({ isOpen, onClose }: SaveStatePanelProps)
     setIsSaving(false);
   };
 
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  };
+
   const handleCloudSync = async (state: SaveState) => {
     if (!user || !gameId) return;
     setIsSyncing(true);
     try {
-      // RetroArch save states can be large, but for now we assume they fit in the table
-      // In a real app, we'd use Supabase Storage
-      await saveService.uploadSave(user.id, gameId, JSON.stringify(state));
+      // Convert Blob to Base64 for JSON serialization
+      const base64Data = await blobToBase64(state.stateData);
+      const stateToUpload = { ...state, stateData: base64Data };
+      
+      await saveService.uploadSave(user.id, gameId, JSON.stringify(stateToUpload));
       alert('Progreso sincronizado con la Nube.');
     } catch (err) {
       console.error('Cloud sync error:', err);
       alert('Error al sincronizar con la nube.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleCloudDownload = async () => {
+    if (!user || !gameId) return;
+    setIsSyncing(true);
+    try {
+      const cloudDataStr = await saveService.downloadSave(user.id, gameId);
+      if (cloudDataStr) {
+        const cloudState = JSON.parse(cloudDataStr);
+        // Convert base64 back to Blob
+        const res = await fetch(cloudState.stateData);
+        const blob = await res.blob();
+        
+        const newState: SaveState = {
+          ...cloudState,
+          id: crypto.randomUUID(), // new local ID
+          stateData: blob,
+          timestamp: Date.now(), // update timestamp to now so it appears at top
+          type: 'manual'
+        };
+        
+        // Save to local IndexedDB
+        const { storage } = await import('../../services/storage');
+        await storage.saveState(newState);
+        await loadStates();
+        alert('Estado descargado de la nube exitosamente.');
+      } else {
+        alert('No se encontró ningún estado en la nube para este juego.');
+      }
+    } catch (err) {
+      console.error('Cloud download error:', err);
+      alert('Error al descargar de la nube.');
     } finally {
       setIsSyncing(false);
     }
@@ -115,6 +161,19 @@ export default function SaveStatePanel({ isOpen, onClose }: SaveStatePanelProps)
               >
                 {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                 {isSaving ? 'GUARDANDO...' : 'CREAR PUNTO DE CONTROL'}
+              </button>
+              
+              <button
+                onClick={handleCloudDownload}
+                disabled={isSyncing}
+                className={`w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all border ${
+                  isSyncing 
+                    ? 'bg-cyan-900/20 text-cyan-700 border-cyan-900/30 cursor-wait' 
+                    : 'bg-cyan-electric/10 hover:bg-cyan-electric/20 text-cyan-electric border-cyan-electric/30'
+                }`}
+              >
+                {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudDownload className="w-4 h-4" />}
+                {isSyncing ? 'SINCRONIZANDO...' : 'RESTAURAR DESDE LA NUBE'}
               </button>
             </div>
 

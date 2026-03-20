@@ -1,5 +1,6 @@
 import { storage } from './storage';
 import * as fflate from 'fflate';
+import { ROMValidator } from './romValidator';
 
 const CORS_PROXY = "https://corsproxy.io/?";
 
@@ -21,6 +22,77 @@ export class ROMFetchService {
     
     await storage.cacheBios(filename, blob);
     return blob;
+  }
+
+  /**
+   * Prefetches a ROM into the local IndexedDB cache silently.
+   * Useful for predictive loading when a user hovers over a game.
+   */
+  public static async prefetchRom(gameId: string, url: string, system?: string): Promise<void> {
+    try {
+      // 1. Check Cache first
+      const cachedRom = await storage.getCachedRom(gameId);
+      if (cachedRom && cachedRom.blob.size > 1024) {
+        // Already cached, no need to prefetch
+        return;
+      }
+
+      console.log(`[ROM Prefetch] Initiating predictive download for ${gameId}...`);
+      
+      // 2. Resolve 'archive:' URLs
+      if (url.startsWith('archive:')) {
+          const { MetadataNormalizationEngine } = await import('./metadataNormalization');
+          const identifier = url.replace('archive:', '');
+          const resolvedUrl = await MetadataNormalizationEngine.resolveRomUrl(identifier, system);
+          if (resolvedUrl) {
+              url = resolvedUrl;
+          } else {
+              return; // Silently fail
+          }
+      }
+
+      // 3. Auto-correct old URLs
+      if (url.includes('archive.org/download/nointro.') && !url.endsWith('.zip')) {
+        url = url.replace(/\.(nes|sfc|smc|md|gen|gba|gbc|gb|n64|z64)$/i, '.zip');
+      }
+
+      // 4. Define Validator for Zip Integrity and HTML errors
+      const blobValidator = async (blob: Blob) => {
+        if (blob.size < 4096) throw new Error(`Too small`);
+        const header = await blob.slice(0, 100).text();
+        if (header.trim().toLowerCase().startsWith('<') || header.toLowerCase().includes('<!doctype html>')) {
+          throw new Error('HTML error page');
+        }
+      };
+
+      // 5. Fetch from Network (without progress callback)
+      const response = await this.fetchWithProgress(url, undefined, blobValidator);
+      let blob = await response.blob();
+      
+      // 6. Validate
+      if (system) {
+          const validation = await ROMValidator.validate(blob, system);
+          if (!validation.isValid) {
+              console.warn(`[ROM Prefetch] Validation Failed for ${gameId}: ${validation.error}`);
+              return;
+          }
+      }
+
+      // 7. Handle Compressed Files
+      const magic = await blob.slice(0, 4).text();
+      const isZip = url.toLowerCase().endsWith('.zip') || magic.startsWith('PK');
+
+      if (isZip && system !== 'mame' && system !== 'neogeo') {
+        blob = await this.extractMainFileFromZip(blob, system);
+      }
+
+      // 8. Save to Cache
+      await this.saveToCache(gameId, blob);
+      console.log(`[ROM Prefetch] Successfully cached ${gameId} in background.`);
+      
+    } catch (e) {
+      console.warn(`[ROM Prefetch] Failed to prefetch ${gameId}:`, e);
+    }
   }
 
   /**
@@ -91,6 +163,14 @@ export class ROMFetchService {
     // 3. Fetch from Network with Progress and Validation
     const response = await this.fetchWithProgress(url, onProgress, blobValidator);
     let blob = await response.blob();
+    
+    // NEW: Robust ROM Validation
+    if (system) {
+        const validation = await ROMValidator.validate(blob, system);
+        if (!validation.isValid) {
+            throw new Error(`ROM Validation Failed: ${validation.error}`);
+        }
+    }
 
     // 4. Handle Compressed Files (.zip, .7z)
     // Sometimes URLs don't end in .zip but the content is actually a zip file.
@@ -112,6 +192,7 @@ export class ROMFetchService {
 
     return blob;
   }
+
 
   private static async validateResponse(response: Response): Promise<void> {
     const contentType = response.headers.get('content-type');
