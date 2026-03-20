@@ -5,10 +5,12 @@ interface UIState {
   socialPanelOpen: boolean;
   searchModalOpen: boolean;
   achievementsModalOpen: boolean;
+  debugPanelOpen: boolean;
   toggleSocialPanel: () => void;
   setSocialPanel: (open: boolean) => void;
   setSearchModal: (open: boolean) => void;
   setAchievementsModal: (open: boolean) => void;
+  setDebugPanel: (open: boolean) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -17,10 +19,12 @@ export const useUIStore = create<UIState>()(
       socialPanelOpen: true,
       searchModalOpen: false,
       achievementsModalOpen: false,
+      debugPanelOpen: false,
       toggleSocialPanel: () => set((state) => ({ socialPanelOpen: !state.socialPanelOpen })),
       setSocialPanel: (open) => set({ socialPanelOpen: open }),
       setSearchModal: (open) => set({ searchModalOpen: open }),
       setAchievementsModal: (open) => set({ achievementsModalOpen: open }),
+      setDebugPanel: (open) => set({ debugPanelOpen: open }),
     }),
     {
       name: 'dominion-ui-storage',

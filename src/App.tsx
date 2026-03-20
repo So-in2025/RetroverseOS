@@ -24,7 +24,7 @@ import MobileNavbar from './components/layout/MobileNavbar';
 import MobileHeader from './components/layout/MobileHeader';
 import SearchModal from './components/layout/SearchModal';
 import AchievementsModal from './components/community/AchievementsModal';
-
+import DebugPanel from './components/game/DebugPanel';
 import { useUIStore } from './store/uiStore';
 import { useEffect, useState } from 'react';
 import { SentinelEngine } from './services/gcts';
@@ -32,7 +32,15 @@ import { SentinelEngine } from './services/gcts';
 function Layout() {
   const location = useLocation();
   const isGameRoom = location.pathname.startsWith('/play/');
-  const { socialPanelOpen, searchModalOpen, setSearchModal, achievementsModalOpen, setAchievementsModal } = useUIStore();
+  const { 
+    socialPanelOpen, 
+    searchModalOpen, 
+    setSearchModal, 
+    achievementsModalOpen, 
+    setAchievementsModal,
+    debugPanelOpen,
+    setDebugPanel
+  } = useUIStore();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -40,10 +48,16 @@ function Layout() {
         e.preventDefault();
         setSearchModal(true);
       }
+      
+      // Global Debug Shortcut: Shift + Alt + D
+      if (e.shiftKey && e.altKey && e.code === 'KeyD') {
+        e.preventDefault();
+        setDebugPanel(!debugPanelOpen);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setSearchModal]);
+  }, [setSearchModal, setDebugPanel, debugPanelOpen]);
 
   useEffect(() => {
     // Start Sentinel Engine in background
@@ -61,6 +75,7 @@ function Layout() {
       {!isGameRoom && <MobileNavbar />}
       <SearchModal isOpen={searchModalOpen} onClose={() => setSearchModal(false)} />
       <AchievementsModal isOpen={achievementsModalOpen} onClose={() => setAchievementsModal(false)} />
+      <DebugPanel isOpen={debugPanelOpen} onClose={() => setDebugPanel(false)} />
       <main className={`${!isGameRoom ? 'lg:ml-20' : ''} ${!isGameRoom && socialPanelOpen ? 'xl:mr-64' : ''} min-h-screen relative ${!isGameRoom ? 'pt-16 lg:pt-0 pb-24 lg:pb-0' : ''} transition-all duration-300`}>
         <Outlet />
       </main>

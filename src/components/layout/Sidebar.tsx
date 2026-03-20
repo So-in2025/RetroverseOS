@@ -11,7 +11,7 @@ import {
   Trophy,
   Coins
 } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../services/AuthContext';
 import { useUIStore } from '../../store/uiStore';
 import { useEconomy } from '../../hooks/useEconomy';
@@ -29,20 +29,45 @@ export default function Sidebar() {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const setSearchModal = useUIStore((state) => state.setSearchModal);
+  const setDebugPanel = useUIStore((state) => state.setDebugPanel);
   const { balance } = useEconomy();
+  const navigate = useNavigate();
+  const [logoClicks, setLogoClicks] = React.useState(0);
+
+  const handleLogoClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const nextClicks = logoClicks + 1;
+    setLogoClicks(nextClicks);
+    
+    if (nextClicks >= 5) {
+      setDebugPanel(true);
+      setLogoClicks(0);
+      haptics.success();
+    } else {
+      // If single click, navigate to home
+      if (nextClicks === 1) {
+        setTimeout(() => {
+          if (logoClicks < 5) {
+            navigate('/');
+            setLogoClicks(0);
+          }
+        }, 300);
+      }
+    }
+  };
 
   return (
     <aside className="hidden lg:flex fixed left-0 top-0 h-full w-20 flex-col items-center py-6 bg-black border-r border-white/10 z-50">
       {/* Logo / Home */}
       <div className="mb-10">
-        <Link to="/">
+        <button onClick={handleLogoClick} className="block">
           <div className="group relative w-12 h-12 flex items-center justify-center">
             <div className="absolute inset-0 bg-cyan-electric/20 rounded-xl blur-md group-hover:bg-cyan-electric/40 transition-all duration-500" />
             <div className="relative bg-zinc-900 border border-cyan-electric/30 rounded-xl p-2.5 shadow-[0_0_15px_rgba(0,242,255,0.2)] group-hover:scale-105 transition-transform">
               <Gamepad2 className="w-6 h-6 text-cyan-electric" />
             </div>
           </div>
-        </Link>
+        </button>
       </div>
 
       {/* User Profile Avatar */}
@@ -165,7 +190,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Logout */}
-      <div className="mt-auto pb-4">
+      <div className="mt-auto pb-4 flex flex-col items-center gap-4">
         <button 
           onClick={() => signOut()}
           className="group relative p-3 text-zinc-600 hover:text-rose-500 transition-colors"
@@ -177,6 +202,16 @@ export default function Sidebar() {
             </span>
           </div>
         </button>
+
+        {/* Hidden Debug Trigger */}
+        <button 
+          onClick={() => {
+            setDebugPanel(true);
+            haptics.success();
+          }}
+          className="w-1 h-1 bg-transparent hover:bg-rose-500/10 transition-colors cursor-default"
+          title="Neural Debugger"
+        />
       </div>
     </aside>
   );

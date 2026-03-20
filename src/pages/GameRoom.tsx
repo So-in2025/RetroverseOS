@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import React from 'react';
-import { Share2, Users, MessageSquare, Send, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video, Bot, Cloud, Zap, Target, Shield, Cpu } from 'lucide-react';
+import { Share2, Users, MessageSquare, Send, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video, Bot, Cloud, Zap, Target, Shield, Cpu, ShoppingBag } from 'lucide-react';
 import { emulator } from '../services/emulator';
 import { multiplayer } from '../services/multiplayer';
 import { inputManager, RetroButton } from '../services/inputManager';
@@ -13,6 +13,9 @@ import { useEconomy } from '../hooks/useEconomy';
 import { AudioEngine } from '../services/audioEngine';
 import { MetadataNormalizationEngine } from '../services/metadataNormalization';
 import { haptics } from '../services/haptics';
+import { quotaService } from '../services/quotaService';
+import { apiPoolService } from '../services/apiPoolService';
+import { neuralService } from '../services/neuralService';
 import GameOverlay from '../components/game/GameOverlay';
 import LobbyView from '../components/game/LobbyView';
 import SaveStatePanel from '../components/game/SaveStatePanel';
@@ -22,6 +25,8 @@ import LoadingScreen from '../components/game/LoadingScreen';
 import CommunityTipsPanel from '../components/game/CommunityTipsPanel';
 import QuickChatWheel from '../components/game/QuickChatWheel';
 import TacticalOverlay from '../components/game/TacticalOverlay';
+import Store from '../components/game/Store';
+import { STORE_ITEMS, StoreItem } from '../constants/storeItems';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Type } from "@google/genai";
 
@@ -67,6 +72,16 @@ export default function GameRoom() {
   const [tacticalAdvice, setTacticalAdvice] = useState('');
   const [isTacticalLoading, setIsTacticalLoading] = useState(false);
   const [isTacticalVisible, setIsTacticalVisible] = useState(false);
+  const [showQuotaModal, setShowQuotaModal] = useState(false);
+  const [quotaStatus, setQuotaStatus] = useState<{ used: number; limit: number; remaining: number } | null>(null);
+  const [timeLeft, setTimeLeft] = useState<string>('');
+  const [isPremium, setIsPremium] = useState(false);
+  
+  // Store State
+  const [isStoreOpen, setIsStoreOpen] = useState(false);
+  const [purchasedItems, setPurchasedItems] = useState<string[]>(['filter-classic', 'skin-default']);
+  const [activeFilter, setActiveFilter] = useState('classic');
+  const [activeSkin, setActiveSkin] = useState('default');
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -114,8 +129,47 @@ export default function GameRoom() {
     };
     loadVideoSettings();
 
-    return () => { mountedRef.current = false; };
+    // Load store settings
+    const loadStoreSettings = async () => {
+      const purchased = await storage.getSetting('purchased_items');
+      const filter = await storage.getSetting('active_filter');
+      const skin = await storage.getSetting('active_skin');
+      
+      if (purchased) setPurchasedItems(purchased);
+      if (filter) setActiveFilter(filter);
+      if (skin) setActiveSkin(skin);
+    };
+    loadStoreSettings();
+
+    // Load initial quota status
+    const updateQuota = async () => {
+      const premium = achievements.isUnlocked('arcade_master');
+      setIsPremium(premium);
+      const status = await quotaService.getStatus(premium);
+      setQuotaStatus(status);
+    };
+    updateQuota();
+
+    return () => {
+      mountedRef.current = false;
+    };
   }, []);
+
+  useEffect(() => {
+    if (!showQuotaModal) return;
+
+    const updateTimer = () => {
+      const ms = quotaService.getTimeUntilReset();
+      const hours = Math.floor(ms / (1000 * 60 * 60));
+      const minutes = Math.floor((ms % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((ms % (1000 * 60)) / 1000);
+      setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [showQuotaModal]);
 
   useEffect(() => {
     if (voiceEnabled) {
@@ -140,6 +194,31 @@ export default function GameRoom() {
     }
     return () => clearInterval(interval);
   }, [gameState]);
+
+  const handlePurchase = async (item: StoreItem) => {
+    const newPurchased = [...purchasedItems, item.id];
+    setPurchasedItems(newPurchased);
+    await storage.saveSetting('purchased_items', newPurchased);
+    
+    // Auto-equip if it's the first of its kind or just for UX
+    handleSelect(item);
+    
+    haptics.success();
+    AudioEngine.playSelectSound();
+  };
+
+  const handleSelect = async (item: StoreItem) => {
+    if (item.category === 'filter') {
+      setActiveFilter(item.value);
+      await storage.saveSetting('active_filter', item.value);
+    } else if (item.category === 'skin') {
+      setActiveSkin(item.value as any);
+      await storage.saveSetting('active_skin', item.value);
+    }
+    
+    haptics.light();
+    AudioEngine.playSelectSound();
+  };
 
   const initializedRef = useRef(false);
 
@@ -392,11 +471,19 @@ export default function GameRoom() {
     }
   };
 
-  const requestTacticalAdvice = async () => {
+  const requestTacticalAdvice = async (): Promise<void> => {
     if (isTacticalLoading || gameState !== 'playing') return;
     
+    // Check quota
+    const isAllowed = await quotaService.canUse(isPremium);
+    if (!isAllowed) {
+      setShowQuotaModal(true);
+      haptics.error();
+      return;
+    }
+    
     setIsTacticalLoading(true);
-    haptics.impact();
+    haptics.medium();
     AudioEngine.playSelectSound();
 
     try {
@@ -405,32 +492,45 @@ export default function GameRoom() {
 
       const base64Data = screenshot.split(',')[1];
       
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: [
-          {
-            parts: [
-              { text: "Eres una IA táctica de combate. Analiza esta captura de pantalla de un videojuego retro y da un consejo estratégico corto (máximo 15 palabras) para el jugador. Sé directo, técnico y un poco futurista. Responde en español." },
-              { inlineData: { mimeType: "image/jpeg", data: base64Data } }
-            ]
-          }
-        ]
-      });
-
-      const advice = response.text || "ANÁLISIS FALLIDO. REINTENTAR ENLACE.";
-      setTacticalAdvice(advice);
+      const response = await neuralService.generateTacticalAdvice(base64Data);
+      
+      setTacticalAdvice(response.text);
       setIsTacticalVisible(true);
+      
+      // Increment usage and update status
+      await quotaService.incrementUsage(isPremium);
+      const newStatus = await quotaService.getStatus(isPremium);
+      setQuotaStatus(newStatus);
       
       // Auto-hide after 8 seconds
       setTimeout(() => setIsTacticalVisible(false), 8000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Tactical AI Error:', error);
       setTacticalAdvice("ERROR DE ENLACE NEURONAL. INTERFERENCIA DETECTADA.");
       setIsTacticalVisible(true);
       setTimeout(() => setIsTacticalVisible(false), 5000);
     } finally {
       setIsTacticalLoading(false);
+    }
+  };
+
+  const handleRefillQuota = async () => {
+    const cost = 500; // Cost to refill
+    if (balance < cost) {
+      haptics.error();
+      return;
+    }
+
+    const success = await economy.spendCoins(cost, 'Recarga de IA Táctica');
+    if (success) {
+      await quotaService.resetQuota();
+      const newStatus = await quotaService.getStatus(isPremium);
+      setQuotaStatus(newStatus);
+      setShowQuotaModal(false);
+      haptics.success();
+      AudioEngine.playSelectSound();
+      // Trigger advice immediately after refill
+      requestTacticalAdvice();
     }
   };
 
@@ -609,7 +709,7 @@ export default function GameRoom() {
             filter: crtEnabled ? 'blur(0.5px)' : 'none'
           }}
         />
-        <CRTFilter enabled={crtEnabled} />
+        <CRTFilter enabled={crtEnabled} style={activeFilter as any} />
       </div>
 
       {/* Floating Top Bar */}
@@ -632,6 +732,14 @@ export default function GameRoom() {
             <Coins className="w-3 h-3 text-amber-500" />
             <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{balance}</span>
           </div>
+
+          <button 
+            onClick={() => setIsStoreOpen(true)}
+            className="pointer-events-auto mt-2 bg-indigo-500/20 hover:bg-indigo-500/40 backdrop-blur-md border border-indigo-500/30 px-4 py-2 rounded-xl flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-500/10"
+          >
+            <ShoppingBag className="w-4 h-4 text-indigo-400" />
+            <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Store</span>
+          </button>
         </div>
 
         {/* Desktop Controls */}
@@ -932,7 +1040,10 @@ export default function GameRoom() {
       </div>
 
       {/* Virtual Controller */}
-      <VirtualController isVisible={isTouchDevice && gameState === 'playing'} />
+      <VirtualController 
+        isVisible={isTouchDevice && gameState === 'playing'} 
+        skin={activeSkin as any}
+      />
 
       {/* Overlays */}
       <CommunityTipsPanel 
@@ -1001,7 +1112,7 @@ export default function GameRoom() {
         <motion.button
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          onClick={requestTacticalAdvice}
+          onClick={() => requestTacticalAdvice()}
           disabled={isTacticalLoading}
           className={`fixed top-6 left-6 z-50 p-3 rounded-xl border backdrop-blur-md transition-all flex items-center gap-3 group
             ${isTacticalLoading 
@@ -1018,7 +1129,7 @@ export default function GameRoom() {
           <div className="flex flex-col items-start">
             <span className="text-[10px] font-black text-white uppercase tracking-widest leading-none mb-1">Tactical Link</span>
             <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter leading-none">
-              {isTacticalLoading ? 'Analyzing...' : 'Ready for Sync'}
+              {isTacticalLoading ? 'Analyzing...' : (quotaStatus ? `${quotaStatus.remaining}/${quotaStatus.limit} Syncs` : 'Ready for Sync')}
             </span>
           </div>
         </motion.button>
@@ -1199,37 +1310,92 @@ export default function GameRoom() {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
           >
-            <div className="bg-zinc-900 border border-emerald-500/30 rounded-2xl p-6 max-w-md w-full text-center shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
-              
-              <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4 relative z-10">
-                <Users className="w-8 h-8 text-emerald-400" />
+            <div className="bg-zinc-900 border border-cyan-electric/30 rounded-3xl p-8 max-w-md w-full text-center shadow-[0_0_50px_rgba(0,255,255,0.2)]">
+              <div className="w-20 h-20 bg-cyan-electric/10 rounded-2xl flex items-center justify-center mx-auto mb-6 rotate-3 border border-cyan-electric/20">
+                <Users className="w-10 h-10 text-cyan-electric" />
               </div>
-              <h3 className="text-2xl font-black italic uppercase tracking-tight text-white mb-2 relative z-10">¡Únete a Retroverse!</h3>
-              <p className="text-zinc-400 text-sm mb-6 relative z-10">
-                Estás jugando como invitado. Regístrate gratis para guardar tu progreso, grabar clips virales, jugar torneos y ganar <strong className="text-emerald-400">500 CR</strong> de bienvenida.
-              </p>
-              <div className="flex flex-col gap-3 relative z-10">
+              <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white mb-4">¡Únete a la Revolución!</h3>
+              <p className="text-zinc-400 text-sm mb-8 leading-relaxed">Estás jugando como invitado. Crea una cuenta para guardar tu progreso en la nube, ganar Retro Coins y desbloquear logros épicos.</p>
+              <div className="flex flex-col gap-4">
                 <button 
-                  onClick={() => { navigate('/auth'); setShowGuestModal(false); }}
-                  className="w-full py-3 bg-emerald-500 text-black font-bold rounded-xl hover:bg-emerald-400 transition-colors"
+                  onClick={() => navigate('/auth')}
+                  className="w-full py-4 bg-cyan-electric text-black font-black uppercase tracking-widest rounded-xl hover:bg-white transition-all shadow-lg shadow-cyan-electric/20"
                 >
                   Crear Cuenta Gratis
                 </button>
                 <button 
-                  onClick={() => {
-                    setShowGuestModal(false);
-                    if (pendingExit) {
-                      handleExit();
-                    }
-                  }}
-                  className="w-full py-3 bg-white/5 text-white font-bold rounded-xl hover:bg-white/10 transition-colors"
+                  onClick={() => setShowGuestModal(false)}
+                  className="w-full py-4 bg-white/5 text-zinc-500 font-bold rounded-xl hover:bg-white/10 transition-all"
                 >
-                  {pendingExit ? 'Salir sin guardar' : 'Seguir como Invitado'}
+                  Continuar como Invitado
                 </button>
               </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <Store 
+        isOpen={isStoreOpen}
+        onClose={() => setIsStoreOpen(false)}
+        purchasedItems={purchasedItems}
+        onPurchase={handlePurchase}
+        activeFilter={activeFilter}
+        activeSkin={activeSkin}
+        onSelect={handleSelect}
+      />
+
+      {/* Quota Exceeded Modal */}
+      <AnimatePresence>
+        {showQuotaModal && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl"
+          >
+            <div className="bg-zinc-900 border border-amber-500/40 rounded-3xl p-8 max-w-md w-full text-center shadow-[0_0_60px_rgba(245,158,11,0.15)] relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-amber-500 to-transparent opacity-50" />
+              
+              <div className="w-20 h-20 bg-amber-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-amber-500/20 rotate-3">
+                <Bot className="w-10 h-10 text-amber-500" />
+              </div>
+              
+              <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white mb-4">Límite de Enlace Neuronal</h3>
+              <p className="text-zinc-400 text-sm mb-8 leading-relaxed">
+                Has agotado tus consultas gratuitas de IA táctica por hoy. 
+                Reinicio en: <span className="text-amber-500 font-mono">{timeLeft}</span>
+              </p>
+              
+              <div className="flex flex-col gap-4">
+                <button 
+                  onClick={handleRefillQuota}
+                  disabled={balance < 500}
+                  className={`w-full py-4 rounded-xl font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${
+                    balance >= 500 
+                    ? 'bg-amber-500 text-black hover:bg-white shadow-lg shadow-amber-500/20' 
+                    : 'bg-zinc-800 text-zinc-600 cursor-not-allowed'
+                  }`}
+                >
+                  <Coins className="w-5 h-5" />
+                  Recargar por 500 CR
+                </button>
+                
+                <button 
+                  onClick={() => setShowQuotaModal(false)}
+                  className="w-full py-4 bg-white/5 text-zinc-500 font-bold rounded-xl hover:bg-white/10 transition-all"
+                >
+                  Cerrar
+                </button>
+              </div>
+              
+              {balance < 500 && (
+                <p className="mt-4 text-xs text-rose-500 font-bold animate-pulse">
+                  CRÉDITOS INSUFICIENTES PARA RECARGA INMEDIATA
+                </p>
+              )}
             </div>
           </motion.div>
         )}
