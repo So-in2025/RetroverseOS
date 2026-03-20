@@ -221,73 +221,130 @@ async function startServer() {
       targetUrl = 'https://' + targetUrl;
     }
 
-    try {
-      const parsedUrl = new URL(targetUrl);
-      targetUrl = parsedUrl.href;
-      
-      console.log(`[Tunnel] Fetching: ${targetUrl}`);
+    const maxRetries = 3; // Reduced from 5 to stay within browser timeout limits
+    let attempt = 0;
+    let lastError: any = null;
+
+    while (attempt < maxRetries) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout for large ROMs
+      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s per attempt (total ~75s + delays)
       
-      const response = await fetch(targetUrl, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': '*/*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Referer': 'https://archive.org/'
-        }
-      });
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        console.error(`[Tunnel] Target returned ${response.status}`);
-        return res.status(response.status).send(`Target returned ${response.status}`);
-      }
-
-      // Forward headers safely
-      const contentType = response.headers.get('content-type');
-      const contentLength = response.headers.get('content-length');
-      
-      if (contentType) res.setHeader('Content-Type', contentType);
-      if (contentLength) res.setHeader('Content-Length', contentLength);
-      
-      // Add CORS headers
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-
-      // Stream the response instead of loading into memory
-      if (!response.body) {
-        throw new Error('Response body is null');
-      }
-
-      // Convert Web Stream to Node Stream
-      const reader = response.body.getReader();
-      const stream = new Readable({
-        async read() {
-          const { done, value } = await reader.read();
-          if (done) {
-            this.push(null);
-          } else {
-            this.push(Buffer.from(value));
+      try {
+        console.log(`[Tunnel] Fetching (Attempt ${attempt + 1}/${maxRetries}): ${targetUrl}`);
+        const response = await fetch(targetUrl, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://archive.org/',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Connection': 'keep-alive'
           }
-        }
-      });
-
-      stream.pipe(res);
-
-      res.on('close', () => {
-        controller.abort();
-      });
-
-    } catch (error) {
-      console.error('[Tunnel] Error:', error);
-      if (!res.headersSent) {
-        res.status(500).json({ 
-          error: 'Failed to fetch data', 
-          details: error instanceof Error ? error.message : String(error) 
         });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+          // If it's a 404, don't retry
+          if (response.status === 404) {
+            console.error(`[Tunnel] Target returned 404: ${targetUrl}`);
+            return res.status(404).send('Target not found');
+          }
+          
+          // If it's a 503, 429 or 408, wait a bit and retry
+          if (response.status === 503 || response.status === 429 || response.status === 408) {
+            console.warn(`[Tunnel] Target returned ${response.status}. Retrying...`);
+            const waitTime = 1000 * (attempt + 1) + Math.random() * 500;
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            throw new Error(`Target returned ${response.status}`);
+          }
+
+          throw new Error(`Target returned ${response.status}`);
+        }
+
+        // Forward headers safely
+        const contentType = response.headers.get('content-type');
+        const contentLength = response.headers.get('content-length');
+        
+        if (contentType) res.setHeader('Content-Type', contentType);
+        if (contentLength) res.setHeader('Content-Length', contentLength);
+        
+        // Add CORS headers
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+
+        // Stream the response instead of loading into memory
+        if (!response.body) {
+          throw new Error('Response body is null');
+        }
+
+        // Convert Web Stream to Node Stream
+        const reader = response.body.getReader();
+        const stream = new Readable({
+          async read() {
+            try {
+              const { done, value } = await reader.read();
+              if (done) {
+                this.push(null);
+              } else {
+                // Ensure value is not null before Buffer.from
+                if (value) {
+                  this.push(Buffer.from(value));
+                } else {
+                  this.push(null);
+                }
+              }
+            } catch (err) {
+              this.destroy(err instanceof Error ? err : new Error(String(err)));
+            }
+          }
+        });
+
+        stream.pipe(res);
+
+        res.on('close', () => {
+          controller.abort();
+          stream.destroy();
+        });
+
+        return; // Success!
+
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        lastError = error;
+        attempt++;
+        
+        const isTimeout = error.name === 'AbortError';
+        const isConnReset = error.message?.includes('ECONNRESET') || error.code === 'ECONNRESET';
+        const isRetryableStatus = error.message?.includes('503') || error.message?.includes('408');
+        
+        console.warn(`[Tunnel] Attempt ${attempt} failed: ${error.message}`);
+        
+        if (attempt < maxRetries && (isTimeout || isConnReset || isRetryableStatus || !res.headersSent)) {
+          // Wait a bit before retrying (exponential backoff with jitter)
+          const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+          console.log(`[Tunnel] Retrying in ${Math.round(delay)}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        } else {
+          break;
+        }
       }
+    }
+
+    // If we get here, all attempts failed
+    console.error(`[Tunnel] All attempts failed for ${targetUrl}:`, lastError);
+    if (!res.headersSent) {
+      const isTimeout = lastError?.name === 'AbortError' || lastError?.message?.includes('408');
+      const isOverloaded = lastError?.message?.includes('503');
+      
+      const status = isTimeout ? 408 : (isOverloaded ? 503 : 502);
+      const message = isTimeout ? 'Oops... Request Timeout.' : 
+                     (isOverloaded ? 'Archive.org is currently overloaded. Please try again later.' : 
+                     `Gateway Error: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
+      
+      res.status(status).send(message);
     }
   });
 

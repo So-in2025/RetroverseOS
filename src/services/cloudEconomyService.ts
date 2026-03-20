@@ -9,6 +9,7 @@ export interface ReferralData {
 class CloudEconomyService {
   // --- Retro Pass ---
   async hasRetroPass(userId: string): Promise<boolean> {
+    if (!supabase) return false;
     const { data, error } = await supabase
       .from('user_profiles')
       .select('has_retro_pass')
@@ -19,6 +20,7 @@ class CloudEconomyService {
   }
 
   async subscribeRetroPass(userId: string): Promise<boolean> {
+    if (!supabase) return false;
     const { error } = await supabase
       .from('user_profiles')
       .update({ has_retro_pass: true })
@@ -28,6 +30,7 @@ class CloudEconomyService {
 
   // --- Credits ---
   async getCredits(userId: string): Promise<number> {
+    if (!supabase) return 0;
     const { data, error } = await supabase
       .from('user_profiles')
       .select('credits')
@@ -38,6 +41,7 @@ class CloudEconomyService {
   }
 
   async addCredits(userId: string, amount: number): Promise<number> {
+    if (!supabase) return 0;
     const current = await this.getCredits(userId);
     const newValue = current + amount;
     const { error } = await supabase
@@ -50,6 +54,7 @@ class CloudEconomyService {
 
   // --- Premium Packs ---
   async getOwnedPacks(userId: string): Promise<string[]> {
+    if (!supabase) return [];
     const { data, error } = await supabase
       .from('user_owned_packs')
       .select('pack_id')
@@ -59,6 +64,7 @@ class CloudEconomyService {
   }
 
   async buyPack(userId: string, packId: string, price: number): Promise<boolean> {
+    if (!supabase) return false;
     const credits = await this.getCredits(userId);
     if (credits >= price) {
       // Transaction-like update
@@ -79,6 +85,7 @@ class CloudEconomyService {
   }
   // --- Referrals ---
   async getReferralData(userId: string): Promise<ReferralData> {
+    if (!supabase) return { code: 'RV-' + userId.substring(0, 6).toUpperCase(), invites: 0, claimedRewards: [] };
     const { data, error } = await supabase
       .from('user_referrals')
       .select('referral_code, invites, claimed_rewards')
@@ -97,6 +104,7 @@ class CloudEconomyService {
   }
 
   async claimReferralReward(userId: string, rewardId: string, requiredInvites: number): Promise<boolean> {
+    if (!supabase) return false;
     const data = await this.getReferralData(userId);
     if (data.invites >= requiredInvites && !data.claimedRewards.includes(rewardId)) {
       const updatedRewards = [...data.claimedRewards, rewardId];
@@ -121,6 +129,7 @@ class CloudEconomyService {
   }
   // --- Cosmetics & Settings ---
   async getCoachVoice(userId: string): Promise<string> {
+    if (!supabase) return 'Kore';
     const { data, error } = await supabase
       .from('user_profiles')
       .select('coach_voice')
@@ -131,6 +140,7 @@ class CloudEconomyService {
   }
 
   async saveCoachVoice(userId: string, voiceId: string): Promise<void> {
+    if (!supabase) return;
     await supabase
       .from('user_profiles')
       .update({ coach_voice: voiceId })
@@ -138,6 +148,7 @@ class CloudEconomyService {
   }
 
   async getPurchasedItems(userId: string): Promise<number[]> {
+    if (!supabase) return [];
     const { data, error } = await supabase
       .from('user_profiles')
       .select('purchased_items')
@@ -148,12 +159,14 @@ class CloudEconomyService {
   }
 
   async savePurchasedItems(userId: string, items: number[]): Promise<void> {
+    if (!supabase) return;
     await supabase
       .from('user_profiles')
       .update({ purchased_items: items })
       .eq('user_id', userId);
   }
   async getUserPreferences(userId: string): Promise<any> {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('user_profiles')
       .select('user_preferences')
@@ -164,6 +177,7 @@ class CloudEconomyService {
   }
 
   async saveUserPreferences(userId: string, prefs: any): Promise<void> {
+    if (!supabase) return;
     await supabase
       .from('user_profiles')
       .update({ user_preferences: prefs })
@@ -171,6 +185,7 @@ class CloudEconomyService {
   }
 
   async getControls(userId: string): Promise<any> {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('user_profiles')
       .select('controls')
@@ -181,12 +196,14 @@ class CloudEconomyService {
   }
 
   async saveControls(userId: string, controls: any): Promise<void> {
+    if (!supabase) return;
     await supabase
       .from('user_profiles')
       .update({ controls: controls })
       .eq('user_id', userId);
   }
   async getVideoSettings(userId: string): Promise<any> {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('user_profiles')
       .select('video_settings')
@@ -197,6 +214,7 @@ class CloudEconomyService {
   }
 
   async saveVideoSettings(userId: string, settings: any): Promise<void> {
+    if (!supabase) return;
     await supabase
       .from('user_profiles')
       .update({ video_settings: settings })
@@ -204,6 +222,7 @@ class CloudEconomyService {
   }
 
   async getAudioSettings(userId: string): Promise<any> {
+    if (!supabase) return null;
     const { data, error } = await supabase
       .from('user_profiles')
       .select('audio_settings')
@@ -214,6 +233,7 @@ class CloudEconomyService {
   }
 
   async saveAudioSettings(userId: string, settings: any): Promise<void> {
+    if (!supabase) return;
     await supabase
       .from('user_profiles')
       .update({ audio_settings: settings })

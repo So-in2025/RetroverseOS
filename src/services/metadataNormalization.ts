@@ -113,40 +113,53 @@ export const ELITE_TOP_20 = [
 export class MetadataNormalizationEngine {
   
   public static async resolveRomUrl(identifier: string, system?: string): Promise<string | null> {
-    try {
-      const metaTargetUrl = `https://archive.org/metadata/${identifier}`;
-      const proxyUrl = `/api/tunnel?url=${encodeURIComponent(metaTargetUrl)}`;
-      
-      const fetchWithTimeout = async (url: string, timeout: number = 30000) => {
-        const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), timeout);
-        try {
-          const response = await fetch(url, { signal: controller.signal });
-          clearTimeout(id);
-          return response;
-        } catch (e) {
-          clearTimeout(id);
-          throw e;
-        }
-      };
+    const maxRetries = 4;
+    let attempt = 0;
 
-      let response;
+    while (attempt < maxRetries) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout per attempt
+
       try {
-        response = await fetchWithTimeout(proxyUrl);
-      } catch (e) {
-        console.warn(`[RomResolver] Proxy failed for ${identifier}, trying direct...`);
+        const metaTargetUrl = `https://archive.org/metadata/${identifier}`;
+        const proxyUrl = `/api/tunnel?url=${encodeURIComponent(metaTargetUrl)}`;
+        
+        let response;
         try {
-          response = await fetchWithTimeout(metaTargetUrl);
-        } catch (e2) {
-          console.error(`[RomResolver] Direct fetch also failed for ${identifier}:`, e2);
-          return null;
+          console.log(`[RomResolver] Fetching metadata for ${identifier} (Attempt ${attempt + 1}/${maxRetries})`);
+          response = await fetch(proxyUrl, { signal: controller.signal });
+        } catch (e: any) {
+          console.warn(`[RomResolver] Proxy failed for ${identifier}: ${e.message}`);
+          
+          // If it's the last attempt, try direct
+          if (attempt === maxRetries - 1) {
+            console.log(`[RomResolver] Final attempt for ${identifier}, trying direct...`);
+            try {
+              response = await fetch(metaTargetUrl, { signal: controller.signal });
+            } catch (e2: any) {
+              console.error(`[RomResolver] Direct fetch also failed for ${identifier}:`, e2.message);
+              throw e2;
+            }
+          } else {
+            throw e;
+          }
         }
-      }
-      
-      if (response && response.ok) {
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const metaData = await response.json();
+        
+        if (response && response.ok) {
+          const text = await response.text();
+          
+          if (!text || text.trim().startsWith('<!DOCTYPE')) {
+             throw new Error("Received HTML instead of JSON from Archive.org");
+          }
+
+          let metaData;
+          try {
+            metaData = JSON.parse(text);
+          } catch (parseError) {
+            console.error(`[RomResolver] Failed to parse JSON for ${identifier}:`, text.substring(0, 100));
+            throw new Error("Invalid JSON response from Archive.org");
+          }
+
           if (metaData && metaData.files) {
             let validExtensions: string[] = [];
             if (system === 'nes') validExtensions = ['.nes', '.zip'];
@@ -167,21 +180,39 @@ export class MetadataNormalizationEngine {
 
             const romFile = this.findMainRom(metaData.files, validExtensions);
             if (romFile) {
+              clearTimeout(timeoutId);
               return `https://archive.org/download/${identifier}/${encodeURIComponent(romFile.name)}`;
             } else {
-              console.warn(`[RomResolver] No valid ROM file found in metadata for ${identifier}. Files: ${metaData.files.length}`);
+              console.warn(`[RomResolver] No valid ROM file found in metadata for ${identifier}.`);
+              clearTimeout(timeoutId);
+              return null; 
             }
           } else {
             console.warn(`[RomResolver] No files found in metadata for ${identifier}`);
+            clearTimeout(timeoutId);
+            return null;
           }
-        } else {
-          console.warn(`[RomResolver] Expected JSON, got ${contentType} for ${identifier}`);
+        } else if (response) {
+          console.warn(`[RomResolver] Metadata fetch failed for ${identifier} with status ${response.status}`);
+          if (response.status === 404) {
+            clearTimeout(timeoutId);
+            return null;
+          }
+          throw new Error(`HTTP ${response.status}`);
         }
-      } else if (response) {
-        console.warn(`[RomResolver] Metadata fetch failed for ${identifier} with status ${response.status}`);
+      } catch (e: any) {
+        attempt++;
+        console.error(`[RomResolver] Attempt ${attempt} failed for ${identifier}:`, e.message);
+        if (attempt < maxRetries) {
+          // Exponential backoff with jitter
+          const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          break;
+        }
+      } finally {
+        clearTimeout(timeoutId);
       }
-    } catch (e) {
-      console.error(`[RomResolver] Failed to resolve ROM URL for ${identifier}:`, e);
     }
     return null;
   }
@@ -806,8 +837,8 @@ export class MetadataNormalizationEngine {
   public static async searchArchiveOrg(query: string, system?: string, rows: number = 100, page: number = 1): Promise<GameObject[]> {
     // PROXY ROTATION STRATEGY
     const proxies = [
-      { name: 'Direct', url: '' },
       { name: 'LocalTunnel', url: '/api/tunnel?url=' },
+      { name: 'Direct', url: '' },
       { name: 'CorsProxy', url: 'https://corsproxy.io/?' },
       { name: 'AllOrigins', url: 'https://api.allorigins.win/raw?url=' }
     ];
@@ -883,10 +914,12 @@ export class MetadataNormalizationEngine {
 
     let searchData: any = null;
     let lastError: string = "";
+    const startTime = Date.now();
+    const globalTimeout = 120000; // 2 minutes total for all attempts
 
     // Attempt fetch with query fallback, proxy rotation and endpoint fallback
     for (const currentQ of queries) {
-      if (searchData && searchData.response && searchData.response.docs && searchData.response.docs.length > 0) break;
+      if (searchData || (Date.now() - startTime > globalTimeout)) break;
 
       const endpoints = [
         `https://archive.org/advancedsearch.php?q=${encodeURIComponent(currentQ)}&${flParams}&sort[]=${sort}&rows=${rows}&page=${page}&output=json`
@@ -897,29 +930,42 @@ export class MetadataNormalizationEngine {
       }
 
       for (const endpoint of endpoints) {
-        if (searchData && searchData.response && searchData.response.docs && searchData.response.docs.length > 0) break;
+        if (searchData || (Date.now() - startTime > globalTimeout)) break;
         
         let endpointSuccess = false;
 
         for (const proxy of proxies) {
+          if (Date.now() - startTime > globalTimeout) break;
+          
           try {
             const fetchUrl = proxy.url ? `${proxy.url}${encodeURIComponent(endpoint)}` : endpoint;
-            console.log(`[Archive.org Search] Attempting via ${proxy.name} (Query: ${currentQ.substring(0, 30)}...): ${fetchUrl}`);
+            console.log(`[Archive.org Search] Attempting via ${proxy.name} (${currentQ.substring(0, 20)}...): ${proxy.name === 'LocalTunnel' ? 'tunneling' : fetchUrl}`);
             
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout per attempt
+            const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout per proxy attempt
             
-            // Add random jitter to avoid slamming the server
-            await new Promise(resolve => setTimeout(resolve, Math.random() * 2000));
+            // Add small jitter to avoid slamming the server
+            await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 500));
             
             const response = await fetch(fetchUrl, { 
-              signal: controller.signal
+              signal: controller.signal,
+              headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+              }
             });
             clearTimeout(timeoutId);
 
             if (!response.ok) {
               const errText = await response.text().catch(() => "No error body");
-              // If it's a 400/500 error from Archive.org, it might be a paging error
+              
+              // If it's a 503, 429 or 408, move to next proxy
+              if (response.status === 503 || response.status === 429 || response.status === 408) {
+                console.warn(`[Archive.org Search] ${proxy.name} returned ${response.status}. Moving to next proxy...`);
+                continue;
+              }
+
+              // If it's a paging error, stop this query
               if (errText.includes('DEEP_PAGING') || errText.includes('paging limit')) {
                 throw new Error(`Archive.org API Error: [DEEP_PAGING] Limit reached at page ${page}`);
               }
@@ -927,6 +973,10 @@ export class MetadataNormalizationEngine {
             }
             
             const text = await response.text();
+            if (!text || text.trim().startsWith('<!DOCTYPE')) {
+              throw new Error('Received HTML instead of JSON');
+            }
+
             try {
               const data = JSON.parse(text);
               
@@ -948,7 +998,7 @@ export class MetadataNormalizationEngine {
                  throw new Error('Invalid data format: missing docs or items array');
               }
             } catch (e) {
-              if (e instanceof Error && e.message.includes('Archive.org API Error')) {
+              if (e instanceof Error && (e.message.includes('Archive.org API Error') || e.message.includes('Received HTML'))) {
                 throw e;
               }
               throw new Error('Invalid JSON response or format');
@@ -957,30 +1007,18 @@ export class MetadataNormalizationEngine {
             lastError = e instanceof Error ? e.message : String(e);
             console.warn(`[Archive.org Search] Proxy ${proxy.name} failed: ${lastError}`);
             
-            // CRITICAL: If it's a logical API error (like deep paging), don't try other proxies
-            if (lastError.includes('Archive.org API Error')) {
-               console.error("[Archive.org Search] Logical error detected. Aborting proxy rotation.");
-               throw e; 
-            }
-            continue;
+            // If it's a logical API error (like deep paging), don't try other proxies
+            if (lastError.includes('DEEP_PAGING')) break;
           }
         }
-
-        // If the endpoint succeeded (even with 0 results), break the endpoint loop
-        if (endpointSuccess) {
-           break;
-        }
+        
+        if (endpointSuccess) break;
       }
     }
 
-    if (searchData && searchData.response && searchData.response.docs) {
-      if (searchData.response.docs.length === 0) {
-        console.log("[Archive.org Search] Query completed successfully but returned 0 results.");
-        return [];
-      }
-    } else {
-      console.error("[Archive.org Search] All queries, proxies and endpoints failed. Last error:", lastError);
-      throw new Error(`Search failed. Archive.org might be unavailable or rate-limited. (Last error: ${lastError})`);
+    if (!searchData) {
+      const timeTaken = Math.round((Date.now() - startTime) / 1000);
+      throw new Error(`All queries, proxies and endpoints failed after ${timeTaken}s. Last error: ${lastError}`);
     }
 
     const docs = searchData.response.docs;
