@@ -221,13 +221,13 @@ async function startServer() {
       targetUrl = 'https://' + targetUrl;
     }
 
-    const maxRetries = 3; // Reduced from 5 to stay within browser timeout limits
+    const maxRetries = 3; 
     let attempt = 0;
     let lastError: any = null;
 
     while (attempt < maxRetries) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25s per attempt (total ~75s + delays)
+      const timeoutId = setTimeout(() => controller.abort(), 40000); // Increased to 40s per attempt
       
       try {
         console.log(`[Tunnel] Fetching (Attempt ${attempt + 1}/${maxRetries}): ${targetUrl}`);
@@ -252,8 +252,8 @@ async function startServer() {
             return res.status(404).send('Target not found');
           }
           
-          // If it's a 503, 429 or 408, wait a bit and retry
-          if (response.status === 503 || response.status === 429 || response.status === 408) {
+          // If it's a 503, 429, 500 or 408, wait a bit and retry
+          if (response.status === 503 || response.status === 429 || response.status === 408 || response.status === 500) {
             console.warn(`[Tunnel] Target returned ${response.status}. Retrying...`);
             const waitTime = 1000 * (attempt + 1) + Math.random() * 500;
             await new Promise(resolve => setTimeout(resolve, waitTime));

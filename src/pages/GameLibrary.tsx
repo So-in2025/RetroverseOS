@@ -387,48 +387,33 @@ export default function GameLibrary() {
               </h1>
             </div>
 
-            <div className="flex items-center gap-2 bg-white/5 p-1 rounded-xl backdrop-blur-md border border-white/10">
-              <button
-                onClick={() => {
-                  setViewMode('discover');
-                  setSpecialFilter(null);
-                }}
-                className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                  viewMode === 'discover' && !specialFilter
-                    ? 'bg-cyan-electric text-black shadow-[0_0_15px_rgba(0,242,255,0.4)]' 
-                    : 'text-zinc-500 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                DESCUBRIR
-              </button>
-              <button
-                onClick={() => {
-                  setViewMode('carousel');
-                  setSpecialFilter(null);
-                }}
-                className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                  viewMode === 'carousel' 
-                    ? 'bg-cyan-electric text-black shadow-[0_0_15px_rgba(0,242,255,0.4)]' 
-                    : 'text-zinc-500 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                PORTADAS
-              </button>
-              <button
-                onClick={() => {
-                  setViewMode('systems');
-                  setSpecialFilter(null);
-                }}
-                className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                  viewMode === 'systems' 
-                    ? 'bg-cyan-electric text-black shadow-[0_0_15px_rgba(0,242,255,0.4)]' 
-                    : 'text-zinc-500 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                CONSOLAS
-              </button>
-            </div>
-            
+            {/* View Mode Switcher */}
+            <div className="hidden lg:flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
+                {[
+                  { id: 'discover', icon: Zap, label: 'DESCUBRIR' },
+                  { id: 'carousel', icon: Disc, label: 'PORTADAS' },
+                  { id: 'systems', icon: Gamepad2, label: 'SISTEMAS' },
+                  { id: 'grid', icon: Search, label: 'TODOS' }
+                ].map((mode) => (
+                  <button
+                    key={mode.id}
+                    onClick={() => {
+                      setViewMode(mode.id as any);
+                      haptics.medium();
+                      AudioEngine.playMoveSound();
+                    }}
+                    className={`px-3 py-1.5 rounded-lg flex items-center gap-2 transition-all ${
+                      viewMode === mode.id 
+                        ? 'bg-cyan-electric text-black shadow-[0_0_15px_rgba(0,242,255,0.3)]' 
+                        : 'text-zinc-500 hover:text-white hover:bg-white/5'
+                    }`}
+                  >
+                    <mode.icon className="w-3 h-3" />
+                    <span className="text-[9px] font-black uppercase tracking-widest">{mode.label}</span>
+                  </button>
+                ))}
+             </div>
+
             {isOffline && (
               <div className="flex items-center gap-2 px-3 py-1 bg-rose-500/20 border border-rose-500/40 rounded-lg animate-pulse">
                 <Radio className="w-3 h-3 text-rose-500" />
@@ -470,33 +455,6 @@ export default function GameLibrary() {
           </form>
 
           <div className="flex items-center gap-2">
-             {/* View Mode Switcher */}
-             <div className="hidden lg:flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/5 mr-2">
-                {[
-                  { id: 'discover', icon: Zap, label: 'DESCUBRIR' },
-                  { id: 'carousel', icon: Disc, label: 'PORTADAS' },
-                  { id: 'systems', icon: Gamepad2, label: 'SISTEMAS' },
-                  { id: 'grid', icon: Search, label: 'TODOS' }
-                ].map((mode) => (
-                  <button
-                    key={mode.id}
-                    onClick={() => {
-                      setViewMode(mode.id as any);
-                      haptics.medium();
-                      AudioEngine.playMoveSound();
-                    }}
-                    className={`px-3 py-1.5 rounded-lg flex items-center gap-2 transition-all ${
-                      viewMode === mode.id 
-                        ? 'bg-cyan-electric text-black shadow-[0_0_15px_rgba(0,242,255,0.3)]' 
-                        : 'text-zinc-500 hover:text-white hover:bg-white/5'
-                    }`}
-                  >
-                    <mode.icon className="w-3 h-3" />
-                    <span className="text-[9px] font-black uppercase tracking-widest">{mode.label}</span>
-                  </button>
-                ))}
-             </div>
-
              <button onClick={toggleBgm} className="p-2 text-zinc-400 hover:text-cyan-electric transition-colors" title="Toggle BGM">
                {isBgmPlaying ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
              </button>

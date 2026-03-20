@@ -275,36 +275,22 @@ export class MetadataNormalizationEngine {
       'atps74', 'atps75', 'atps76', 'atps77', 'atps78', 'atps79', 'atps80', 'atps81',
       'atps82', 'atps83', 'atps84', 'atps85', 'atps86', 'atps87', 'atps88', 'atps89',
       'atps90', 'atps91', 'atps92', 'atps93', 'atps94', 'atps95', 'atps96', 'atps97',
-      'atps98', 'atps99', 'atps100'
+      'atps98', 'atps99', 'atps100', 'emus', 'emulators', 'pc-world', 'pc-gamer', 'pc-magazine'
     ];
 
-    if (lowerTitle.includes('bios') || 
-        lowerTitle.includes('soundtrack') || 
-        lowerTitle.includes('manual') || 
-        lowerTitle.includes('not working') || 
-        lowerTitle.includes('update') ||
-        lowerTitle.includes('magazine') ||
-        lowerTitle.includes('guide') ||
-        lowerTitle.includes('romset') ||
-        lowerTitle.includes('rom set') ||
-        lowerTitle.includes('rom pack') ||
-        lowerTitle.includes('chd pack') ||
-        lowerTitle.includes('full set') ||
-        lowerTitle.includes('collection') ||
-        lowerTitle.includes('emulator') ||
-        lowerTitle.includes('rollback') ||
-        lowerTitle.includes('samples') ||
-        lowerTitle.includes('artwork') ||
-        lowerTitle.includes('flyers') ||
-        lowerTitle.includes('snaps') ||
-        lowerTitle.includes('titles') ||
-        lowerTitle.includes('marquees') ||
-        lowerTitle.includes('cabinets') ||
-        lowerTitle.includes('cpanel') ||
-        lowerTitle.includes('pcb') ||
-        lowerTitle.includes('history') ||
-        lowerTitle.includes('cheat') ||
-        lowerTitle.includes('crosshair') ||
+    const blacklistedKeywords = [
+      'bios', 'soundtrack', 'manual', 'not working', 'update', 'magazine', 'guide', 
+      'romset', 'rom set', 'rom pack', 'chd pack', 'full set', 'collection', 
+      'emulator', 'rollback', 'samples', 'artwork', 'flyers', 'snaps', 'titles', 
+      'marquees', 'cabinets', 'cpanel', 'pcb', 'history', 'cheat', 'crosshair',
+      'pc world', 'pc gamer', 'pc magazine', 'coverdisc', 'cover disc', 'demo disc',
+      'preview disc', 'review disc', 'gog edition', 'steam edition', 'repack',
+      'installer', 'setup', 'utility', 'driver', 'software', 'shareware', 'freeware',
+      'patch', 'crack', 'trainer', 'portable', 'rip', 'full game', 'disc 1', 'disc 2',
+      'disc 3', 'disc 4', 'disc 5', 'cd-rom', 'cdrom', 'dvd-rom', 'dvdrom'
+    ];
+
+    if (blacklistedKeywords.some(k => lowerTitle.includes(k)) || 
         arcadeBiosFiles.includes(lowerId) ||
         arcadeBiosFiles.some(b => lowerTitle === b) ||
         lowerTitle.match(/mame\s*0\.\d+/) ||
@@ -455,36 +441,22 @@ export class MetadataNormalizationEngine {
       'atps74', 'atps75', 'atps76', 'atps77', 'atps78', 'atps79', 'atps80', 'atps81',
       'atps82', 'atps83', 'atps84', 'atps85', 'atps86', 'atps87', 'atps88', 'atps89',
       'atps90', 'atps91', 'atps92', 'atps93', 'atps94', 'atps95', 'atps96', 'atps97',
-      'atps98', 'atps99', 'atps100'
+      'atps98', 'atps99', 'atps100', 'emus', 'emulators', 'pc-world', 'pc-gamer', 'pc-magazine'
     ];
 
-    if (lowerTitle.includes('bios') || 
-        lowerTitle.includes('soundtrack') || 
-        lowerTitle.includes('manual') || 
-        lowerTitle.includes('not working') || 
-        lowerTitle.includes('update') ||
-        lowerTitle.includes('magazine') ||
-        lowerTitle.includes('guide') ||
-        lowerTitle.includes('romset') ||
-        lowerTitle.includes('rom set') ||
-        lowerTitle.includes('rom pack') ||
-        lowerTitle.includes('chd pack') ||
-        lowerTitle.includes('full set') ||
-        lowerTitle.includes('collection') ||
-        lowerTitle.includes('emulator') ||
-        lowerTitle.includes('rollback') ||
-        lowerTitle.includes('samples') ||
-        lowerTitle.includes('artwork') ||
-        lowerTitle.includes('flyers') ||
-        lowerTitle.includes('snaps') ||
-        lowerTitle.includes('titles') ||
-        lowerTitle.includes('marquees') ||
-        lowerTitle.includes('cabinets') ||
-        lowerTitle.includes('cpanel') ||
-        lowerTitle.includes('pcb') ||
-        lowerTitle.includes('history') ||
-        lowerTitle.includes('cheat') ||
-        lowerTitle.includes('crosshair') ||
+    const blacklistedKeywords = [
+      'bios', 'soundtrack', 'manual', 'not working', 'update', 'magazine', 'guide', 
+      'romset', 'rom set', 'rom pack', 'chd pack', 'full set', 'collection', 
+      'emulator', 'rollback', 'samples', 'artwork', 'flyers', 'snaps', 'titles', 
+      'marquees', 'cabinets', 'cpanel', 'pcb', 'history', 'cheat', 'crosshair',
+      'pc world', 'pc gamer', 'pc magazine', 'coverdisc', 'cover disc', 'demo disc',
+      'preview disc', 'review disc', 'gog edition', 'steam edition', 'repack',
+      'installer', 'setup', 'utility', 'driver', 'software', 'shareware', 'freeware',
+      'patch', 'crack', 'trainer', 'portable', 'rip', 'full game', 'disc 1', 'disc 2',
+      'disc 3', 'disc 4', 'disc 5', 'cd-rom', 'cdrom', 'dvd-rom', 'dvdrom'
+    ];
+
+    if (blacklistedKeywords.some(k => lowerTitle.includes(k)) || 
         arcadeBiosFiles.includes(lowerId) ||
         arcadeBiosFiles.some(b => lowerTitle === b) ||
         lowerTitle.match(/mame\s*0\.\d+/) ||
@@ -680,7 +652,11 @@ export class MetadataNormalizationEngine {
         'readme', 'info', 'metadata', 'license', 'install', 'setup',
         '__ia_thumb', 'xml', 'txt', 'pdf', 'jpg', 'png', 'gif', 'mp4',
         'flyer', 'cabinet', 'marquee', 'cpanel', 'pcb', 'history', 'cheat',
-        'crosshair', 'sample', 'artwork', 'device', 'bios'
+        'crosshair', 'sample', 'artwork', 'device', 'bios', 'pc world', 
+        'pc gamer', 'pc magazine', 'coverdisc', 'cover disc', 'demo disc',
+        'preview disc', 'review disc', 'gog edition', 'steam edition', 'repack',
+        'installer', 'setup', 'utility', 'driver', 'software', 'shareware', 'freeware',
+        'patch', 'crack', 'trainer', 'portable', 'rip', 'full game'
       ];
       
       if (exclusions.some(exc => lower.includes(exc))) return false;
@@ -837,10 +813,11 @@ export class MetadataNormalizationEngine {
   public static async searchArchiveOrg(query: string, system?: string, rows: number = 100, page: number = 1): Promise<GameObject[]> {
     // PROXY ROTATION STRATEGY
     const proxies = [
-      { name: 'LocalTunnel', url: '/api/tunnel?url=' },
-      { name: 'Direct', url: '' },
-      { name: 'CorsProxy', url: 'https://corsproxy.io/?' },
-      { name: 'AllOrigins', url: 'https://api.allorigins.win/raw?url=' }
+      { name: 'LocalTunnel', url: '/api/tunnel?url=', timeout: 45000 },
+      { name: 'Direct', url: '', timeout: 15000 },
+      { name: 'CorsProxy', url: 'https://corsproxy.io/?', timeout: 25000 },
+      { name: 'CodeTabs', url: 'https://api.codetabs.com/v1/proxy?quest=', timeout: 25000 },
+      { name: 'AllOrigins', url: 'https://api.allorigins.win/raw?url=', timeout: 25000 }
     ];
 
     // Simplified Query Strategy: "OR" everything to avoid complexity errors
@@ -872,7 +849,7 @@ export class MetadataNormalizationEngine {
     let q = `mediatype:(software)`;
     
     // Exclude obvious non-games
-    q += ` AND NOT title:(BIOS OR Soundtrack OR Manual OR Demo OR "Not Working" OR "Update" OR Magazine OR Guide OR Romset OR "Rom Set" OR "Rom Pack" OR "CHD Pack" OR "Full Set" OR Collection OR Emulator OR "MAME 0.*")`;
+    q += ` AND NOT title:(BIOS OR Soundtrack OR Manual OR Demo OR "Not Working" OR "Update" OR Magazine OR Guide OR Romset OR "Rom Set" OR "Rom Pack" OR "CHD Pack" OR "Full Set" OR Collection OR Emulator OR "MAME 0.*" OR "PC World" OR "PC Gamer" OR "PC Magazine" OR Coverdisc OR "Cover Disc" OR "Demo Disc" OR "Preview Disc" OR "Review Disc" OR "GOG Edition" OR "Steam Edition" OR Repack OR Installer OR Setup OR Utility OR Driver OR Software OR Shareware OR Freeware OR Patch OR Crack OR Trainer OR Portable OR Rip OR "Full Game" OR "Disc 1" OR "Disc 2" OR "Disc 3" OR "Disc 4" OR "Disc 5" OR "CD-ROM" OR CDROM OR "DVD-ROM" OR DVDROM)`;
     
     if (query) {
       // Escape special characters for Archive.org
@@ -903,7 +880,7 @@ export class MetadataNormalizationEngine {
 
     // Primary and Fallback Queries
     const queries = [q];
-    const notFilters = `NOT title:(BIOS OR Soundtrack OR Manual OR Demo OR "Not Working" OR "Update" OR Magazine OR Guide OR Romset OR "Rom Set" OR "Rom Pack" OR "CHD Pack" OR "Full Set" OR Collection OR Emulator OR "MAME 0.*")`;
+    const notFilters = `NOT title:(BIOS OR Soundtrack OR Manual OR Demo OR "Not Working" OR "Update" OR Magazine OR Guide OR Romset OR "Rom Set" OR "Rom Pack" OR "CHD Pack" OR "Full Set" OR Collection OR Emulator OR "MAME 0.*" OR "PC World" OR "PC Gamer" OR "PC Magazine" OR Coverdisc OR "Cover Disc" OR "Demo Disc" OR "Preview Disc" OR "Review Disc" OR "GOG Edition" OR "Steam Edition" OR Repack OR Installer OR Setup OR Utility OR Driver OR Software OR Shareware OR Freeware OR Patch OR Crack OR Trainer OR Portable OR Rip OR "Full Game" OR "Disc 1" OR "Disc 2" OR "Disc 3" OR "Disc 4" OR "Disc 5" OR "CD-ROM" OR CDROM OR "DVD-ROM" OR DVDROM)`;
     
     if (query && system && system !== 'All') {
       // Fallback 1: Just title and system (less restrictive subject)
@@ -915,7 +892,7 @@ export class MetadataNormalizationEngine {
     let searchData: any = null;
     let lastError: string = "";
     const startTime = Date.now();
-    const globalTimeout = 120000; // 2 minutes total for all attempts
+    const globalTimeout = 180000; // 3 minutes total for all attempts
 
     // Attempt fetch with query fallback, proxy rotation and endpoint fallback
     for (const currentQ of queries) {
@@ -934,7 +911,7 @@ export class MetadataNormalizationEngine {
         
         let endpointSuccess = false;
 
-        for (const proxy of proxies) {
+        for (const proxy of (proxies as any[])) {
           if (Date.now() - startTime > globalTimeout) break;
           
           try {
@@ -942,7 +919,8 @@ export class MetadataNormalizationEngine {
             console.log(`[Archive.org Search] Attempting via ${proxy.name} (${currentQ.substring(0, 20)}...): ${proxy.name === 'LocalTunnel' ? 'tunneling' : fetchUrl}`);
             
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 20000); // 20s timeout per proxy attempt
+            const timeout = proxy.timeout || 25000;
+            const timeoutId = setTimeout(() => controller.abort(), timeout); 
             
             // Add small jitter to avoid slamming the server
             await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 500));
@@ -957,8 +935,13 @@ export class MetadataNormalizationEngine {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
-              const errText = await response.text().catch(() => "No error body");
+              let errText = await response.text().catch(() => "No error body");
               
+              // Clean up AllOrigins/Proxy internal errors to be more readable
+              if (errText.includes('"error":"Error: internal error"')) {
+                errText = "Proxy Internal Error (Target might be unreachable)";
+              }
+
               // If it's a 503, 429 or 408, move to next proxy
               if (response.status === 503 || response.status === 429 || response.status === 408) {
                 console.warn(`[Archive.org Search] ${proxy.name} returned ${response.status}. Moving to next proxy...`);
@@ -1004,7 +987,15 @@ export class MetadataNormalizationEngine {
               throw new Error('Invalid JSON response or format');
             }
           } catch (e) {
-            lastError = e instanceof Error ? e.message : String(e);
+            const err = e instanceof Error ? e.message : String(e);
+            
+            // Handle aborted signal specifically
+            if (err.includes('aborted') || err.includes('timeout')) {
+              lastError = `Timeout after ${proxy.timeout}ms via ${proxy.name}`;
+            } else {
+              lastError = err;
+            }
+            
             console.warn(`[Archive.org Search] Proxy ${proxy.name} failed: ${lastError}`);
             
             // If it's a logical API error (like deep paging), don't try other proxies
