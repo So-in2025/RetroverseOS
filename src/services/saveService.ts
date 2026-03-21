@@ -6,14 +6,18 @@ export const saveService = {
       console.warn('[SaveService] Supabase not initialized, skipping upload');
       return;
     }
-    const { error } = await supabase
+    
+    // Create blob from JSON string
+    const blob = new Blob([saveData], { type: 'application/json' });
+    
+    const filePath = `${userId}/${gameId}/save.json`;
+    
+    const { error } = await supabase.storage
       .from('game_saves')
-      .upsert({
-        user_id: userId,
-        game_id: gameId,
-        save_data: saveData,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'user_id,game_id' });
+      .upload(filePath, blob, {
+        upsert: true,
+        contentType: 'application/json'
+      });
 
     if (error) throw error;
   },
@@ -23,14 +27,21 @@ export const saveService = {
       console.warn('[SaveService] Supabase not initialized, skipping download');
       return null;
     }
-    const { data, error } = await supabase
+    
+    const filePath = `${userId}/${gameId}/save.json`;
+    
+    const { data, error } = await supabase.storage
       .from('game_saves')
-      .select('save_data')
-      .eq('user_id', userId)
-      .eq('game_id', gameId)
-      .single();
+      .download(filePath);
 
-    if (error && error.code !== 'PGRST116') throw error; // PGRST116 is "no rows returned"
-    return data?.save_data || null;
+    if (error) {
+      if (error.message.includes('Object not found')) return null;
+      throw error;
+    }
+    
+    if (!data) return null;
+    
+    // Convert blob to text (JSON string)
+    return await data.text();
   }
 };

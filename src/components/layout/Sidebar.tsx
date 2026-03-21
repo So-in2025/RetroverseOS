@@ -25,6 +25,7 @@ const navItems = [
   { icon: Database, label: 'PREMIUM', path: '/premium' },
   { icon: ShoppingBag, label: 'MERCADO', path: '/marketplace' },
   { icon: Globe, label: 'NETPLAY', path: '/netplay' },
+  { icon: Trophy, label: 'LOGROS', path: '/achievements' },
   { icon: Settings, label: 'SISTEMA', path: '/settings' },
 ];
 

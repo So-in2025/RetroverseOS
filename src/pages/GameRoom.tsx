@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import React from 'react';
-import { Share2, Users, MessageSquare, Send, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video, Bot, Cloud, Zap, Target, Shield, Cpu, ShoppingBag } from 'lucide-react';
+import { Share2, Users, MessageSquare, Send, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video, Bot, Cloud, Zap, Target, Shield, Cpu, ShoppingBag, Settings } from 'lucide-react';
 import { emulator } from '../services/emulator';
 import { multiplayer } from '../services/multiplayer';
 import { inputManager, RetroButton } from '../services/inputManager';
@@ -30,6 +30,8 @@ import Store from '../components/game/Store';
 import { STORE_ITEMS, StoreItem } from '../constants/storeItems';
 import { motion, AnimatePresence } from 'motion/react';
 import { BYOKModal } from '../components/ai/BYOKModal';
+import ChatPanel from '../components/game/ChatPanel';
+import EmulatorSettingsPanel from '../components/game/EmulatorSettingsPanel';
 
 import { saveService } from '../services/saveService';
 import { useAuth } from '../services/AuthContext';
@@ -63,9 +65,42 @@ export default function GameRoom() {
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [crtEnabled, setCrtEnabled] = useState(true);
   const [bilinearEnabled, setBilinearEnabled] = useState(false);
+  const [scanlinesEnabled, setScanlinesEnabled] = useState(true);
+  const [activeFilter, setActiveFilter] = useState('classic');
   const { balance } = useEconomy();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isRecordingClip, setIsRecordingClip] = useState(false);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      const crt = await storage.getSetting('crtEnabled');
+      const bilinear = await storage.getSetting('bilinearEnabled');
+      const scanlines = await storage.getSetting('scanlinesEnabled');
+      const filter = await storage.getSetting('activeFilter');
+      
+      if (crt !== null) setCrtEnabled(crt);
+      if (bilinear !== null) setBilinearEnabled(bilinear);
+      if (scanlines !== null) setScanlinesEnabled(scanlines);
+      if (filter !== null) setActiveFilter(filter);
+    };
+    loadSettings();
+  }, []);
+
+  useEffect(() => {
+    storage.saveSetting('crtEnabled', crtEnabled);
+  }, [crtEnabled]);
+
+  useEffect(() => {
+    storage.saveSetting('bilinearEnabled', bilinearEnabled);
+  }, [bilinearEnabled]);
+
+  useEffect(() => {
+    storage.saveSetting('scanlinesEnabled', scanlinesEnabled);
+  }, [scanlinesEnabled]);
+
+  useEffect(() => {
+    storage.saveSetting('activeFilter', activeFilter);
+  }, [activeFilter]);
   const [showClipModal, setShowClipModal] = useState(false);
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [showHypeNotification, setShowHypeNotification] = useState(false);
@@ -77,6 +112,8 @@ export default function GameRoom() {
   const [isTacticalVisible, setIsTacticalVisible] = useState(false);
   const [showQuotaModal, setShowQuotaModal] = useState(false);
   const [showBYOKModal, setShowBYOKModal] = useState(false);
+  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
+  const [showGlobalChat, setShowGlobalChat] = useState(false);
   const [quotaStatus, setQuotaStatus] = useState<{ used: number; limit: number; remaining: number } | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [isPremium, setIsPremium] = useState(false);
@@ -85,7 +122,6 @@ export default function GameRoom() {
   const [isUiVisible, setIsUiVisible] = useState(true);
   const [isStoreOpen, setIsStoreOpen] = useState(false);
   const [purchasedItems, setPurchasedItems] = useState<string[]>(['filter-classic', 'skin-default']);
-  const [activeFilter, setActiveFilter] = useState('classic');
   const [activeSkin, setActiveSkin] = useState('default');
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -241,6 +277,8 @@ export default function GameRoom() {
         return;
       }
 
+      achievements.unlock('first_match');
+      
       const initEmulator = async () => {
       if (!mountedRef.current) return;
       
@@ -726,7 +764,7 @@ export default function GameRoom() {
             filter: crtEnabled ? 'blur(0.5px)' : 'none'
           }}
         />
-        <CRTFilter enabled={crtEnabled} style={activeFilter as any} />
+        <CRTFilter enabled={crtEnabled} style={activeFilter as any} scanlines={scanlinesEnabled} />
       </div>
 
       {/* Game Menu */}
@@ -961,8 +999,29 @@ export default function GameRoom() {
             className={`p-2 md:p-4 rounded-2xl transition-all border ${
               isChatOpen ? 'bg-cyan-electric/10 text-cyan-electric border-cyan-electric/20' : 'bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border-transparent hover:border-white/10'
             }`}
+            title="Chat Local"
           >
             <MessageSquare className="w-4 h-4 md:w-6 md:h-6" />
+          </button>
+
+          <button 
+            onClick={() => setShowGlobalChat(!showGlobalChat)}
+            className={`p-2 md:p-4 rounded-2xl transition-all border ${
+              showGlobalChat ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' : 'bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border-transparent hover:border-white/10'
+            }`}
+            title="Chat Global"
+          >
+            <Users className="w-4 h-4 md:w-6 md:h-6" />
+          </button>
+
+          <button 
+            onClick={() => setShowSettingsPanel(!showSettingsPanel)}
+            className={`p-2 md:p-4 rounded-2xl transition-all border ${
+              showSettingsPanel ? 'bg-amber-500/10 text-amber-500 border-amber-500/20' : 'bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border-transparent hover:border-white/10'
+            }`}
+            title="Ajustes del Emulador"
+          >
+            <Settings className="w-4 h-4 md:w-6 md:h-6" />
           </button>
 
           <button 
@@ -1043,6 +1102,25 @@ export default function GameRoom() {
       <SaveStatePanel 
         isOpen={isSavePanelOpen} 
         onClose={() => setIsSavePanelOpen(false)} 
+      />
+
+      <ChatPanel
+        isOpen={showGlobalChat}
+        onClose={() => setShowGlobalChat(false)}
+        gameId={gameId || 'global'}
+      />
+
+      <EmulatorSettingsPanel
+        isOpen={showSettingsPanel}
+        onClose={() => setShowSettingsPanel(false)}
+        crtEnabled={crtEnabled}
+        onToggleCrt={setCrtEnabled}
+        activeFilter={activeFilter}
+        onChangeFilter={setActiveFilter}
+        bilinearEnabled={bilinearEnabled}
+        onToggleBilinear={setBilinearEnabled}
+        scanlinesEnabled={scanlinesEnabled}
+        onToggleScanlines={setScanlinesEnabled}
       />
 
       {/* AI Tactical Link Button */}

@@ -3,9 +3,10 @@ import React from 'react';
 interface CRTFilterProps {
   enabled: boolean;
   style?: 'classic' | 'cyberpunk' | 'vhs' | 'matrix';
+  scanlines?: boolean;
 }
 
-export default function CRTFilter({ enabled, style = 'classic' }: CRTFilterProps) {
+export default function CRTFilter({ enabled, style = 'classic', scanlines = true }: CRTFilterProps) {
   if (!enabled) return null;
 
   const getStyleClasses = () => {
@@ -42,13 +43,15 @@ export default function CRTFilter({ enabled, style = 'classic' }: CRTFilterProps
   return (
     <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden mix-blend-overlay">
       {/* Scanlines */}
-      <div 
-        className={`absolute inset-0 ${config.scanlines}`}
-        style={{
-          backgroundImage: config.gradient,
-          backgroundSize: '100% 4px, 6px 100%'
-        }}
-      />
+      {scanlines && (
+        <div 
+          className={`absolute inset-0 ${config.scanlines}`}
+          style={{
+            backgroundImage: config.gradient,
+            backgroundSize: '100% 4px, 6px 100%'
+          }}
+        />
+      )}
       {/* Vignette & Tube shadow */}
       <div className={`absolute inset-0 ${config.vignette}`} />
       

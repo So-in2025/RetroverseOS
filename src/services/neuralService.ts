@@ -42,8 +42,12 @@ class NeuralService {
 
   async generateTacticalAdvice(imageBase64: string, gameId?: string, retryCount = 0): Promise<NeuralResponse> {
     const start = Date.now();
-    const key = await apiPoolService.getNextKey();
-    if (!key) throw new Error('NO_NODES_AVAILABLE');
+    
+    // STRICT BYOK ENFORCEMENT: Do not use the platform pool for individual coaching
+    const key = localStorage.getItem('retroos_gemini_key');
+    if (!key || !key.startsWith('AIza')) {
+      throw new Error('BYOK_REQUIRED');
+    }
 
     const ai = new GoogleGenAI({ apiKey: key });
 
@@ -79,8 +83,8 @@ class NeuralService {
       };
     } catch (error: any) {
       if (error.message?.includes('429')) {
-        await apiPoolService.markExhausted(key);
-        if (retryCount < 3) return this.generateTacticalAdvice(imageBase64, gameId, retryCount + 1);
+        // If BYOK key is exhausted, we just throw, we don't mark the platform pool
+        throw new Error('BYOK_EXHAUSTED');
       }
       throw error;
     }

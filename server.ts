@@ -203,7 +203,7 @@ async function startServer() {
     }
 
     // Security: Only allow specific domains to be proxied
-    const allowedDomains = ['archive.org', 'raw.githubusercontent.com', 'cdn.jsdelivr.net'];
+    const allowedDomains = ['archive.org', 'raw.githubusercontent.com', 'cdn.jsdelivr.net', 'myrient.erista.me'];
     try {
       const parsedTarget = new URL(url.startsWith('//') ? 'https:' + url : (url.startsWith('http') ? url : 'https://' + url));
       if (!allowedDomains.some(domain => parsedTarget.hostname.endsWith(domain))) {

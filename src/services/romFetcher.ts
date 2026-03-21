@@ -99,22 +99,36 @@ export class ROMFetchService {
    * Fetches a ROM, either from the local IndexedDB cache or from the network.
    */
   public static async fetchRom(gameId: string, url: string, onProgress?: (status: string) => void, system?: string): Promise<Blob> {
+    // 0. Agentic Discovery Engine (NEW)
+    let finalUrl = url;
+    try {
+        const { ROMDiscoveryBrain } = await import('./DiscoveryBrain');
+        const brain = new ROMDiscoveryBrain();
+        const candidate = await brain.findBestCandidate(gameId, system || '');
+        if (candidate) {
+            console.log(`[ROM Fetch] Discovery Engine found better URL: ${candidate.url}`);
+            finalUrl = candidate.url;
+        }
+    } catch (e) {
+        console.warn('[ROM Fetch] Discovery Engine failed, falling back to original URL:', e);
+    }
+
     // 0. Resolve 'archive:' URLs
-    if (url.startsWith('archive:')) {
+    if (finalUrl.startsWith('archive:')) {
         const { MetadataNormalizationEngine } = await import('./metadataNormalization');
-        const identifier = url.replace('archive:', '');
+        const identifier = finalUrl.replace('archive:', '');
         const resolvedUrl = await MetadataNormalizationEngine.resolveRomUrl(identifier, system);
         if (resolvedUrl) {
-            url = resolvedUrl;
+            finalUrl = resolvedUrl;
         } else {
-            throw new Error(`No se pudo resolver el enlace de la ROM: ${url}`);
+            throw new Error(`No se pudo resolver el enlace de la ROM: ${finalUrl}`);
         }
     }
 
     // 0. Auto-correct old URLs that used raw extensions instead of .zip for nointro sets
-    if (url.includes('archive.org/download/nointro.') && !url.endsWith('.zip')) {
-      url = url.replace(/\.(nes|sfc|smc|md|gen|gba|gbc|gb|n64|z64)$/i, '.zip');
-      console.log(`[ROM Fetch] Auto-corrected URL to: ${url}`);
+    if (finalUrl.includes('archive.org/download/nointro.') && !finalUrl.endsWith('.zip')) {
+      finalUrl = finalUrl.replace(/\.(nes|sfc|smc|md|gen|gba|gbc|gb|n64|z64)$/i, '.zip');
+      console.log(`[ROM Fetch] Auto-corrected URL to: ${finalUrl}`);
     }
 
     // 1. Check Cache
@@ -134,7 +148,7 @@ export class ROMFetchService {
       console.warn(`[ROM Fetch] Cache hit for ${gameId} but file is too small (${cachedRom.blob.size} bytes). Re-downloading...`);
     }
 
-    console.log(`[ROM Fetch] Cache miss for ${gameId}. Downloading...`);
+    console.log(`[ROM Fetch] Cache miss for ${gameId}. Downloading from ${finalUrl}...`);
     onProgress?.('Iniciando descarga...');
     
     // 2. Define Validator for Zip Integrity and HTML errors
@@ -147,7 +161,7 @@ export class ROMFetchService {
       if (header.trim().toLowerCase().startsWith('<') || header.toLowerCase().includes('<!doctype html>')) {
         throw new Error('Downloaded ROM is an HTML error page. Sector de Datos Dañado.');
       }
-      if (url.toLowerCase().endsWith('.zip') || header.startsWith('PK')) {
+      if (finalUrl.toLowerCase().endsWith('.zip') || header.startsWith('PK')) {
         try {
            // Attempt to unzip header to verify integrity
            // Only unzip if not arcade
@@ -161,7 +175,7 @@ export class ROMFetchService {
     };
 
     // 3. Fetch from Network with Progress and Validation
-    const response = await this.fetchWithProgress(url, onProgress, blobValidator);
+    const response = await this.fetchWithProgress(finalUrl, onProgress, blobValidator);
     let blob = await response.blob();
     
     // NEW: Robust ROM Validation
@@ -176,7 +190,7 @@ export class ROMFetchService {
     // Sometimes URLs don't end in .zip but the content is actually a zip file.
     // We check the magic number (PK\x03\x04) to be sure.
     const magic = await blob.slice(0, 4).text();
-    const isZip = url.toLowerCase().endsWith('.zip') || magic.startsWith('PK');
+    const isZip = finalUrl.toLowerCase().endsWith('.zip') || magic.startsWith('PK');
 
     if (isZip && system !== 'mame' && system !== 'neogeo') {
       onProgress?.('Extrayendo archivo principal...');
@@ -218,10 +232,11 @@ export class ROMFetchService {
         { name: 'CorsProxy', url: `https://corsproxy.io/?${encodeURIComponent(url)}` },
         { name: 'AllOrigins', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
         { name: 'CodeTabs', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}` },
+        { name: 'ThingProxy', url: `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(url)}` },
         { name: 'CorsAnywhere', url: `https://cors-anywhere.herokuapp.com/${url}` }
     ];
 
-    // Strictly: LocalTunnel -> CorsProxy -> AllOrigins -> Codetabs -> CorsAnywhere
+    // Strictly: LocalTunnel -> CorsProxy -> AllOrigins -> Codetabs -> ThingProxy -> CorsAnywhere
     const proxies = baseProxies;
 
     // Try direct fetch first if it's HTTPS (some Archive.org nodes support CORS)
@@ -274,6 +289,8 @@ export class ROMFetchService {
             if (e instanceof Error && e.name !== 'AbortError') {
                 console.warn(`[ROM Fetch] ${proxy.name} collapsed:`, e);
                 onProgress?.(`Tunnel ${proxy.name} collapsed, rerouting...`);
+                // Delay before next attempt
+                await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
     }

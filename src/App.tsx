@@ -14,6 +14,7 @@ import PremiumVault from './pages/PremiumVault';
 import Profile from './pages/Profile';
 import Marketplace from './pages/Marketplace';
 import Community from './pages/Community';
+import Achievements from './pages/Achievements';
 import Settings from './pages/Settings';
 import NetplayLobby from './pages/NetplayLobby';
 import Login from './pages/Login';
@@ -149,6 +150,7 @@ function AppContent() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/community" element={<Community />} />
+            <Route path="/achievements" element={<Achievements />} />
             <Route path="/tournaments" element={<Community />} />
             <Route path="/netplay" element={<NetplayLobby />} />
             <Route path="/settings" element={<Settings />} />

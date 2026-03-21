@@ -9,10 +9,10 @@ export default function MobileNavbar() {
   const navigate = useNavigate();
   const setAchievementsModal = useUIStore(state => state.setAchievementsModal);
 
-  const navItems = [
+  const navItems: Array<{ id: string; icon: any; label: string; path?: string; action?: () => void }> = [
     { id: 'marketplace', icon: ShoppingBag, label: 'MERCADO', path: '/marketplace' },
     { id: 'community', icon: Globe, label: 'RED', path: '/community' },
-    { id: 'achievements', icon: Trophy, label: 'LOGROS', action: () => setAchievementsModal(true) },
+    { id: 'achievements', icon: Trophy, label: 'LOGROS', path: '/achievements' },
     { id: 'settings', icon: Settings, label: 'SISTEMA', path: '/settings' },
   ];
 
