@@ -210,7 +210,9 @@ async function startServer() {
         console.warn(`[Tunnel] Blocked unauthorized domain: ${parsedTarget.hostname}`);
         return res.status(403).json({ error: 'Domain not allowed' });
       }
+      console.log(`[Tunnel] Proxying request to: ${parsedTarget.toString()}`);
     } catch (e) {
+      console.error(`[Tunnel] Invalid URL: ${url}`, e);
       return res.status(400).json({ error: 'Invalid URL' });
     }
 
@@ -237,7 +239,6 @@ async function startServer() {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
             'Accept': 'application/json, text/plain, */*',
             'Accept-Language': 'en-US,en;q=0.9',
-            'Referer': 'https://archive.org/',
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache',
             'Connection': 'keep-alive'

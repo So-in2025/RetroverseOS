@@ -131,6 +131,16 @@ export default function GameRoom() {
 
   const [pendingExit, setPendingExit] = useState(false);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'h') {
+        setIsUiVisible(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Simulate AI Hype Detection
   useEffect(() => {
     if (gameState !== 'playing') return;
@@ -985,8 +995,24 @@ export default function GameRoom() {
       </AnimatePresence>
 
       {/* Floating Bottom Bar (Desktop Only) */}
+      {isUiVisible && (
       <div className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-4 z-30 pointer-events-none bottom-8">
         <div className="pointer-events-auto flex items-center gap-2 md:gap-3 bg-carbon/60 backdrop-blur-xl border border-white/10 p-2 md:p-3 rounded-3xl shadow-2xl glass origin-top">
+          {gameState === 'playing' && (
+          <button 
+            onClick={() => requestTacticalAdvice()}
+            disabled={isTacticalLoading}
+            className={`p-2 md:p-4 rounded-2xl transition-all border ${
+              isTacticalLoading 
+                ? 'bg-cyan-electric/10 text-cyan-electric border-cyan-electric/20' 
+                : 'bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border-transparent hover:border-white/10'
+            }`}
+            title="Tactical Link"
+          >
+            <Cpu className={`w-4 h-4 md:w-6 md:h-6 ${isTacticalLoading ? 'animate-spin' : ''}`} />
+          </button>
+          )}
+
           <button 
             onClick={() => setIsSavePanelOpen(true)}
             className="p-2 md:p-4 rounded-2xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all border border-transparent hover:border-white/10"
@@ -1035,21 +1061,26 @@ export default function GameRoom() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Virtual Controller */}
+      {isUiVisible && (
       <VirtualController 
         isVisible={isTouchDevice && gameState === 'playing'} 
         skin={activeSkin as any}
       />
+      )}
 
       {/* Overlays */}
+      {isUiVisible && (
       <CommunityTipsPanel 
         isOpen={isTipsPanelOpen} 
         onClose={() => setIsTipsPanelOpen(false)} 
         gameId={gameId || 'Unknown'} 
       />
+      )}
 
-      {gameState === 'waiting' && (
+      {gameState === 'waiting' && isUiVisible && (
         <LobbyView 
           gameId={gameId || 'Unknown'} 
           players={players}
@@ -1059,7 +1090,7 @@ export default function GameRoom() {
         />
       )}
 
-      {gameState === 'paused' && (
+      {gameState === 'paused' && isUiVisible && (
         <GameOverlay 
           isPaused={true}
           onPause={handlePause}
@@ -1099,17 +1130,22 @@ export default function GameRoom() {
         </div>
       )}
 
+      {isUiVisible && (
       <SaveStatePanel 
         isOpen={isSavePanelOpen} 
         onClose={() => setIsSavePanelOpen(false)} 
       />
+      )}
 
+      {isUiVisible && (
       <ChatPanel
         isOpen={showGlobalChat}
         onClose={() => setShowGlobalChat(false)}
         gameId={gameId || 'global'}
       />
+      )}
 
+      {isUiVisible && (
       <EmulatorSettingsPanel
         isOpen={showSettingsPanel}
         onClose={() => setShowSettingsPanel(false)}
@@ -1122,35 +1158,11 @@ export default function GameRoom() {
         scanlinesEnabled={scanlinesEnabled}
         onToggleScanlines={setScanlinesEnabled}
       />
-
-      {/* AI Tactical Link Button */}
-      {gameState === 'playing' && (
-        <motion.button
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          onClick={() => requestTacticalAdvice()}
-          disabled={isTacticalLoading}
-          className={`fixed top-6 left-6 z-50 p-3 rounded-xl border backdrop-blur-md transition-all flex items-center gap-3 group
-            ${isTacticalLoading 
-              ? 'bg-cyan-electric/20 border-cyan-electric/30 cursor-wait' 
-              : 'bg-black/40 border-white/10 hover:border-cyan-electric/50 hover:bg-black/60 active:scale-95'
-            }`}
-        >
-          <div className={`relative ${isTacticalLoading ? 'animate-spin' : ''}`}>
-            <Cpu className={`w-5 h-5 ${isTacticalLoading ? 'text-cyan-electric' : 'text-zinc-400 group-hover:text-cyan-electric'}`} />
-            {isTacticalLoading && (
-              <div className="absolute inset-0 bg-cyan-electric blur-sm opacity-50 animate-pulse" />
-            )}
-          </div>
-          <div className="flex flex-col items-start">
-            <span className="text-[10px] font-black text-white uppercase tracking-widest leading-none mb-1">Tactical Link</span>
-            <span className="text-[8px] font-bold text-zinc-500 uppercase tracking-tighter leading-none">
-              {isTacticalLoading ? 'Analyzing...' : (quotaStatus ? `${quotaStatus.remaining}/${quotaStatus.limit} Syncs` : 'Ready for Sync')}
-            </span>
-          </div>
-        </motion.button>
       )}
 
+
+
+      {isUiVisible && (
       <AnimatePresence>
         {showHypeNotification && (
           <motion.div
@@ -1169,8 +1181,10 @@ export default function GameRoom() {
           </motion.div>
         )}
       </AnimatePresence>
+      )}
 
       {/* Cloud Save Notification */}
+      {isUiVisible && (
       <AnimatePresence>
         {showCloudSaveToast && (
           <motion.div
@@ -1189,8 +1203,10 @@ export default function GameRoom() {
           </motion.div>
         )}
       </AnimatePresence>
+      )}
 
       {/* Opponent Disconnected Notification */}
+      {isUiVisible && (
       <AnimatePresence>
         {isOpponentDisconnected && (
           <motion.div
@@ -1207,12 +1223,16 @@ export default function GameRoom() {
           </motion.div>
         )}
       </AnimatePresence>
+      )}
 
+      {isUiVisible && (
       <TacticalOverlay 
         advice={tacticalAdvice} 
         isVisible={isTacticalVisible} 
       />
+      )}
 
+      {isUiVisible && (
       <AnimatePresence>
         {isChatOpen && (
           <motion.div
@@ -1284,8 +1304,10 @@ export default function GameRoom() {
           </motion.div>
         )}
       </AnimatePresence>
+      )}
 
       {/* Clip Saved Modal */}
+      {isUiVisible && (
       <AnimatePresence>
         {showClipModal && (
           <motion.div
@@ -1318,8 +1340,10 @@ export default function GameRoom() {
           </motion.div>
         )}
       </AnimatePresence>
+      )}
 
       {/* Guest Upsell Modal */}
+      {isUiVisible && (
       <AnimatePresence>
         {showGuestModal && (
           <motion.div
@@ -1352,7 +1376,9 @@ export default function GameRoom() {
           </motion.div>
         )}
       </AnimatePresence>
+      )}
 
+      {isUiVisible && (
       <Store 
         isOpen={isStoreOpen}
         onClose={() => setIsStoreOpen(false)}
@@ -1362,7 +1388,9 @@ export default function GameRoom() {
         activeSkin={activeSkin}
         onSelect={handleSelect}
       />
+      )}
 
+      {isUiVisible && (
       <BYOKModal 
         isOpen={showBYOKModal} 
         onClose={() => setShowBYOKModal(false)}
@@ -1371,8 +1399,10 @@ export default function GameRoom() {
           requestTacticalAdvice();
         }}
       />
+      )}
 
       {/* Quota Exceeded Modal */}
+      {isUiVisible && (
       <AnimatePresence>
         {showQuotaModal && (
           <motion.div
@@ -1425,6 +1455,7 @@ export default function GameRoom() {
           </motion.div>
         )}
       </AnimatePresence>
+      )}
     </div>
   );
 }
