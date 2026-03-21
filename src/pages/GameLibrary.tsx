@@ -5,7 +5,7 @@ import { Search, AlertTriangle, Loader2, Trash2, Coins, Trophy, Play, Star, Disc
 import { gameCatalog } from '../services/gameCatalog';
 import { storage } from '../services/storage';
 import { GameObject, ELITE_TOP_20 } from '../services/metadataNormalization';
-import { DynamicCover } from '../components/library/DynamicCover';
+import { GameCover } from '../components/library/GameCover';
 import { DownloadButton } from '../components/library/DownloadButton';
 import { AudioEngine } from '../services/audioEngine';
 import { haptics } from '../services/haptics';
@@ -619,12 +619,11 @@ export default function GameLibrary() {
                             onClick={() => AudioEngine.playSelectSound()}
                             className="w-20 h-28 flex-shrink-0 bg-black rounded-xl overflow-hidden border border-white/10 shadow-lg relative"
                           >
-                             <DynamicCover 
-                                game_id={game.game_id}
-                                src={game.cover_url || game.artwork_url} 
-                                alt={game.title}
+                             <GameCover 
+                                gameId={game.game_id}
+                                primaryUrl={game.cover_url || game.artwork_url} 
                                 title={game.title}
-                                system={game.system}
+                                systemId={game.system_id}
                                 className="w-full h-full transition-transform duration-500 group-hover:scale-110"
                               />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -787,12 +786,11 @@ export default function GameLibrary() {
                                   : 'border-white/5 z-0'
                               }`}
                             >
-                              <DynamicCover 
-                                game_id={game.game_id}
-                                src={game.cover_url || game.artwork_url} 
-                                alt={game.title}
+                              <GameCover 
+                                gameId={game.game_id}
+                                primaryUrl={game.cover_url || game.artwork_url} 
                                 title={game.title}
-                                system={game.system}
+                                systemId={game.system_id}
                                 className="w-full h-full object-cover"
                               />
                               
@@ -954,12 +952,11 @@ export default function GameLibrary() {
                                           onClick={() => AudioEngine.playSelectSound()}
                                           className="group relative aspect-[2/3] bg-zinc-900 rounded-xl overflow-hidden border border-white/10 hover:border-cyan-electric hover:shadow-[0_0_20px_rgba(0,242,255,0.2)] transition-all"
                                         >
-                                          <DynamicCover 
-                                             game_id={game.game_id}
-                                             src={game.cover_url || game.artwork_url} 
-                                             alt={game.title}
+                                          <GameCover 
+                                             gameId={game.game_id}
+                                             primaryUrl={game.cover_url || game.artwork_url} 
                                              title={game.title}
-                                             system={game.system}
+                                             systemId={game.system_id}
                                              className="w-full h-full transition-transform duration-500 group-hover:scale-110"
                                            />
                                            <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-4 text-center">

@@ -1,32 +1,41 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { motion } from 'motion/react';
-import { Play, Info, Trophy, Zap, ShieldCheck } from 'lucide-react';
+import { Play, Info, Trophy, Zap, ShieldCheck, Lock } from 'lucide-react';
 import { GameObject } from '../../services/metadataNormalization';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { gameCatalog } from '../../services/gameCatalog';
+import { haptics } from '../../services/haptics';
+import { GameCover } from './GameCover';
+import { useCustomization } from '../../hooks/useCustomization';
 
 interface FeaturedGameProps {
   game: GameObject;
 }
 
 export default function FeaturedGame({ game }: FeaturedGameProps) {
-  const [imgError, setImgError] = useState(false);
+  const navigate = useNavigate();
+  const { ownedItems, isRetroPassActive } = useCustomization();
+  const isLocked = gameCatalog.isGameLocked(game);
+
+  const handlePlayClick = (e: React.MouseEvent) => {
+    if (isLocked) {
+      e.preventDefault();
+      haptics.error();
+      navigate('/marketplace');
+    }
+  };
 
   return (
-    <section className="relative w-full h-[60vh] min-h-[500px] rounded-3xl overflow-hidden mb-12 group">
+    <section className={`relative w-full h-[60vh] min-h-[500px] rounded-3xl overflow-hidden mb-12 group ${isLocked ? 'grayscale opacity-80' : ''}`}>
       {/* Background Image with Blur */}
       <div className="absolute inset-0 bg-zinc-900">
-        {!imgError && (
-          <img 
-            src={game.cover_url || game.artwork_url || ''} 
-            alt={game.title}
-            className="w-full h-full object-cover scale-110 blur-2xl opacity-40 group-hover:scale-105 transition-transform duration-1000"
-            referrerPolicy="no-referrer"
-            onError={() => setImgError(true)}
-          />
-        )}
-        {imgError && (
-          <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(0,255,255,0.05)_50%,transparent_75%,transparent_100%)] bg-[length:250%_250%,100%_100%] animate-shimmer opacity-30" />
-        )}
+        <GameCover 
+          gameId={game.game_id}
+          primaryUrl={game.cover_url || game.artwork_url}
+          title={game.title}
+          systemId={game.system_id}
+          className="w-full h-full object-cover scale-110 blur-2xl opacity-40 group-hover:scale-105 transition-transform duration-1000"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-carbon via-carbon/40 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-carbon via-carbon/20 to-transparent" />
       </div>
@@ -60,17 +69,23 @@ export default function FeaturedGame({ game }: FeaturedGameProps) {
           </h1>
 
           <p className="text-zinc-400 text-lg mb-8 max-w-2xl line-clamp-2 font-medium leading-relaxed">
-            {game.description || `Experience the ultimate ${game.system} classic. Re-engineered for 2026 with tactical AI coaching and real-time multiplayer.`}
+            {isLocked 
+              ? `Este juego requiere el desbloqueo de la consola ${game.system} en el Mercado.`
+              : (game.description || `Experience the ultimate ${game.system} classic. Re-engineered for 2026 with tactical AI coaching and real-time multiplayer.`)}
           </p>
 
           <div className="flex items-center gap-4">
-            <Link to={`/play/${game.game_id}?url=${encodeURIComponent(game.rom_url)}&system=${game.system_id}`}>
+            <Link 
+              to={`/play/${game.game_id}?url=${encodeURIComponent(game.rom_url)}&system=${game.system_id}`}
+              onClick={handlePlayClick}
+            >
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-8 py-4 bg-cyan-electric text-black rounded-xl font-black text-lg flex items-center gap-3 neon-glow-cyan transition-all"
+                className={`px-8 py-4 ${isLocked ? 'bg-yellow-500' : 'bg-cyan-electric'} text-black rounded-xl font-black text-lg flex items-center gap-3 neon-glow-cyan transition-all`}
               >
-                <Play className="w-6 h-6 fill-current" /> PLAY NOW
+                {isLocked ? <Lock className="w-6 h-6" /> : <Play className="w-6 h-6 fill-current" />}
+                {isLocked ? 'DESBLOQUEAR' : 'PLAY NOW'}
               </motion.button>
             </Link>
             

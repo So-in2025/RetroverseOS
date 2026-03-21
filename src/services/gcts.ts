@@ -28,8 +28,23 @@ export interface TestResult {
  */
 export class SentinelEngine {
   private static isRunning = false;
+  private static status: 'idle' | 'analyzing' | 'optimizing' | 'protected' = 'protected';
+  private static listeners: (() => void)[] = [];
   private static MAX_RETRIES = 2;
   private static timeoutId: any = null;
+
+  public static getStatus() { return this.status; }
+  
+  public static subscribe(listener: () => void) {
+    this.listeners.push(listener);
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== listener);
+    };
+  }
+
+  private static notify() {
+    this.listeners.forEach(l => l());
+  }
 
   public static async startBackgroundWorker() {
     if (this.isRunning) return;
@@ -45,11 +60,26 @@ export class SentinelEngine {
         const untested = games.filter(g => g.compatibility_status === 'untested');
 
         if (untested.length > 0) {
+          this.status = 'analyzing';
+          this.notify();
+          
           // Process one game at a time to avoid blocking the main thread
           const game = untested[0];
           console.log(`[Sentinel] Testing ${game.title} (${game.game_id})...`);
           
           const result = await this.testGameWithRecovery(game);
+          
+          if (result.retries > 0 && result.status === 'compatible') {
+            this.status = 'optimizing';
+            this.notify();
+            setTimeout(() => {
+              this.status = 'protected';
+              this.notify();
+            }, 3000);
+          } else {
+            this.status = 'protected';
+            this.notify();
+          }
           
           // Update store stats
           const stats = useGameStore.getState().sentinelStats;

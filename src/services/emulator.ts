@@ -4,6 +4,7 @@ import { RetroButton } from './inputManager';
 import { ROMFetchService } from './romFetcher';
 import { AudioEngine } from './audioEngine';
 import { achievements } from './achievements';
+import { customization } from './customization';
 
 // Track AudioContexts created by Nostalgist/RetroArch to forcefully close them on exit
 const createdAudioContexts: AudioContext[] = [];
@@ -72,7 +73,9 @@ export class EmulatorService {
   private isRunning: boolean = false;
   private isInitializing: boolean = false;
   private currentGameId: string | null = null;
+  private currentSystem: string | null = null;
   private canvas: HTMLCanvasElement | null = null;
+  private sessionStartTime: number | null = null;
 
   constructor() {}
 
@@ -131,7 +134,9 @@ export class EmulatorService {
       onProgress?.(`Preparing ${core}...`);
 
       this.currentGameId = config.gameId;
+      this.currentSystem = config.system || null;
       this.canvas = config.canvas;
+      this.sessionStartTime = Date.now();
 
       // Clear canvas before starting to prevent visual ghosting
       if (this.canvas) {
@@ -194,6 +199,10 @@ export class EmulatorService {
       onProgress?.('Launching engine...');
       
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      const has4K = await customization.hasFeature('perf_4k_ultra');
+      const hasLowLatency = await customization.hasFeature('perf_low_latency');
+
       const videoSettings = await storage.getSetting('videoSettings') || {
         qualityPreset: 'smooth',
         aspectRatio: '4:3',
@@ -204,8 +213,10 @@ export class EmulatorService {
         vsync: true
       };
 
-      const isHighRes = videoSettings.resolution !== 'Nativa';
-      const isUltraRes = videoSettings.resolution === '4K';
+      // Enforce 4K restriction
+      const effectiveResolution = (!has4K && videoSettings.resolution === '4K') ? '1080p' : videoSettings.resolution;
+      const isHighRes = effectiveResolution !== 'Nativa';
+      const isUltraRes = effectiveResolution === '4K';
       const useEnhancements = videoSettings.textureEnhancement ?? false;
 
       const nostalgistOptions: any = {
@@ -219,13 +230,13 @@ export class EmulatorService {
           video_aspect_ratio_auto: videoSettings.aspectRatio === 'Original',
           video_smooth: videoSettings.bilinearFiltering,
           video_shader_enable: videoSettings.crtFilter && !isMobile,
-          video_threaded: true,
-          audio_latency: isMobile ? 128 : 64,
+          video_threaded: !hasLowLatency, // Threaded video adds 1 frame of lag but improves performance
+          audio_latency: hasLowLatency ? 32 : (isMobile ? 128 : 64),
           directory_system: '/home/web_user/retroarch/system',
           directory_savefile: '/home/web_user/retroarch/saves',
           directory_savestate: '/home/web_user/retroarch/states',
           video_vsync: videoSettings.vsync ?? false,
-          video_hard_sync: false,
+          video_hard_sync: hasLowLatency,
           threaded_data_runloop_enable: true
         },
         retroarchCoreOptions: {
@@ -345,6 +356,51 @@ export class EmulatorService {
     await storage.deleteState(stateId);
   }
 
+  private async updateStats(gameId: string, system: string, playTimeSeconds: number) {
+    try {
+      // 1. Increment play count and track last played
+      await storage.incrementPlayCount(gameId);
+
+      // 2. Track total play time
+      const totalPlayTime = (await storage.getSetting('total_play_time') || 0) + playTimeSeconds;
+      await storage.saveSetting('total_play_time', totalPlayTime);
+
+      // 3. Track unique systems
+      const playedSystems: string[] = await storage.getSetting('played_systems') || [];
+      if (!playedSystems.includes(system)) {
+        playedSystems.push(system);
+        await storage.saveSetting('played_systems', playedSystems);
+      }
+
+      // 4. Track unique games
+      const playedGames: string[] = await storage.getSetting('played_games') || [];
+      if (!playedGames.includes(gameId)) {
+        playedGames.push(gameId);
+        await storage.saveSetting('played_games', playedGames);
+      }
+
+      // Check Achievements
+      if (totalPlayTime >= 3600) { // 60 minutes
+        achievements.unlock('marathon_gamer');
+      }
+      if (playedSystems.length >= 5) {
+        achievements.unlock('retro_fanatic');
+      }
+      if (playedGames.length >= 10) {
+        achievements.unlock('arcade_master');
+      }
+      
+      // Completionist check (games in library)
+      const catalog = await storage.getCatalogGames();
+      if (catalog.length >= 50) {
+        achievements.unlock('completionist');
+      }
+
+    } catch (e) {
+      console.error('[Emulator] Failed to update stats', e);
+    }
+  }
+
   async pause() {
     if (this.nostalgist) {
       await this.nostalgist.pause();
@@ -373,6 +429,12 @@ export class EmulatorService {
         if (this.currentGameId) {
           try {
             await this.saveState('auto');
+            
+            // Track stats
+            if (this.sessionStartTime) {
+              const playTime = Math.floor((Date.now() - this.sessionStartTime) / 1000); // seconds
+              await this.updateStats(this.currentGameId, this.currentSystem || 'unknown', playTime);
+            }
           } catch (e) {
             console.warn('[Emulator] Auto-save failed during stop', e);
           }

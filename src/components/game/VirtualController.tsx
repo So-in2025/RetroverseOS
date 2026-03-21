@@ -1,18 +1,60 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { inputManager, RetroButton } from '../../services/inputManager';
+import { motion, AnimatePresence } from 'motion/react';
+import { Settings, Check, RotateCcw } from 'lucide-react';
 
 interface VirtualControllerProps {
   isVisible: boolean;
   skin?: 'default' | 'gold' | 'carbon' | 'translucent';
 }
 
+interface ButtonLayout {
+  x: number;
+  y: number;
+  size: number;
+}
+
 export default function VirtualController({ isVisible, skin = 'default' }: VirtualControllerProps) {
+  const [isCustomizing, setIsCustomizing] = useState(false);
+  const [layout, setLayout] = useState<Record<string, ButtonLayout>>({});
+
+  useEffect(() => {
+    const loadLayout = async () => {
+      const saved = await inputManager.getVirtualLayout();
+      if (saved) setLayout(saved);
+    };
+    loadLayout();
+  }, []);
+
   if (!isVisible) return null;
 
   const handleInput = (button: RetroButton, pressed: boolean) => (e: React.TouchEvent | React.MouseEvent) => {
+    if (isCustomizing) return;
     e.preventDefault();
     e.stopPropagation();
     inputManager.injectInput(button, pressed);
+  };
+
+  const handleDragEnd = (button: string, info: any) => {
+    const newLayout = {
+      ...layout,
+      [button]: {
+        x: (layout[button]?.x || 0) + info.offset.x,
+        y: (layout[button]?.y || 0) + info.offset.y,
+        size: layout[button]?.size || 1
+      }
+    };
+    setLayout(newLayout);
+  };
+
+  const saveLayout = async () => {
+    await inputManager.saveVirtualLayout(layout);
+    setIsCustomizing(false);
+  };
+
+  const resetLayout = async () => {
+    setLayout({});
+    await inputManager.saveVirtualLayout({});
   };
 
   const getSkinClasses = () => {
@@ -65,8 +107,42 @@ export default function VirtualController({ isVisible, skin = 'default' }: Virtu
 
   return (
     <div className="absolute inset-x-0 bottom-0 h-40 md:h-56 pointer-events-none z-50 flex justify-between items-end px-2 pb-4 md:pb-6 select-none touch-none">
+      {/* Customization Controls */}
+      <div className="absolute top-[-40px] left-1/2 -translate-x-1/2 flex gap-2 pointer-events-auto">
+        {!isCustomizing ? (
+          <button 
+            onClick={() => setIsCustomizing(true)}
+            className="p-2 bg-black/60 border border-white/10 rounded-full text-zinc-400 hover:text-white transition-colors"
+            title="Personalizar Controles"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <button 
+              onClick={saveLayout}
+              className="px-4 py-1 bg-emerald-500 text-black font-bold text-[10px] uppercase tracking-widest rounded-full flex items-center gap-2"
+            >
+              <Check className="w-3 h-3" /> Guardar
+            </button>
+            <button 
+              onClick={resetLayout}
+              className="px-4 py-1 bg-rose-500 text-white font-bold text-[10px] uppercase tracking-widest rounded-full flex items-center gap-2"
+            >
+              <RotateCcw className="w-3 h-3" /> Reset
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* D-Pad Area */}
-      <div className="relative w-32 h-32 md:w-48 md:h-48 pointer-events-auto">
+      <motion.div 
+        drag={isCustomizing}
+        dragMomentum={false}
+        onDragEnd={(_, info) => handleDragEnd('dpad', info)}
+        style={{ x: layout.dpad?.x, y: layout.dpad?.y }}
+        className={`relative w-32 h-32 md:w-48 md:h-48 pointer-events-auto ${isCustomizing ? 'ring-2 ring-emerald-500 ring-dashed rounded-full' : ''}`}
+      >
         {/* D-Pad Background */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 md:w-36 md:h-36 bg-black/10 rounded-full blur-xl"></div>
         
@@ -120,10 +196,16 @@ export default function VirtualController({ isVisible, skin = 'default' }: Virtu
         
         {/* Center Pivot */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 md:w-14 md:h-14 bg-white/5 rounded-lg pointer-events-none"></div>
-      </div>
+      </motion.div>
 
       {/* Center Menu Buttons */}
-      <div className="flex gap-2 md:gap-4 mb-2 md:mb-8 pointer-events-auto z-50">
+      <motion.div 
+        drag={isCustomizing}
+        dragMomentum={false}
+        onDragEnd={(_, info) => handleDragEnd('menu', info)}
+        style={{ x: layout.menu?.x, y: layout.menu?.y }}
+        className={`flex gap-2 md:gap-4 mb-2 md:mb-8 pointer-events-auto z-50 ${isCustomizing ? 'ring-2 ring-emerald-500 ring-dashed rounded-full p-2' : ''}`}
+      >
         <button 
           className={`px-3 py-1 md:px-5 md:py-2 ${skinClasses.menu} active:bg-white/20 backdrop-blur-md rounded-full border text-[8px] md:text-[10px] font-black uppercase tracking-widest transition-colors`}
           onTouchStart={handleInput('select', true)}
@@ -142,10 +224,16 @@ export default function VirtualController({ isVisible, skin = 'default' }: Virtu
         >
           Start
         </button>
-      </div>
+      </motion.div>
 
       {/* Action Buttons (Nintendo Layout: X Top, B Bottom, Y Left, A Right) */}
-      <div className="relative w-32 h-32 md:w-48 md:h-48 pointer-events-auto">
+      <motion.div 
+        drag={isCustomizing}
+        dragMomentum={false}
+        onDragEnd={(_, info) => handleDragEnd('actions', info)}
+        style={{ x: layout.actions?.x, y: layout.actions?.y }}
+        className={`relative w-32 h-32 md:w-48 md:h-48 pointer-events-auto ${isCustomizing ? 'ring-2 ring-emerald-500 ring-dashed rounded-full' : ''}`}
+      >
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 md:w-36 md:h-36 bg-black/20 rounded-full blur-xl"></div>
 
         {/* X (Top) */}
@@ -195,7 +283,7 @@ export default function VirtualController({ isVisible, skin = 'default' }: Virtu
         >
           A
         </button>
-      </div>
+      </motion.div>
     </div>
   );
 }

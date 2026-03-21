@@ -14,14 +14,13 @@ export class AICoachingService {
   constructor() {}
 
   private get ai(): GoogleGenAI {
-    if (!this._ai) {
-      const key = process.env.GEMINI_API_KEY;
-      if (!key) {
-        throw new Error("GEMINI_API_KEY environment variable is required");
-      }
-      this._ai = new GoogleGenAI({ apiKey: key });
+    const key = localStorage.getItem('retroos_gemini_key');
+    if (!key || !key.startsWith('AIza')) {
+      throw new Error("BYOK_REQUIRED");
     }
-    return this._ai;
+    
+    // Always create a new instance to ensure we use the latest key if it changed
+    return new GoogleGenAI({ apiKey: key });
   }
 
   async getGameTips(gameId: string, gameTitle: string): Promise<string> {
@@ -36,7 +35,8 @@ export class AICoachingService {
       }
 
       // 2. Generate with Gemini if not cached
-      const response = await this.ai.models.generateContent({
+      const aiInstance = this.ai;
+      const response = await aiInstance.models.generateContent({
         model: "gemini-3.1-flash-lite-preview",
         contents: `Eres un experto historiador y estratega de videojuegos retro. 
         Para el juego "${gameTitle}", proporciona la siguiente información en formato Markdown:
@@ -69,7 +69,10 @@ export class AICoachingService {
       });
 
       return tips;
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === "BYOK_REQUIRED") {
+        return "El Coach Neural requiere que configures tu propia API Key (BYOK) en el Marketplace.";
+      }
       console.error("AI Tips Error:", error);
       return "Error retrieving tips. Please try again later.";
     }
@@ -78,8 +81,9 @@ export class AICoachingService {
   async analyzeFrame(canvas: HTMLCanvasElement, gameTitle: string = "this game"): Promise<string> {
     try {
       const base64Image = canvas.toDataURL("image/jpeg", 0.7).split(",")[1];
+      const aiInstance = this.ai;
 
-      const response = await this.ai.models.generateContent({
+      const response = await aiInstance.models.generateContent({
         model: this.modelId,
         contents: {
           parts: [
@@ -111,7 +115,10 @@ export class AICoachingService {
       }
 
       return advice;
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === "BYOK_REQUIRED") {
+        return "Núcleo Neural Desconectado. Configura tu API Key (BYOK) en el Marketplace.";
+      }
       console.error("AI Coaching Error:", error);
       return "Systems offline. Focus on the game.";
     }

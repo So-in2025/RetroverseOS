@@ -2,6 +2,20 @@ import { GameObject, MetadataNormalizationEngine, ELITE_TOP_20 } from './metadat
 import { storage } from './storage';
 import { INITIAL_GAMES } from './initialGames';
 import { FULL_CATALOG } from './catalogManager';
+import { customization } from './customization';
+
+const PREMIUM_SYSTEMS = ['psx', 'n64', 'gba', 'ps2'];
+
+const GAME_PACKS: Record<string, string[]> = {
+  'pack_elite_arcade': [
+    'Metal Slug', 'Street Fighter II', 'Pac-Man', 'Donkey Kong', 'Galaga', 
+    'Dig Dug', 'Frogger', 'Asteroids', 'Centipede', 'Mortal Kombat'
+  ],
+  'pack_rpg_legends': [
+    'Final Fantasy', 'Chrono Trigger', 'Dragon Quest', 'Secret of Mana', 
+    'EarthBound', 'Phantasy Star', 'Breath of Fire', 'Suikoden', 'Xenogears'
+  ]
+};
 
 class GameCatalogService {
   private games: Map<string, GameObject> = new Map();
@@ -71,6 +85,40 @@ class GameCatalogService {
     } finally {
       clearTimeout(timeoutId);
     }
+  }
+
+  public hasAccessToSystem(systemId: string): boolean {
+    const systemKey = systemId.toLowerCase();
+    if (!PREMIUM_SYSTEMS.includes(systemKey)) return true;
+    
+    if (customization.isRetroPassActive()) return true;
+    
+    const ownedItems = customization.getOwnedItems();
+    return ownedItems.some(id => id === `console_${systemKey}`);
+  }
+
+  public isGameLocked(game: GameObject): boolean {
+    // Elite Top 20 are ALWAYS unlocked (Teaser)
+    const isElite = ELITE_TOP_20.some(title => 
+      game.title.toLowerCase().includes(title.toLowerCase())
+    );
+    if (isElite) return false;
+
+    if (customization.isRetroPassActive()) return false;
+
+    // Check if game belongs to an owned pack
+    const ownedItems = customization.getOwnedItems();
+    for (const [packId, gameTitles] of Object.entries(GAME_PACKS)) {
+      if (ownedItems.includes(packId)) {
+        if (gameTitles.some(title => game.title.toLowerCase().includes(title.toLowerCase()))) {
+          return false;
+        }
+      }
+    }
+
+    // Check system access
+    const systemKey = game.system_id?.toLowerCase() || 'unknown';
+    return !this.hasAccessToSystem(systemKey);
   }
 
   private async initializeCatalog() {

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Save, Download, Trash2, Clock, X, Cloud, CloudUpload, CloudDownload, Loader2 } from 'lucide-react';
+import { Save, Download, Trash2, Clock, X, Cloud, CloudUpload, CloudDownload, Loader2, Lock, ShoppingBag } from 'lucide-react';
 import { emulator } from '../../services/emulator';
 import { SaveState } from '../../services/storage';
 import { saveService } from '../../services/saveService';
 import { useAuth } from '../../services/AuthContext';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
+import { customization } from '../../services/customization';
 
 interface SaveStatePanelProps {
   isOpen: boolean;
@@ -16,14 +17,24 @@ export default function SaveStatePanel({ isOpen, onClose }: SaveStatePanelProps)
   const [states, setStates] = useState<SaveState[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [maxSlots, setMaxSlots] = useState(3);
+  const [hasCloudSync, setHasCloudSync] = useState(false);
   const { user } = useAuth();
   const { gameId } = useParams();
 
   useEffect(() => {
     if (isOpen) {
       loadStates();
+      checkPermissions();
     }
   }, [isOpen]);
+
+  const checkPermissions = async () => {
+    const slots = await customization.getMaxSaveSlots();
+    const cloud = await customization.isCloudSyncEnabled();
+    setMaxSlots(slots);
+    setHasCloudSync(cloud);
+  };
 
   const loadStates = async () => {
     const fetchedStates = await emulator.getSaveStates();
@@ -31,6 +42,10 @@ export default function SaveStatePanel({ isOpen, onClose }: SaveStatePanelProps)
   };
 
   const handleSave = async () => {
+    if (states.length >= maxSlots) {
+      alert(`Has alcanzado el límite de ${maxSlots} slots de guardado. Libera espacio o adquiere la Expansión de Slots en el Marketplace.`);
+      return;
+    }
     setIsSaving(true);
     await emulator.saveState('manual');
     await loadStates();
@@ -48,6 +63,10 @@ export default function SaveStatePanel({ isOpen, onClose }: SaveStatePanelProps)
 
   const handleCloudSync = async (state: SaveState) => {
     if (!user || !gameId) return;
+    if (!hasCloudSync) {
+      alert('La Sincronización en la Nube requiere una licencia activa. Visita el Marketplace.');
+      return;
+    }
     setIsSyncing(true);
     try {
       // Convert Blob to Base64 for JSON serialization
@@ -66,6 +85,10 @@ export default function SaveStatePanel({ isOpen, onClose }: SaveStatePanelProps)
 
   const handleCloudDownload = async () => {
     if (!user || !gameId) return;
+    if (!hasCloudSync) {
+      alert('La Sincronización en la Nube requiere una licencia activa. Visita el Marketplace.');
+      return;
+    }
     setIsSyncing(true);
     try {
       const cloudDataStr = await saveService.downloadSave(user.id, gameId);
@@ -150,31 +173,62 @@ export default function SaveStatePanel({ isOpen, onClose }: SaveStatePanelProps)
             </div>
 
             <div className="p-6 border-b border-white/10 space-y-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Slots de Memoria</span>
+                <span className={`text-[10px] font-black uppercase tracking-widest ${states.length >= maxSlots ? 'text-rose-500' : 'text-emerald-500'}`}>
+                  {states.length} / {maxSlots}
+                </span>
+              </div>
+              <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden mb-4">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${(states.length / maxSlots) * 100}%` }}
+                  className={`h-full ${states.length >= maxSlots ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                />
+              </div>
+
               <button
                 onClick={handleSave}
                 disabled={isSaving}
                 className={`w-full py-4 rounded-xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all ${
                   isSaving 
                     ? 'bg-emerald-900/50 text-emerald-700 cursor-wait' 
-                    : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_20px_rgba(16,185,129,0.3)]'
+                    : states.length >= maxSlots
+                      ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed border border-white/5'
+                      : 'bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_20px_rgba(16,185,129,0.3)]'
                 }`}
               >
-                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                {isSaving ? 'GUARDANDO...' : 'CREAR PUNTO DE CONTROL'}
+                {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : states.length >= maxSlots ? <Lock className="w-5 h-5" /> : <Save className="w-5 h-5" />}
+                {isSaving ? 'GUARDANDO...' : states.length >= maxSlots ? 'SLOTS AGOTADOS' : 'CREAR PUNTO DE CONTROL'}
               </button>
               
-              <button
-                onClick={handleCloudDownload}
-                disabled={isSyncing}
-                className={`w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all border ${
-                  isSyncing 
-                    ? 'bg-cyan-900/20 text-cyan-700 border-cyan-900/30 cursor-wait' 
-                    : 'bg-cyan-electric/10 hover:bg-cyan-electric/20 text-cyan-electric border-cyan-electric/30'
-                }`}
-              >
-                {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <CloudDownload className="w-4 h-4" />}
-                {isSyncing ? 'SINCRONIZANDO...' : 'RESTAURAR DESDE LA NUBE'}
-              </button>
+              <div className="relative group">
+                {!hasCloudSync && (
+                  <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] rounded-xl z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Link 
+                      to="/marketplace" 
+                      className="px-4 py-2 bg-cyan-electric text-black text-[10px] font-black uppercase tracking-widest rounded-lg flex items-center gap-2"
+                    >
+                      <ShoppingBag className="w-3 h-3" />
+                      DESBLOQUEAR NUBE
+                    </Link>
+                  </div>
+                )}
+                <button
+                  onClick={handleCloudDownload}
+                  disabled={isSyncing || !hasCloudSync}
+                  className={`w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all border ${
+                    isSyncing 
+                      ? 'bg-cyan-900/20 text-cyan-700 border-cyan-900/30 cursor-wait' 
+                      : !hasCloudSync
+                        ? 'bg-zinc-900/50 text-zinc-600 border-white/5 cursor-not-allowed'
+                        : 'bg-cyan-electric/10 hover:bg-cyan-electric/20 text-cyan-electric border-cyan-electric/30'
+                  }`}
+                >
+                  {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : hasCloudSync ? <CloudDownload className="w-4 h-4" /> : <Cloud className="w-4 h-4 opacity-30" />}
+                  {isSyncing ? 'SINCRONIZANDO...' : hasCloudSync ? 'RESTAURAR DESDE LA NUBE' : 'SINCRONIZACIÓN BLOQUEADA'}
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4 hide-scrollbar">

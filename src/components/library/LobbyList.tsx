@@ -1,17 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Users, Play, Plus, Loader2, Globe, ShieldCheck } from 'lucide-react';
+import { Users, Play, Plus, Loader2, Globe, ShieldCheck, Lock } from 'lucide-react';
 import { multiplayerService, GameSession } from '../../services/supabase';
 import { useAuth } from '../../services/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../services/supabase';
+import { gameCatalog } from '../../services/gameCatalog';
+import { GameCover } from './GameCover';
+import { useCustomization } from '../../hooks/useCustomization';
 
 export const LobbyList: React.FC = () => {
   const [sessions, setSessions] = useState<GameSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const { user } = useAuth();
+  const { ownedItems, isRetroPassActive } = useCustomization();
   const navigate = useNavigate();
+
+  const hasMultiplayerAccess = isRetroPassActive || ownedItems.includes('feature_multiplayer');
 
   const fetchSessions = async () => {
     if (!supabase) {
@@ -78,7 +84,25 @@ export const LobbyList: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {loading ? (
+        {!hasMultiplayerAccess ? (
+          <div className="col-span-full py-12 flex flex-col items-center justify-center gap-6 bg-zinc-900/50 border border-white/10 rounded-3xl border-dashed">
+            <div className="w-16 h-16 rounded-2xl bg-zinc-800 flex items-center justify-center border border-white/5">
+              <Lock className="w-8 h-8 text-zinc-600" />
+            </div>
+            <div className="text-center max-w-md px-4">
+              <h3 className="text-lg font-black text-white uppercase tracking-widest mb-2 italic">Acceso Restringido</h3>
+              <p className="text-xs text-zinc-500 uppercase tracking-widest leading-relaxed">
+                El modo multijugador requiere una <span className="text-emerald-400">Licencia Pro</span> o un <span className="text-emerald-400">Retro Pass</span> activo.
+              </p>
+            </div>
+            <Link 
+              to="/marketplace"
+              className="px-8 py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase tracking-widest rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)]"
+            >
+              Ir al Mercado
+            </Link>
+          </div>
+        ) : loading ? (
           <div className="col-span-full py-12 flex flex-col items-center justify-center gap-4 bg-zinc-900/30 border border-white/5 rounded-2xl">
             <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Sincronizando con la Red...</p>
@@ -93,52 +117,61 @@ export const LobbyList: React.FC = () => {
           </div>
         ) : (
           <AnimatePresence mode="popLayout">
-            {sessions.map((session) => (
-              <motion.div
-                key={session.id}
-                layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="group relative bg-zinc-900/50 border border-white/10 rounded-2xl p-4 hover:border-emerald-500/50 transition-all hover:shadow-[0_0_30px_rgba(16,185,129,0.1)]"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-zinc-800 border border-white/5 flex items-center justify-center text-emerald-500">
-                      <Users className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <h3 className="text-xs font-black text-white uppercase tracking-tight truncate w-32">
-                        SALA DE {session.game_id.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-                      </h3>
-                      <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Host: {session.host_id.slice(0, 8)}</p>
-                    </div>
-                  </div>
-                  <div className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 rounded text-[8px] font-black text-emerald-500 uppercase tracking-widest">
-                    WAITING
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="flex -space-x-2">
-                    <div className="w-6 h-6 rounded-full border-2 border-zinc-900 bg-zinc-800 flex items-center justify-center">
-                      <User className="w-3 h-3 text-zinc-500" />
-                    </div>
-                    <div className="w-6 h-6 rounded-full border-2 border-zinc-900 bg-zinc-900/50 flex items-center justify-center border-dashed">
-                      <Plus className="w-3 h-3 text-zinc-700" />
-                    </div>
-                  </div>
-                  <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">1/2 Jugadores</span>
-                </div>
-
-                <button
-                  onClick={() => handleJoin(session)}
-                  className="w-full py-2.5 bg-emerald-500 text-black rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-400 transition-all flex items-center justify-center gap-2"
+            {sessions.map((session) => {
+              const game = gameCatalog.getGame(session.game_id);
+              return (
+                <motion.div
+                  key={session.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="group relative bg-zinc-900/50 border border-white/10 rounded-2xl p-4 hover:border-emerald-500/50 transition-all hover:shadow-[0_0_30px_rgba(16,185,129,0.1)]"
                 >
-                  <Play className="w-3 h-3 fill-current" /> UNIRSE AL DUELO
-                </button>
-              </motion.div>
-            ))}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-16 rounded-lg overflow-hidden bg-zinc-800 border border-white/5 flex-shrink-0">
+                        <GameCover 
+                          gameId={session.game_id}
+                          primaryUrl={game?.cover_url || game?.artwork_url}
+                          title={game?.title || session.game_id}
+                          systemId={game?.system_id || 'unknown'}
+                          className="w-full h-full"
+                        />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-black text-white uppercase tracking-tight truncate w-32">
+                          {game?.title || session.game_id.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                        </h3>
+                        <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">Host: {session.host_id.slice(0, 8)}</p>
+                      </div>
+                    </div>
+                    <div className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 rounded text-[8px] font-black text-emerald-500 uppercase tracking-widest">
+                      WAITING
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="flex -space-x-2">
+                      <div className="w-6 h-6 rounded-full border-2 border-zinc-900 bg-zinc-800 flex items-center justify-center">
+                        <User className="w-3 h-3 text-zinc-500" />
+                      </div>
+                      <div className="w-6 h-6 rounded-full border-2 border-zinc-900 bg-zinc-900/50 flex items-center justify-center border-dashed">
+                        <Plus className="w-3 h-3 text-zinc-700" />
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">1/2 Jugadores</span>
+                  </div>
+
+                  <button
+                    onClick={() => handleJoin(session)}
+                    className="w-full py-2.5 bg-emerald-500 text-black rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-400 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Play className="w-3 h-3 fill-current" /> UNIRSE AL DUELO
+                  </button>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         )}
       </div>

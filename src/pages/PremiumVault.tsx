@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { gameCatalog } from '../services/gameCatalog';
 import { MetadataNormalizationEngine, GameObject } from '../services/metadataNormalization';
+import { GameCover } from '../components/library/GameCover';
 
 const PREMIUM_SYSTEMS = [
   { id: 'ps2', name: 'PlayStation 2', icon: '🎮', color: 'blue' },
@@ -191,11 +192,12 @@ export default function PremiumVault() {
                 className="group relative bg-zinc-900/40 border border-white/10 rounded-3xl overflow-hidden hover:border-cyan-electric/50 transition-all"
               >
                 <div className="aspect-[16/9] relative overflow-hidden">
-                  <img 
-                    src={game.cover_url} 
-                    alt={game.title}
+                  <GameCover 
+                    gameId={game.game_id}
+                    primaryUrl={game.cover_url}
+                    title={game.title}
+                    systemId={game.system_id}
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 opacity-60 group-hover:opacity-100"
-                    referrerPolicy="no-referrer"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent" />
                   <div className="absolute top-4 left-4 flex gap-2">

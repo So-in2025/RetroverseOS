@@ -74,6 +74,14 @@ export class InputManager {
     }
   }
 
+  public async getVirtualLayout(): Promise<Record<string, { x: number, y: number, size: number }> | null> {
+    return await storage.getSetting('virtual_controller_layout');
+  }
+
+  public async saveVirtualLayout(layout: Record<string, { x: number, y: number, size: number }>) {
+    await storage.saveSetting('virtual_controller_layout', layout);
+  }
+
   public updateGamepadMapping(mapping: Record<number, RetroButton>) {
     this.gamepadMap = mapping;
     storage.saveSetting('gamepad_mapping', mapping);

@@ -43,6 +43,19 @@ class EconomyService {
     await this.saveTransactions();
     this.notifyListeners();
 
+    // Sync to cloud if enabled
+    import('./supabase').then(({ supabase }) => {
+      if (supabase) {
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (user) {
+            import('./profileSyncService').then(({ profileSync }) => {
+              profileSync.syncProfile(user.id);
+            });
+          }
+        });
+      }
+    });
+
     if (this.balance >= 5000) {
       // We need to import achievements at the top
       import('./achievements').then(({ achievements }) => {
@@ -57,6 +70,16 @@ class EconomyService {
     // storage.addCredits can take negative amounts
     this.balance = await storage.addCredits(-amount);
     
+    // Track total spent
+    const totalSpent = (await storage.getSetting('total_spent_coins') || 0) + amount;
+    await storage.saveSetting('total_spent_coins', totalSpent);
+
+    if (totalSpent >= 10000) {
+      import('./achievements').then(({ achievements }) => {
+        achievements.unlock('high_roller');
+      });
+    }
+
     this.addTransaction({
       id: crypto.randomUUID(),
       amount,
@@ -67,6 +90,20 @@ class EconomyService {
 
     await this.saveTransactions();
     this.notifyListeners();
+
+    // Sync to cloud if enabled
+    import('./supabase').then(({ supabase }) => {
+      if (supabase) {
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (user) {
+            import('./profileSyncService').then(({ profileSync }) => {
+              profileSync.syncProfile(user.id);
+            });
+          }
+        });
+      }
+    });
+
     return true;
   }
 

@@ -40,7 +40,7 @@ class NeuralService {
     }
   }
 
-  async generateTacticalAdvice(imageBase64: string, retryCount = 0): Promise<NeuralResponse> {
+  async generateTacticalAdvice(imageBase64: string, gameId?: string, retryCount = 0): Promise<NeuralResponse> {
     const start = Date.now();
     const key = await apiPoolService.getNextKey();
     if (!key) throw new Error('NO_NODES_AVAILABLE');
@@ -65,6 +65,13 @@ class NeuralService {
 
       const text = response.text || 'ANÁLISIS FALLIDO';
 
+      // Save to history if gameId is provided
+      if (gameId && text !== 'ANÁLISIS FALLIDO') {
+        import('./aiCoachHistoryService').then(({ aiCoachHistory }) => {
+          aiCoachHistory.addAdvice(gameId, text, imageBase64);
+        });
+      }
+
       return {
         text,
         nodeUsed: key.substring(0, 8) + '...',
@@ -73,7 +80,7 @@ class NeuralService {
     } catch (error: any) {
       if (error.message?.includes('429')) {
         await apiPoolService.markExhausted(key);
-        if (retryCount < 3) return this.generateTacticalAdvice(imageBase64, retryCount + 1);
+        if (retryCount < 3) return this.generateTacticalAdvice(imageBase64, gameId, retryCount + 1);
       }
       throw error;
     }

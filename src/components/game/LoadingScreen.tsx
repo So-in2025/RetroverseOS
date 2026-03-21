@@ -1,15 +1,18 @@
 import { motion } from 'motion/react';
 import React, { useEffect, useState } from 'react';
+import { GameCover } from '../library/GameCover';
 
 interface LoadingScreenProps {
   status: string;
   progress: number;
+  gameId?: string | null;
   coverUrl?: string | null;
   title?: string;
   system?: string;
+  systemId?: string;
 }
 
-export default function LoadingScreen({ status, progress, coverUrl, title, system }: LoadingScreenProps) {
+export default function LoadingScreen({ status, progress, gameId, coverUrl, title, system, systemId }: LoadingScreenProps) {
   const [showCover, setShowCover] = useState(false);
 
   useEffect(() => {
@@ -51,13 +54,16 @@ export default function LoadingScreen({ status, progress, coverUrl, title, syste
           className="relative group"
         >
           <div className="absolute inset-0 bg-cyan-electric/20 blur-3xl rounded-full opacity-50 animate-pulse"></div>
-          {coverUrl ? (
-            <img 
-              src={coverUrl} 
-              alt={title || "Game Cover"} 
-              className="relative w-64 h-auto md:w-96 rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.8)] z-10 object-contain max-h-[50vh]"
-              referrerPolicy="no-referrer"
-            />
+          {gameId || coverUrl ? (
+            <div className="relative w-64 h-auto md:w-96 rounded-lg shadow-[0_0_50px_rgba(0,0,0,0.8)] z-10 overflow-hidden">
+              <GameCover 
+                gameId={gameId || ''}
+                primaryUrl={coverUrl}
+                title={title || "Game Cover"}
+                systemId={systemId}
+                className="w-full h-auto object-contain max-h-[50vh]"
+              />
+            </div>
           ) : (
             <div className="relative w-64 h-80 md:w-96 md:h-96 bg-zinc-900 rounded-lg shadow-2xl flex items-center justify-center border border-white/5 z-10">
               <span className="text-zinc-700 font-black text-4xl uppercase tracking-tighter">NO SIGNAL</span>

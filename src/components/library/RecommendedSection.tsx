@@ -4,7 +4,7 @@ import { Sparkles, Play, ChevronRight, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { recommendationEngine } from '../../services/recommendationEngine';
 import { GameObject } from '../../services/metadataNormalization';
-import { DynamicCover } from './DynamicCover';
+import { GameCover } from './GameCover';
 import { AudioEngine } from '../../services/audioEngine';
 import { haptics } from '../../services/haptics';
 
@@ -70,13 +70,12 @@ export const RecommendedSection: React.FC = () => {
                   onClick={() => { AudioEngine.playSelectSound(); haptics.medium(); }}
                   className="block relative aspect-[2/3] rounded-2xl overflow-hidden border border-white/10 group-hover:border-cyan-electric/50 transition-all duration-500 shadow-2xl"
                 >
-                  <DynamicCover
-                    game_id={game.game_id}
-                    src={game.cover_url || game.artwork_url}
-                    alt={game.title}
+                  <GameCover
+                    gameId={game.game_id}
+                    primaryUrl={game.cover_url || game.artwork_url}
                     title={game.title}
-                    system={game.system}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 group-hover:rotate-1"
+                    systemId={game.system_id}
+                    className="w-full h-full transition-transform duration-700 group-hover:scale-110 group-hover:rotate-1"
                   />
                   
                   {/* Overlay */}

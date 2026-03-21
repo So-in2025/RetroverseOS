@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Trophy, BrainCircuit, Swords, Coins, ShoppingBag, MessageSquare, Power, X, Moon, History, Gamepad2, Crown } from 'lucide-react';
+import { Trophy, BrainCircuit, Swords, Coins, ShoppingBag, MessageSquare, Power, X, Moon, History, Gamepad2, Crown, Clock, Zap, Star, LayoutGrid } from 'lucide-react';
 import { achievements, Achievement } from '../services/achievements';
 import { haptics } from '../services/haptics';
 import { AudioEngine } from '../services/audioEngine';
@@ -16,7 +16,11 @@ const iconMap: Record<string, any> = {
   Moon,
   History,
   Gamepad2,
-  Crown
+  Crown,
+  Clock,
+  Zap,
+  Star,
+  LayoutGrid
 };
 
 const rarityConfig = {

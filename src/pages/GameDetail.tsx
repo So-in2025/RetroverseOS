@@ -1,12 +1,13 @@
 import { useParams, Link } from 'react-router-dom';
-import { Play, Share2, Heart, Trophy, Users, ArrowLeft, BrainCircuit, Loader2, X } from 'lucide-react';
+import { Play, Share2, Heart, Trophy, Users, ArrowLeft, BrainCircuit, Loader2, X, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { gameCatalog } from '../services/gameCatalog';
 import { useEffect, useState, useMemo } from 'react';
 import { CoverService } from '../services/coverService';
-import { DynamicCover } from '../components/library/DynamicCover';
+import { GameCover } from '../components/library/GameCover';
 import { aiCoach } from '../services/aiCoaching';
 import ReactMarkdown from 'react-markdown';
+import { BYOKModal } from '../components/ai/BYOKModal';
 
 export default function GameDetail() {
   const { gameId } = useParams();
@@ -15,6 +16,7 @@ export default function GameDetail() {
   const [aiBriefing, setAiBriefing] = useState<string | null>(null);
   const [isBriefingLoading, setIsBriefingLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showBYOKModal, setShowBYOKModal] = useState(false);
 
   const handleRequestBriefing = async () => {
     if (!game) return;
@@ -24,6 +26,11 @@ export default function GameDetail() {
     setIsBriefingLoading(true);
     try {
       const briefing = await aiCoach.getGameTips(game.game_id, game.title);
+      
+      if (briefing === "El Coach Neural requiere que configures tu propia API Key (BYOK) en el Marketplace.") {
+        setShowBYOKModal(true);
+      }
+      
       setAiBriefing(briefing);
     } catch (e) {
       console.error(e);
@@ -69,12 +76,12 @@ export default function GameDetail() {
     <div className="min-h-screen bg-zinc-950 text-white relative overflow-hidden">
       {/* Hero Background */}
       <div className="absolute inset-0 z-0">
-        <DynamicCover 
-          src={coverCandidates[coverIndex]} 
-          alt="Hero" 
+        <GameCover 
+          gameId={game.game_id}
+          primaryUrl={game.cover_url || game.artwork_url} 
           title={game.title}
-          system={game.system}
-          className="w-full h-full object-cover opacity-30 blur-sm" 
+          systemId={game.system_id}
+          className="w-full h-full opacity-30 blur-sm" 
         />
         <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/80 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/50 to-transparent" />
@@ -92,13 +99,12 @@ export default function GameDetail() {
             animate={{ opacity: 1, y: 0 }}
             className="w-64 md:w-80 shrink-0 rounded-lg shadow-2xl shadow-black/50 overflow-hidden border border-white/10"
           >
-            <DynamicCover 
-              src={coverCandidates[coverIndex]} 
-              alt={game.title} 
+            <GameCover 
+              gameId={game.game_id}
+              primaryUrl={game.cover_url || game.artwork_url} 
               title={game.title}
-              system={game.system}
-              className="w-full h-full object-cover" 
-              onError={handleImageError}
+              systemId={game.system_id}
+              className="w-full h-full" 
             />
           </motion.div>
 
@@ -302,6 +308,15 @@ export default function GameDetail() {
                 ) : (
                   <div className="prose prose-invert prose-emerald max-w-none">
                     <ReactMarkdown>{aiBriefing || 'No hay informe disponible.'}</ReactMarkdown>
+                    {aiBriefing?.includes('BYOK') && (
+                      <button 
+                        onClick={() => setShowBYOKModal(true)}
+                        className="mt-6 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm uppercase tracking-widest transition-all w-full flex items-center justify-center gap-2"
+                      >
+                        <Zap className="w-5 h-5" />
+                        Configurar BYOK
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -309,6 +324,15 @@ export default function GameDetail() {
           </div>
         )}
       </AnimatePresence>
+      
+      <BYOKModal 
+        isOpen={showBYOKModal}
+        onClose={() => setShowBYOKModal(false)}
+        onSuccess={() => {
+          setAiBriefing(null);
+          handleRequestBriefing();
+        }}
+      />
     </div>
   );
 }

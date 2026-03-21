@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Play, Star, Users, Trophy, Clock, Gamepad2, Heart } from 'lucide-react';
 import { GameObject } from '../../services/metadataNormalization';
-import { DynamicCover } from './DynamicCover';
+import { GameCover } from './GameCover';
 import { Link, useNavigate } from 'react-router-dom';
 import { AudioEngine } from '../../services/audioEngine';
 import { haptics } from '../../services/haptics';
@@ -63,12 +63,12 @@ export default function GameQuickViewModal({ game, isOpen, onClose }: GameQuickV
             {/* Left: Cover & Actions */}
             <div className="w-full md:w-2/5 relative bg-black">
               <div className="aspect-[3/4] md:aspect-auto md:h-full relative">
-                <DynamicCover
-                  src={game.cover_url || game.artwork_url}
-                  alt={game.title}
+                <GameCover
+                  gameId={game.game_id}
+                  primaryUrl={game.cover_url || game.artwork_url}
                   title={game.title}
-                  system={game.system}
-                  className="w-full h-full object-cover opacity-80"
+                  systemId={game.system_id}
+                  className="w-full h-full opacity-80"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent md:bg-gradient-to-r md:from-transparent md:to-zinc-950" />
               </div>

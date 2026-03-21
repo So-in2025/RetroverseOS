@@ -538,7 +538,7 @@ export class MetadataNormalizationEngine {
     // or a high-quality static asset. For now, we use a reliable placeholder service with text.
     const fallbackCoverUrl = `https://placehold.co/400x600/1a1a1a/00f2ff?text=${encodeURIComponent(cleanTitle)}&font=roboto`;
 
-    // We return the Libretro URL as primary. The UI component (DynamicCover) 
+    // We return the Libretro URL as primary. The UI component (GameCover) 
     // MUST be updated to handle the fallback if this 404s. 
     // However, since we can't change the UI logic from here, we will try to be smart.
     // But the user requested "Triple Cascada de Arte" logic here.
@@ -549,12 +549,12 @@ export class MetadataNormalizationEngine {
     // But we can return a special URL structure or just the Libretro one and hope the UI handles it.
     // Wait, the user said "Implementa un sistema de Triple Cascada".
     // If I can't change the UI to handle the cascade, I have to do it here? No, doing it here means 3 fetches per game. Too slow.
-    // The "DynamicCover" component is the right place for the *execution* of the cascade.
+    // The "GameCover" component is the right place for the *execution* of the cascade.
     // But I will provide the Libretro URL here as it is the "Master".
     
     // Actually, let's look at the user request again: "Implementa un sistema de Triple Cascada de Arte... 1. Libretro... 2. Archive... 3. OpenGameArt".
     // I will construct the URL to point to Libretro.
-    // I will ALSO update the `DynamicCover` component (if I can) or `GameLibrary` to handle the error.
+    // I will ALSO update the `GameCover` component (if I can) or `GameLibrary` to handle the error.
     // But for this file, I will set `cover_url` to Libretro.
     
     let coverUrl = libretroCoverUrl;

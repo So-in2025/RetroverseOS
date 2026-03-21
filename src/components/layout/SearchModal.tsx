@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Search, X, Gamepad2, Users, Trophy, ArrowRight, Command } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { gameCatalog } from '../../services/gameCatalog';
+import { GameCover } from '../library/GameCover';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -98,7 +99,13 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                       className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 transition-all group text-left"
                     >
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-zinc-800 border border-white/10 flex-shrink-0">
-                        <img src={game.cover_url} alt={game.title} className="w-full h-full object-cover" />
+                        <GameCover 
+                          gameId={game.game_id}
+                          primaryUrl={game.cover_url || game.artwork_url}
+                          title={game.title}
+                          systemId={game.system_id}
+                          className="w-full h-full"
+                        />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h4 className="font-bold text-white group-hover:text-emerald-400 transition-colors truncate">{game.title}</h4>

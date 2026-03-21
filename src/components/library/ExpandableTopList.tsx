@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { GameObject } from '../../services/metadataNormalization';
 import { Link } from 'react-router-dom';
 import { Play, ChevronDown } from 'lucide-react';
-import { DynamicCover } from './DynamicCover';
+import { GameCover } from './GameCover';
 
 interface ExpandableTopListProps {
   title: string;
@@ -37,12 +37,12 @@ export const ExpandableTopList: React.FC<ExpandableTopListProps> = ({ title, gam
             </div>
             <Link to={`/play/${game.game_id}?url=${encodeURIComponent(game.rom_url)}&system=${game.system_id}`}>
               <div className="relative aspect-[2/3] rounded-2xl overflow-hidden mb-3 bg-zinc-900 border border-yellow-500/30 transition-all duration-300 group-hover:scale-105 group-hover:border-yellow-500">
-                <DynamicCover 
-                  src={game.cover_url || game.artwork_url} 
-                  alt={game.title}
+                <GameCover 
+                  gameId={game.game_id}
+                  primaryUrl={game.cover_url || game.artwork_url} 
                   title={game.title}
-                  system={game.system}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  systemId={game.system_id}
+                  className="w-full h-full transition-transform duration-500 group-hover:scale-110"
                 />
                 
                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-4">

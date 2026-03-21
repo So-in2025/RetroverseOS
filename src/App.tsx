@@ -15,6 +15,7 @@ import Profile from './pages/Profile';
 import Marketplace from './pages/Marketplace';
 import Community from './pages/Community';
 import Settings from './pages/Settings';
+import NetplayLobby from './pages/NetplayLobby';
 import Login from './pages/Login';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import NotificationSystem from './components/NotificationSystem';
@@ -149,6 +150,7 @@ function AppContent() {
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/community" element={<Community />} />
             <Route path="/tournaments" element={<Community />} />
+            <Route path="/netplay" element={<NetplayLobby />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>

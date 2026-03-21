@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ShoppingCart, Sparkles, Zap, Shield, Crown, Star, Search, Filter, Hexagon, Cpu, Check, Gift, Heart, Monitor } from 'lucide-react';
-import { DynamicCover } from '../components/library/DynamicCover';
+import { ShoppingCart, Sparkles, Zap, Shield, Crown, Star, Search, Filter, Hexagon, Cpu, Check, Gift, Heart, Monitor, Cloud, Users, Maximize } from 'lucide-react';
+import { GameCover } from '../components/library/GameCover';
 import { UnboxingModal } from '../components/marketplace/UnboxingModal';
+import { BYOKModal } from '../components/ai/BYOKModal';
 import { haptics } from '../services/haptics';
 import { useEconomy } from '../hooks/useEconomy';
 import { useCustomization } from '../hooks/useCustomization';
 import { STORE_ITEMS, ItemCategory, customization } from '../services/customization';
 import { economy } from '../services/economy';
+import { achievements } from '../services/achievements';
+import { AudioEngine } from '../services/audioEngine';
 
 export default function Marketplace() {
   const [activeCategory, setActiveCategory] = useState<ItemCategory | 'featured'>('featured');
   const { balance } = useEconomy();
-  const { ownedItems, equippedTheme, equippedBezel, equippedAvatar, equippedVoice, buyItem, equipItem } = useCustomization();
+  const { ownedItems, equipped, buyItem, equipItem } = useCustomization();
   
   const [isProcessing, setIsProcessing] = useState<string | null>(null);
   const [isSubscribing, setIsSubscribing] = useState(false);
@@ -21,16 +24,23 @@ export default function Marketplace() {
   const [isUnboxingOpen, setIsUnboxingOpen] = useState(false);
   const [selectedBox, setSelectedBox] = useState<{ id: string, name: string, price: number } | null>(null);
 
+  // BYOK state
+  const [isBYOKOpen, setIsBYOKOpen] = useState(false);
+
   const categories: { id: ItemCategory | 'featured', label: string, icon: any }[] = [
     { id: 'featured', label: 'Destacado', icon: Star },
-    { id: 'pack', label: 'Premium Packs', icon: ShoppingCart },
-    { id: 'theme', label: 'Temas UI', icon: Sparkles },
-    { id: 'bezel', label: 'Marcos (Bezels)', icon: Monitor },
-    { id: 'avatar', label: 'Avatares', icon: Shield },
-    { id: 'voice', label: 'Voces IA', icon: Cpu },
+    { id: 'console', label: 'Consolas', icon: Monitor },
+    { id: 'feature', label: 'Funciones Pro', icon: Zap },
+    { id: 'performance', label: 'Rendimiento', icon: Cpu },
+    { id: 'pack', label: 'Packs de Juegos', icon: ShoppingCart },
   ];
 
   const handleBuy = async (item: typeof STORE_ITEMS[0]) => {
+    if (item.id === 'feature_neural_engine') {
+      setIsBYOKOpen(true);
+      return;
+    }
+
     if (balance < item.price) {
       haptics.error();
       alert("¡No tienes suficientes RetroCoins!");
@@ -42,6 +52,16 @@ export default function Marketplace() {
       const success = await buyItem(item.id);
       if (success) {
         haptics.success();
+        AudioEngine.playSuccessSound();
+        
+        // Trigger achievements
+        if (item.category === 'console') {
+          achievements.unlock('console_unlocker');
+        } else if (item.category === 'pack') {
+          achievements.unlock('pack_collector');
+        } else {
+          achievements.unlock('collector');
+        }
       } else {
         haptics.error();
         alert("Error en la transacción.");
@@ -56,6 +76,12 @@ export default function Marketplace() {
 
   const handleEquip = (item: typeof STORE_ITEMS[0]) => {
     haptics.light();
+    
+    if (item.id === 'feature_neural_engine') {
+      setIsBYOKOpen(true);
+      return;
+    }
+
     // If already equipped, unequip it
     const isEquipped = getIsEquipped(item);
     if (isEquipped) {
@@ -66,13 +92,7 @@ export default function Marketplace() {
   };
 
   const getIsEquipped = (item: typeof STORE_ITEMS[0]) => {
-    switch (item.category) {
-      case 'theme': return equippedTheme === item.id;
-      case 'bezel': return equippedBezel === item.id;
-      case 'avatar': return equippedAvatar === item.id;
-      case 'voice': return equippedVoice === item.id;
-      default: return false;
-    }
+    return equipped[item.category] === item.id;
   };
 
   const handleSubscribe = async () => {
@@ -184,7 +204,7 @@ export default function Marketplace() {
               </div>
               <h2 className="text-3xl md:text-5xl font-bold mb-3 md:mb-4 leading-tight text-white">Retro Pass<br/><span className="text-emerald-400">Acceso Total</span></h2>
               <p className="text-zinc-300 text-sm md:text-base mb-6 md:mb-8 leading-relaxed">
-                Cloud Saves ilimitados, cero anuncios, servidores VIP sin lag y entrada gratuita a 2 torneos premium al mes. La experiencia definitiva.
+                Acceso instantáneo a todas las consolas, Cloud Sync ilimitado, servidores de baja latencia y resolución 4K desbloqueada. La experiencia definitiva para el Ronin profesional.
               </p>
               
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -202,14 +222,14 @@ export default function Marketplace() {
 
             {/* Benefits List */}
             <div className="w-full md:w-auto bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl p-6">
-              <h3 className="text-white font-bold mb-4 uppercase tracking-wider text-sm">Beneficios Exclusivos</h3>
+              <h3 className="text-white font-bold mb-4 uppercase tracking-wider text-sm">Ventajas del Retro Pass</h3>
               <ul className="space-y-3">
                 {[
-                  'Servidores Multiplayer VIP (Sin Lag)',
-                  'Cloud Saves Ilimitados',
-                  'Cero Anuncios',
-                  '2 Entradas a Torneos Premium/mes',
-                  'Insignia de Fundador'
+                  'Acceso a TODAS las Consolas Premium',
+                  'Sincronización en la Nube Ilimitada',
+                  'Motor 4K Ultra HD Desbloqueado',
+                  'Modo Latencia Zero Activado',
+                  'Servidores Multiplayer Prioritarios'
                 ].map((benefit, i) => (
                   <li key={i} className="flex items-center gap-3 text-zinc-300 text-sm">
                     <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
@@ -282,12 +302,12 @@ export default function Marketplace() {
                 >
                   {/* Item Image */}
                   <div className="relative aspect-square overflow-hidden bg-zinc-800">
-                    <DynamicCover 
-                      src={item.image} 
-                      alt={item.name} 
-                      title={item.name}
-                      system={item.category}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                    <GameCover 
+                      gameId={item.id}
+                      primaryUrl={item.image} 
+                      title={item.name} 
+                      systemId={item.category}
+                      className="w-full h-full transition-transform duration-500 group-hover:scale-110"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80" />
                     
@@ -357,39 +377,6 @@ export default function Marketplace() {
           </AnimatePresence>
         </motion.div>
 
-        {/* Mystery Box Section */}
-        <div className="mb-8 pt-8 border-t border-white/5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg md:text-xl font-bold flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-500" />
-              Cajas Sorpresa
-            </h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { id: 'box-1', name: 'Caja Básica', price: 100, color: 'from-zinc-800 to-zinc-900', border: 'border-zinc-700', icon: <Hexagon className="w-8 h-8 text-zinc-400" /> },
-              { id: 'box-2', name: 'Caja Rara', price: 500, color: 'from-blue-900/40 to-blue-950/50', border: 'border-blue-500/30', icon: <Star className="w-8 h-8 text-blue-400" /> },
-              { id: 'box-3', name: 'Caja Épica', price: 1500, color: 'from-purple-900/40 to-purple-950/50', border: 'border-purple-500/30', icon: <Crown className="w-8 h-8 text-purple-400" /> },
-            ].map((box) => (
-              <div key={box.id} className={`bg-gradient-to-br ${box.color} border ${box.border} rounded-2xl p-6 flex flex-col items-center justify-center text-center group cursor-pointer hover:scale-[1.02] transition-transform relative overflow-hidden`}>
-                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&q=80&w=400&h=400')] bg-cover opacity-5 group-hover:opacity-10 transition-opacity" />
-                <div className="relative z-10 mb-4 transform group-hover:-translate-y-2 transition-transform duration-300">
-                  {box.icon}
-                </div>
-                <h4 className="font-bold text-white mb-1 relative z-10">{box.name}</h4>
-                <p className="text-xs text-zinc-400 mb-4 relative z-10">Contiene 1 ítem aleatorio.</p>
-                <button 
-                  onClick={() => handleOpenBox(box as any)}
-                  className="px-6 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold transition-colors relative z-10 flex items-center gap-2"
-                >
-                  <Hexagon className="w-3 h-3 fill-emerald-400/20 text-emerald-400" />
-                  {box.price}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-
       </div>
 
       <UnboxingModal
@@ -398,6 +385,16 @@ export default function Marketplace() {
         boxType={selectedBox?.id as 'box-1' | 'box-2' | 'box-3' || 'box-1'}
         boxName={selectedBox?.name || ''}
         onReveal={handleReveal}
+      />
+
+      <BYOKModal 
+        isOpen={isBYOKOpen}
+        onClose={() => setIsBYOKOpen(false)}
+        onSuccess={() => {
+          // Grant the item automatically when they successfully configure the key
+          customization.grantItem('feature_neural_engine');
+          customization.equipItem('feature', 'feature_neural_engine');
+        }}
       />
     </div>
   );

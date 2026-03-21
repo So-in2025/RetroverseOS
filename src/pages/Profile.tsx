@@ -1,11 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Trophy, Activity, Target, TrendingUp, Clock, Map, Shield, Medal, Star, Zap, ChevronRight, Crown, Video, PlayCircle, Users, Coins } from 'lucide-react';
-import { aiCoach } from '../services/aiCoaching';
+import { Trophy, Activity, Target, TrendingUp, Clock, Map, Shield, Medal, Star, Zap, ChevronRight, Crown, Video, PlayCircle, Users, Coins, Monitor, Cpu, Cloud, ShoppingCart, Check, Bot } from 'lucide-react';
+import { aiCoachHistory, CoachAdvice } from '../services/aiCoachHistoryService';
+import { leaderboard, UserRank, LeaderboardEntry } from '../services/leaderboardService';
+import { friendService, Friend } from '../services/friendService';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { achievements, ACHIEVEMENTS } from '../services/achievements';
 import { economyService } from '../services/economyService';
 import { useAuth } from '../services/AuthContext';
+import { useCustomization } from '../hooks/useCustomization';
+import { STORE_ITEMS } from '../services/customization';
+import { gameCatalog } from '../services/gameCatalog';
 
 const iconMap: Record<string, any> = {
   Trophy,
@@ -19,22 +24,41 @@ const iconMap: Record<string, any> = {
 
 export default function Profile() {
   const { user } = useAuth();
-  const [coachInsights, setCoachInsights] = useState<any[]>([]);
+  const { ownedItems, equipped, isRetroPassActive } = useCustomization();
+  const [coachInsights, setCoachInsights] = useState<CoachAdvice[]>([]);
   const [unlockedIds, setUnlockedIds] = useState<string[]>([]);
   const [referralData, setReferralData] = useState({ code: '', invites: 0, claimedRewards: [] as string[] });
+  const [userRank, setUserRank] = useState<UserRank | null>(null);
+  const [topPlayers, setTopPlayers] = useState<LeaderboardEntry[]>([]);
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [streamerMode, setStreamerMode] = useState(false);
 
   useEffect(() => {
-    const history = aiCoach.getHistory();
-    if (history.length > 0) {
-      setCoachInsights(history.slice(0, 4));
-    } else {
-      setCoachInsights([
-        { id: 1, type: "STRENGTH", text: "Excellent map awareness in mid-game rotations." },
-        { id: 2, type: "WEAKNESS", text: "Tendency to over-extend without support in early rounds." },
-        { id: 3, type: "FOCUS", text: "Practice crosshair placement on vertical angles." },
-        { id: 4, type: "STRENGTH", text: "High APM during critical teamfight phases." }
-      ]);
-    }
+    const unsubscribeCoach = aiCoachHistory.subscribe(() => {
+      setCoachInsights(aiCoachHistory.getHistory().slice(0, 5));
+    });
+
+    const unsubscribeFriends = friendService.subscribe(() => {
+      setFriends(friendService.getFriends());
+    });
+
+    const loadInitialData = async () => {
+      await aiCoachHistory.init();
+      if (user) {
+        await aiCoachHistory.pullHistory(user.id);
+        const rank = await leaderboard.getUserRank(user.id);
+        setUserRank(rank);
+        await friendService.init(user.id);
+        
+        // Load streamer mode
+        const streamer = await economyService.getSetting('streamerSettings', user.id);
+        if (streamer) setStreamerMode(streamer.enabled);
+      }
+      const top = await leaderboard.getGlobalTop(5);
+      setTopPlayers(top);
+      setCoachInsights(aiCoachHistory.getHistory().slice(0, 5));
+    };
+    loadInitialData();
 
     const loadAchievements = async () => {
       const unlocked = ACHIEVEMENTS.filter(a => achievements.isUnlocked(a.id)).map(a => a.id);
@@ -47,6 +71,11 @@ export default function Profile() {
       setReferralData(data);
     };
     loadReferrals();
+
+    return () => {
+      unsubscribeCoach();
+      unsubscribeFriends();
+    };
   }, [user?.id]);
 
   const stats = {
@@ -112,13 +141,24 @@ export default function Profile() {
             {/* User Info */}
             <div className="flex-1 pb-2 text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
-                <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20 rounded flex items-center gap-1">
-                  <Crown className="w-3 h-3" /> Retro Pass Activo
-                </span>
-                <span className="text-zinc-500 text-xs font-mono">ID: 8X-2941</span>
+                {isRetroPassActive && (
+                  <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/20 rounded flex items-center gap-1">
+                    <Crown className="w-3 h-3" /> Retro Pass Activo
+                  </span>
+                )}
+                {streamerMode && (
+                  <span className="px-2 py-1 bg-magenta-accent/20 text-magenta-accent text-[10px] font-bold uppercase tracking-wider border border-magenta-accent/20 rounded flex items-center gap-1">
+                    <Video className="w-3 h-3" /> Modo Streamer
+                  </span>
+                )}
+                <span className="text-zinc-500 text-xs font-mono">ID: {user?.id.substring(0, 8).toUpperCase()}</span>
               </div>
               <div className="flex items-center justify-center md:justify-start gap-3 mb-1">
-                <h1 className="text-3xl md:text-5xl font-bold tracking-tight text-white drop-shadow-lg">NEXUS_ONE</h1>
+                <h1 className="text-3xl md:text-5xl font-black italic uppercase tracking-tighter text-white drop-shadow-lg">
+                  {streamerMode && (user?.user_metadata.full_name || 'OPERADOR').length > 10 
+                    ? (user?.user_metadata.full_name || 'OPERADOR').substring(0, 8) + '...' 
+                    : (user?.user_metadata.full_name || 'OPERADOR')}
+                </h1>
                 <div className="flex items-center gap-1 mt-2">
                   <div className="p-1.5 bg-blue-500/20 text-blue-400 rounded-md border border-blue-500/30 tooltip-trigger" title="Beta Tester">
                     <Shield className="w-4 h-4" />
@@ -169,8 +209,8 @@ export default function Profile() {
                   <Trophy className="w-8 h-8 text-emerald-400" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold font-mono text-white">{stats.rank}</div>
-                  <div className="text-emerald-400 font-mono text-sm">{stats.rating} MMR</div>
+                  <div className="text-2xl font-bold font-mono text-white">{userRank?.rank_name || 'RECLUTA'}</div>
+                  <div className="text-emerald-400 font-mono text-sm">{userRank?.score || 0} MMR</div>
                 </div>
               </div>
             </div>
@@ -320,6 +360,114 @@ export default function Profile() {
           </div>
         </motion.div>
 
+        {/* My Collection Section */}
+        <motion.section
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.26 }}
+          className="bg-zinc-900/50 backdrop-blur-md border border-white/5 rounded-2xl p-6 md:p-8"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold flex items-center gap-2">
+              <ShoppingCart className="w-5 h-5 text-emerald-500" />
+              Mi Colección
+            </h3>
+            <span className="text-xs text-zinc-500 font-mono">{ownedItems.length} Ítems Desbloqueados</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Consoles */}
+            <div className="space-y-3">
+              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                <Monitor className="w-3 h-3" /> Sistemas
+              </h4>
+              <div className="space-y-2">
+                {STORE_ITEMS.filter(i => i.category === 'console' && ownedItems.includes(i.id)).map(item => (
+                  <div key={item.id} className="flex items-center gap-3 p-3 bg-black/40 border border-white/5 rounded-xl">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                      <Monitor className="w-4 h-4 text-emerald-400" />
+                    </div>
+                    <span className="text-sm font-medium text-zinc-200">{item.name}</span>
+                  </div>
+                ))}
+                {STORE_ITEMS.filter(i => i.category === 'console' && ownedItems.includes(i.id)).length === 0 && (
+                  <p className="text-xs text-zinc-600 italic">No hay sistemas desbloqueados.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Features */}
+            <div className="space-y-3">
+              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                <Zap className="w-3 h-3" /> Funciones Pro
+              </h4>
+              <div className="space-y-2">
+                {STORE_ITEMS.filter(i => i.category === 'feature' && ownedItems.includes(i.id)).map(item => (
+                  <div key={item.id} className="flex items-center gap-3 p-3 bg-black/40 border border-white/5 rounded-xl">
+                    <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                      <Zap className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-zinc-200">{item.name}</p>
+                      {equipped.feature === item.id && (
+                        <span className="text-[8px] font-bold text-emerald-400 uppercase tracking-tighter">Activo</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {STORE_ITEMS.filter(i => i.category === 'feature' && ownedItems.includes(i.id)).length === 0 && (
+                  <p className="text-xs text-zinc-600 italic">No hay funciones activas.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Performance */}
+            <div className="space-y-3">
+              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                <Cpu className="w-3 h-3" /> Rendimiento
+              </h4>
+              <div className="space-y-2">
+                {STORE_ITEMS.filter(i => i.category === 'performance' && ownedItems.includes(i.id)).map(item => (
+                  <div key={item.id} className="flex items-center gap-3 p-3 bg-black/40 border border-white/5 rounded-xl">
+                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                      <Cpu className="w-4 h-4 text-purple-400" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-zinc-200">{item.name}</p>
+                      {equipped.performance === item.id && (
+                        <span className="text-[8px] font-bold text-emerald-400 uppercase tracking-tighter">Activo</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {STORE_ITEMS.filter(i => i.category === 'performance' && ownedItems.includes(i.id)).length === 0 && (
+                  <p className="text-xs text-zinc-600 italic">Sin mejoras de rendimiento.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Game Packs */}
+            <div className="space-y-3">
+              <h4 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                <ShoppingCart className="w-3 h-3" /> Packs
+              </h4>
+              <div className="space-y-2">
+                {STORE_ITEMS.filter(i => i.category === 'pack' && ownedItems.includes(i.id)).map(item => (
+                  <div key={item.id} className="flex items-center gap-3 p-3 bg-black/40 border border-white/5 rounded-xl">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                      <ShoppingCart className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <span className="text-sm font-medium text-zinc-200">{item.name}</span>
+                  </div>
+                ))}
+                {STORE_ITEMS.filter(i => i.category === 'pack' && ownedItems.includes(i.id)).length === 0 && (
+                  <p className="text-xs text-zinc-600 italic">No hay packs de juegos.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </motion.section>
+
         {/* Bottom Grid: Trophies, Matches, AI Coach */}
         <div className="flex flex-col lg:grid lg:grid-cols-3 gap-6 md:gap-8">
           
@@ -405,23 +553,40 @@ export default function Profile() {
               className="bg-zinc-900/50 backdrop-blur-md border border-white/5 rounded-2xl p-5 md:p-6"
             >
               <h3 className="text-emerald-400 font-bold mb-4 md:mb-6 flex items-center gap-2 text-sm md:text-base">
-                <Activity className="w-4 h-4 md:w-5 md:h-5" />
-                Análisis Post-Partida IA
+                <Bot className="w-4 h-4 md:w-5 md:h-5" />
+                Historial de IA Táctica
               </h3>
               <div className="space-y-3">
-                {coachInsights.map((insight: any) => (
+                {coachInsights.length > 0 ? coachInsights.map((insight) => (
                   <div key={insight.id} className="p-3 md:p-4 bg-black/40 rounded-xl border border-white/5 hover:border-emerald-500/30 transition-colors group">
                     <div className="flex justify-between items-start mb-2">
-                      <span className={`text-[8px] md:text-[10px] font-bold px-1.5 md:px-2 py-0.5 md:py-1 rounded uppercase tracking-wider
-                        ${insight.type === 'STRENGTH' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 
-                          insight.type === 'WEAKNESS' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 
-                          'bg-blue-500/10 text-blue-400 border border-blue-500/20'}`}>
-                        {insight.type === 'STRENGTH' ? 'FORTALEZA' : insight.type === 'WEAKNESS' ? 'DEBILIDAD' : 'ENFOQUE'}
+                      <span className="text-[8px] md:text-[10px] font-bold px-1.5 md:px-2 py-0.5 md:py-1 rounded uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        {gameCatalog.getGame(insight.game_id)?.title || 'Juego Retro'}
+                      </span>
+                      <span className="text-[8px] text-zinc-500 font-mono">
+                        {new Date(insight.timestamp).toLocaleDateString()}
                       </span>
                     </div>
-                    <p className="text-xs md:text-sm text-zinc-300 leading-relaxed group-hover:text-white transition-colors">{insight.text}</p>
+                    <div className="flex gap-3">
+                      {insight.screenshot && (
+                        <img 
+                          src={`data:image/jpeg;base64,${insight.screenshot}`} 
+                          alt="Screenshot" 
+                          className="w-16 h-12 object-cover rounded border border-white/10"
+                          referrerPolicy="no-referrer"
+                        />
+                      )}
+                      <p className="text-xs md:text-sm text-zinc-300 leading-relaxed group-hover:text-white transition-colors flex-1">
+                        {insight.advice}
+                      </p>
+                    </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="text-center py-8">
+                    <Bot className="w-12 h-12 text-zinc-800 mx-auto mb-3" />
+                    <p className="text-xs text-zinc-600 italic">No hay consejos tácticos registrados aún.</p>
+                  </div>
+                )}
               </div>
             </motion.section>
             {/* Friend Activity */}
@@ -434,27 +599,40 @@ export default function Profile() {
               <div className="flex justify-between items-center mb-4 md:mb-6">
                 <h3 className="text-white font-bold flex items-center gap-2 text-sm md:text-base">
                   <Users className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
-                  Actividad de Amigos
+                  Amigos Conectados
                 </h3>
                 <button className="text-[10px] md:text-xs text-zinc-500 hover:text-white transition-colors">Ver Todos</button>
               </div>
               
               <div className="space-y-4">
-                {[
-                  { id: 1, user: 'RetroKing99', action: 'desbloqueó un logro en', game: 'Super Mario World', time: 'hace 5m', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=RetroKing99' },
-                  { id: 2, user: 'PixelQueen', action: 'compró el pack', game: 'JRPG Golden Era', time: 'hace 2h', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=PixelQueen' },
-                  { id: 3, user: 'ArcadeMaster', action: 'superó tu récord en', game: 'Street Fighter II', time: 'hace 5h', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=ArcadeMaster' }
-                ].map(activity => (
-                  <div key={activity.id} className="flex items-start gap-3 group cursor-pointer">
-                    <img src={activity.avatar} alt={activity.user} className="w-8 h-8 rounded-full bg-zinc-800" />
-                    <div>
-                      <p className="text-xs text-zinc-300 leading-tight">
-                        <span className="font-bold text-white group-hover:text-blue-400 transition-colors">{activity.user}</span> {activity.action} <span className="font-bold text-white">{activity.game}</span>
+                {friends.length > 0 ? friends.map(friend => (
+                  <div key={friend.user_id} className="flex items-start gap-3 group cursor-pointer">
+                    <div className="relative">
+                      <img 
+                        src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.username}`} 
+                        alt={friend.username} 
+                        className="w-8 h-8 rounded-full bg-zinc-800" 
+                      />
+                      <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-zinc-900 ${
+                        friend.status === 'online' ? 'bg-emerald-500' : 
+                        friend.status === 'playing' ? 'bg-blue-500' : 'bg-zinc-600'
+                      }`} />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-white font-bold group-hover:text-blue-400 transition-colors">
+                        {friend.username}
                       </p>
-                      <span className="text-[10px] text-zinc-500">{activity.time}</span>
+                      <span className="text-[10px] text-zinc-500 uppercase tracking-widest">
+                        {friend.status === 'playing' ? `Jugando: ${friend.current_game || 'Retro'}` : 
+                         friend.status === 'online' ? 'En Línea' : 'Desconectado'}
+                      </span>
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="text-center py-4 text-zinc-600 italic text-xs">
+                    No tienes amigos agregados aún.
+                  </div>
+                )}
               </div>
             </motion.section>
           </div>
@@ -525,6 +703,51 @@ export default function Profile() {
                     <div className="hidden md:block col-span-2 text-right text-zinc-500 text-xs font-medium">{match.time}</div>
                   </div>
                 ))}
+              </div>
+            </section>
+
+            {/* Global Leaderboard */}
+            <section className="bg-zinc-900/50 backdrop-blur-md border border-white/5 rounded-2xl p-5 md:p-6 mt-6 md:mt-8">
+              <div className="flex justify-between items-center mb-4 md:mb-6">
+                <h3 className="text-white font-bold flex items-center gap-2 text-sm md:text-base">
+                  <Crown className="w-4 h-4 md:w-5 md:h-5 text-yellow-500" />
+                  Ranking Global Ronin
+                </h3>
+              </div>
+              
+              <div className="space-y-2">
+                {topPlayers.map((player, index) => (
+                  <div 
+                    key={player.user_id} 
+                    className={`flex items-center gap-4 p-3 rounded-xl border transition-all ${
+                      player.user_id === user?.id 
+                        ? 'bg-emerald-500/10 border-emerald-500/30' 
+                        : 'bg-black/20 border-white/5 hover:border-white/10'
+                    }`}
+                  >
+                    <div className="w-8 h-8 flex items-center justify-center font-mono font-bold text-zinc-500">
+                      {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-white">{player.username}</span>
+                        {player.user_id === user?.id && (
+                          <span className="text-[8px] font-bold bg-emerald-500 text-black px-1.5 py-0.5 rounded uppercase">Tú</span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-zinc-500 font-mono uppercase">{player.rank_name}</span>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm font-bold font-mono text-emerald-400">{player.score}</div>
+                      <div className="text-[8px] text-zinc-500 font-bold uppercase tracking-widest">MMR</div>
+                    </div>
+                  </div>
+                ))}
+                {topPlayers.length === 0 && (
+                  <div className="text-center py-8 text-zinc-600 italic text-xs">
+                    No hay datos de ranking disponibles.
+                  </div>
+                )}
               </div>
             </section>
 

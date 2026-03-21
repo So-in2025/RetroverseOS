@@ -4,20 +4,29 @@ import { Play, Users, Zap, Trophy, Clock, Star, ArrowRight, Flame, Globe, Swords
 import React, { useEffect, useState } from 'react';
 import { storage } from '../services/storage';
 import { gameCatalog } from '../services/gameCatalog';
-import { DynamicCover } from '../components/library/DynamicCover';
+import { GameCover } from '../components/library/GameCover';
 import { AudioEngine } from '../services/audioEngine';
 import { haptics } from '../services/haptics';
 import GameSection from '../components/library/GameSection';
 import { GameObject } from '../services/metadataNormalization';
+import { recommendationService } from '../services/recommendationService';
+import { useAuth } from '../services/AuthContext';
+import { BYOKModal } from '../components/ai/BYOKModal';
 
 export default function Home() {
+  const { user } = useAuth();
   const [recentGames, setRecentGames] = useState<GameObject[]>([]);
   const [featuredGame, setFeaturedGame] = useState<GameObject | null>(null);
   const [popularGames, setPopularGames] = useState<GameObject[]>([]);
   const [newAdditions, setNewAdditions] = useState<GameObject[]>([]);
+  const [recommendedGames, setRecommendedGames] = useState<GameObject[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasBYOK, setHasBYOK] = useState(false);
+  const [showBYOKModal, setShowBYOKModal] = useState(false);
 
   useEffect(() => {
     const loadDashboard = async () => {
+      setIsLoading(true);
       await gameCatalog.init();
       const allGames = gameCatalog.getAllGames();
       
@@ -29,6 +38,13 @@ export default function Home() {
       }).filter(Boolean) as GameObject[];
       setRecentGames(recentWithData);
 
+      // AI Recommendations
+      const recommended = await recommendationService.getRecommendedGames(user?.id, 15);
+      setRecommendedGames(recommended);
+      
+      const apiKey = localStorage.getItem('retroos_gemini_key');
+      setHasBYOK(!!apiKey && apiKey.startsWith('AIza'));
+
       // Featured (Random or specific)
       if (allGames.length > 0) {
         // Pick a random featured game, preferably a verified one
@@ -36,16 +52,18 @@ export default function Home() {
         const pool = eliteGames.length > 0 ? eliteGames : allGames;
         setFeaturedGame(pool[Math.floor(Math.random() * pool.length)]);
         
-        // Popular: For now, just a random slice of elite games
-        const shuffled = [...allGames].sort(() => 0.5 - Math.random());
-        setPopularGames(shuffled.slice(0, 15));
+        // Popular: Use trending service
+        const trending = await recommendationService.getTrendingGames(15);
+        setPopularGames(trending);
         
         // New Additions: Sort by some criteria, or just another slice
+        const shuffled = [...allGames].sort(() => 0.5 - Math.random());
         setNewAdditions(shuffled.slice(15, 30));
       }
+      setIsLoading(false);
     };
     loadDashboard();
-  }, []);
+  }, [user?.id]);
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white selection:bg-cyan-electric/30 pb-20">
@@ -54,13 +72,12 @@ export default function Home() {
       {featuredGame && (
         <section className="relative h-[60vh] md:h-[70vh] w-full overflow-hidden">
           <div className="absolute inset-0 z-0">
-            <DynamicCover 
-              game_id={featuredGame.game_id}
-              src={featuredGame.cover_url || featuredGame.artwork_url} 
-              alt="Hero" 
+            <GameCover 
+              gameId={featuredGame.game_id}
+              primaryUrl={featuredGame.cover_url || featuredGame.artwork_url} 
               title={featuredGame.title}
-              system={featuredGame.system}
-              className="w-full h-full object-cover opacity-40 blur-sm scale-105" 
+              systemId={featuredGame.system_id}
+              className="w-full h-full opacity-40 blur-sm scale-105" 
             />
             <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/60 to-transparent" />
             <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/40 to-transparent" />
@@ -116,9 +133,36 @@ export default function Home() {
           {recentGames.length > 0 && (
             <GameSection title="Reanudar Rápido" games={recentGames} variant="live" />
           )}
+
+          {recommendedGames.length > 0 && (
+            <div className="relative">
+              <div className="absolute -left-4 top-0 bottom-0 w-1 bg-cyan-electric/50 rounded-full blur-sm" />
+              <GameSection 
+                title={
+                  <div className="flex items-center justify-between w-full pr-4">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-cyan-electric" />
+                      <span>Selecciones de la IA para ti</span>
+                    </div>
+                    {!hasBYOK && (
+                      <button 
+                        onClick={() => setShowBYOKModal(true)}
+                        className="text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-all flex items-center gap-2"
+                      >
+                        <Zap className="w-3 h-3" />
+                        Mejorar con BYOK
+                      </button>
+                    )}
+                  </div>
+                } 
+                games={recommendedGames} 
+                variant="elite" 
+              />
+            </div>
+          )}
           
           {popularGames.length > 0 && (
-            <GameSection title="Tendencias en la Red" games={popularGames} variant="elite" />
+            <GameSection title="Tendencias en la Red" games={popularGames} variant="default" />
           )}
 
           {newAdditions.length > 0 && (
@@ -175,6 +219,16 @@ export default function Home() {
         </section>
 
       </div>
+
+      <BYOKModal 
+        isOpen={showBYOKModal}
+        onClose={() => setShowBYOKModal(false)}
+        onSuccess={() => {
+          setHasBYOK(true);
+          // Reload recommendations
+          recommendationService.getRecommendedGames(user?.id, 15).then(setRecommendedGames);
+        }}
+      />
     </div>
   );
 }

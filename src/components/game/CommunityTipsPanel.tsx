@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, MessageSquare, ThumbsUp, ShieldAlert, Loader2, Send } from 'lucide-react';
+import { X, MessageSquare, ThumbsUp, ShieldAlert, Loader2, Send, Zap } from 'lucide-react';
 
 import ReactMarkdown from 'react-markdown';
+import { BYOKModal } from '../ai/BYOKModal';
 
 interface Tip {
   id: string;
@@ -26,12 +27,16 @@ export default function CommunityTipsPanel({ isOpen, onClose, gameId }: Communit
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [newTip, setNewTip] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showBYOKModal, setShowBYOKModal] = useState(false);
+  const [hasBYOK, setHasBYOK] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       fetchTips();
       fetchCheats();
       checkAiCache();
+      const apiKey = localStorage.getItem('retroos_gemini_key');
+      setHasBYOK(!!apiKey && apiKey.startsWith('AIza'));
     }
   }, [isOpen, gameId]);
 
@@ -48,10 +53,13 @@ export default function CommunityTipsPanel({ isOpen, onClose, gameId }: Communit
   const requestAiGuide = async () => {
     setIsAiLoading(true);
     try {
-      // In a real app, we would pass the game title here. For now, we'll use gameId.
-      // We can import aiCoach and use it directly since it handles the fetch/cache logic.
       const { aiCoach } = await import('../../services/aiCoaching');
       const guide = await aiCoach.getGameTips(gameId, gameId.replace(/([A-Z])/g, ' $1').trim());
+      
+      if (guide === "El Coach Neural requiere que configures tu propia API Key (BYOK) en el Marketplace.") {
+        setShowBYOKModal(true);
+      }
+      
       setAiGuide(guide);
     } catch (e) {
       console.error(e);
@@ -221,6 +229,15 @@ export default function CommunityTipsPanel({ isOpen, onClose, gameId }: Communit
                 {aiGuide ? (
                   <div className="prose prose-invert prose-sm prose-emerald max-w-none bg-white/5 border border-white/10 rounded-xl p-4">
                     <ReactMarkdown>{aiGuide}</ReactMarkdown>
+                    {aiGuide.includes('BYOK') && (
+                      <button 
+                        onClick={() => setShowBYOKModal(true)}
+                        className="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs uppercase tracking-widest transition-all w-full flex items-center justify-center gap-2"
+                      >
+                        <Zap className="w-4 h-4" />
+                        Configurar BYOK
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-12 flex flex-col items-center">
@@ -263,6 +280,15 @@ export default function CommunityTipsPanel({ isOpen, onClose, gameId }: Communit
           )}
         </motion.div>
       )}
+      
+      <BYOKModal 
+        isOpen={showBYOKModal}
+        onClose={() => setShowBYOKModal(false)}
+        onSuccess={() => {
+          setHasBYOK(true);
+          requestAiGuide(); // Retry automatically
+        }}
+      />
     </AnimatePresence>
   );
 }

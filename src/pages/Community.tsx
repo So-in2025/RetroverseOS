@@ -7,6 +7,7 @@ import { haptics } from '../services/haptics';
 import { communityService, FeedItem, Tournament, LeaderboardEntry, AgentLog } from '../services/communityService';
 import { useAuthStore } from '../store/authStore';
 import TournamentBracket from '../components/community/TournamentBracket';
+import { BYOKModal } from '../components/ai/BYOKModal';
 
 import { useGameStore } from '../store/gameStore';
 
@@ -19,6 +20,7 @@ export default function Community() {
   const [isGeneratingTournament, setIsGeneratingTournament] = useState(false);
   const [showGeneratedTournament, setShowGeneratedTournament] = useState(false);
   const [generatedTournament, setGeneratedTournament] = useState<Tournament | null>(null);
+  const [showBYOKModal, setShowBYOKModal] = useState(false);
   
   const [feed, setFeed] = useState<FeedItem[]>([]);
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
@@ -95,8 +97,11 @@ export default function Community() {
       setTournaments(updatedTournaments);
       setShowGeneratedTournament(true);
       haptics.success();
-    } catch (e) {
+    } catch (e: any) {
       console.error("AI Generation failed:", e);
+      if (e.message === 'NO_NODES_AVAILABLE' || e.message === 'BYOK_REQUIRED') {
+        setShowBYOKModal(true);
+      }
       haptics.error();
     } finally {
       setIsGeneratingTournament(false);
@@ -799,6 +804,14 @@ export default function Community() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <BYOKModal 
+        isOpen={showBYOKModal}
+        onClose={() => setShowBYOKModal(false)}
+        onSuccess={() => {
+          handleGenerateTournament();
+        }}
+      />
     </div>
   );
 }

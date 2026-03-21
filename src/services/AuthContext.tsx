@@ -56,8 +56,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const newUser = session?.user ?? null;
+      setUser(newUser);
       setLoading(false);
+
+      if (newUser) {
+        // Trigger profile sync on login
+        import('./profileSyncService').then(({ profileSync }) => {
+          profileSync.init().then(() => {
+            profileSync.pullProfile(newUser.id);
+          });
+        });
+      }
     });
 
     return () => {

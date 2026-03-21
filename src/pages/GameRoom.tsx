@@ -29,15 +29,17 @@ import TacticalOverlay from '../components/game/TacticalOverlay';
 import Store from '../components/game/Store';
 import { STORE_ITEMS, StoreItem } from '../constants/storeItems';
 import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI, Type } from "@google/genai";
+import { BYOKModal } from '../components/ai/BYOKModal';
 
 import { saveService } from '../services/saveService';
 import { useAuth } from '../services/AuthContext';
+import { useCustomization } from '../hooks/useCustomization';
 
 export default function GameRoom() {
   const { gameId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { ownedItems, isRetroPassActive } = useCustomization();
   const [players, setPlayers] = useState<string[]>([]);
   const [messages, setMessages] = useState<{user: string, text: string}[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -74,6 +76,7 @@ export default function GameRoom() {
   const [isTacticalLoading, setIsTacticalLoading] = useState(false);
   const [isTacticalVisible, setIsTacticalVisible] = useState(false);
   const [showQuotaModal, setShowQuotaModal] = useState(false);
+  const [showBYOKModal, setShowBYOKModal] = useState(false);
   const [quotaStatus, setQuotaStatus] = useState<{ used: number; limit: number; remaining: number } | null>(null);
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [isPremium, setIsPremium] = useState(false);
@@ -375,20 +378,26 @@ export default function GameRoom() {
 
     loadGame();
 
-    // Start Matchmaking instead of direct connect
-    multiplayer.joinMatchmaking(
-      gameId, 
-      userId.current, 
-      (roomId, opponentId, isHostValue) => {
-        console.log(`Match found! Room: ${roomId}, Opponent: ${opponentId}, Host: ${isHostValue}`);
-        setPlayers([opponentId]);
-        setMatchmakingStatus('Opponent found! Connecting...');
-        setIsHost(isHostValue);
-      },
-      (status) => {
-        setMatchmakingStatus(`Matchmaking: ${status}...`);
-      }
-    );
+    const hasMultiplayerAccess = isRetroPassActive || ownedItems.includes('feature_multiplayer');
+
+    // Start Matchmaking instead of direct connect - ONLY if user has license
+    if (hasMultiplayerAccess) {
+      multiplayer.joinMatchmaking(
+        gameId, 
+        userId.current, 
+        (roomId, opponentId, isHostValue) => {
+          console.log(`Match found! Room: ${roomId}, Opponent: ${opponentId}, Host: ${isHostValue}`);
+          setPlayers([opponentId]);
+          setMatchmakingStatus('Opponent found! Connecting...');
+          setIsHost(isHostValue);
+        },
+        (status) => {
+          setMatchmakingStatus(`Matchmaking: ${status}...`);
+        }
+      );
+    } else {
+      setMatchmakingStatus('Modo Multijugador Desactivado (Licencia Pro Requerida)');
+    }
 
     inputManager.start();
     const cleanupInput = inputManager.onInput((button: RetroButton, isPressed: boolean) => {
@@ -494,7 +503,7 @@ export default function GameRoom() {
 
       const base64Data = screenshot.split(',')[1];
       
-      const response = await neuralService.generateTacticalAdvice(base64Data);
+      const response = await neuralService.generateTacticalAdvice(base64Data, gameId);
       
       setTacticalAdvice(response.text);
       setIsTacticalVisible(true);
@@ -508,9 +517,13 @@ export default function GameRoom() {
       setTimeout(() => setIsTacticalVisible(false), 8000);
     } catch (error: any) {
       console.error('Tactical AI Error:', error);
-      setTacticalAdvice("ERROR DE ENLACE NEURONAL. INTERFERENCIA DETECTADA.");
-      setIsTacticalVisible(true);
-      setTimeout(() => setIsTacticalVisible(false), 5000);
+      if (error.message === 'NO_NODES_AVAILABLE' || error.message === 'BYOK_REQUIRED') {
+        setShowBYOKModal(true);
+      } else {
+        setTacticalAdvice("ERROR DE ENLACE NEURONAL. INTERFERENCIA DETECTADA.");
+        setIsTacticalVisible(true);
+        setTimeout(() => setIsTacticalVisible(false), 5000);
+      }
     } finally {
       setIsTacticalLoading(false);
     }
@@ -651,8 +664,10 @@ export default function GameRoom() {
         <LoadingScreen 
           status={loadingStatus} 
           progress={loadingProgress} 
+          gameId={gameId}
           coverUrl={gameCatalog.getGame(gameId || '')?.cover_url}
           title={gameCatalog.getGame(gameId || '')?.title}
+          systemId={gameCatalog.getGame(gameId || '')?.system_id}
         />
       )}
 
@@ -1268,6 +1283,15 @@ export default function GameRoom() {
         activeFilter={activeFilter}
         activeSkin={activeSkin}
         onSelect={handleSelect}
+      />
+
+      <BYOKModal 
+        isOpen={showBYOKModal} 
+        onClose={() => setShowBYOKModal(false)}
+        onSuccess={() => {
+          setShowBYOKModal(false);
+          requestTacticalAdvice();
+        }}
       />
 
       {/* Quota Exceeded Modal */}

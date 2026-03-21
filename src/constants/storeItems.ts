@@ -3,11 +3,59 @@ export interface StoreItem {
   name: string;
   description: string;
   price: number;
-  category: 'filter' | 'skin' | 'effect';
+  category: 'filter' | 'skin' | 'effect' | 'console' | 'pack';
   value: string;
+  image?: string;
 }
 
 export const STORE_ITEMS: StoreItem[] = [
+  // Consolas (Desbloqueables)
+  {
+    id: 'console-psx',
+    name: 'PlayStation 1',
+    description: 'Desbloquea el acceso completo a la biblioteca de PSX.',
+    price: 5000,
+    category: 'console',
+    value: 'psx',
+    image: 'https://images.unsplash.com/photo-1592155934442-cd18014315b8?w=400&h=400&fit=crop'
+  },
+  {
+    id: 'console-n64',
+    name: 'Nintendo 64',
+    description: 'Desbloquea el acceso completo a la biblioteca de N64.',
+    price: 4500,
+    category: 'console',
+    value: 'n64',
+    image: 'https://images.unsplash.com/photo-1527176930608-09cb256ab504?w=400&h=400&fit=crop'
+  },
+  {
+    id: 'console-gba',
+    name: 'Game Boy Advance',
+    description: 'Desbloquea el acceso completo a la biblioteca de GBA.',
+    price: 3000,
+    category: 'console',
+    value: 'gba',
+    image: 'https://images.unsplash.com/photo-1531525645387-7f14be1bdbbd?w=400&h=400&fit=crop'
+  },
+  // Paquetes de Juegos
+  {
+    id: 'pack-elite-arcade',
+    name: 'Elite Arcade Pack',
+    description: 'Los 50 juegos arcade más jugados de la historia.',
+    price: 2000,
+    category: 'pack',
+    value: 'elite_arcade',
+    image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=400&h=400&fit=crop'
+  },
+  {
+    id: 'pack-rpg-legends',
+    name: 'RPG Legends Pack',
+    description: 'Una colección de los mejores RPGs de 16 y 32 bits.',
+    price: 3500,
+    category: 'pack',
+    value: 'rpg_legends',
+    image: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=400&fit=crop'
+  },
   // Filters
   {
     id: 'filter-classic',
@@ -33,14 +81,6 @@ export const STORE_ITEMS: StoreItem[] = [
     category: 'filter',
     value: 'vhs'
   },
-  {
-    id: 'filter-matrix',
-    name: 'Matrix Digital',
-    description: 'Todo es código. Tinte verde y lluvia digital.',
-    price: 1200,
-    category: 'filter',
-    value: 'matrix'
-  },
   // Skins
   {
     id: 'skin-default',
@@ -57,21 +97,5 @@ export const STORE_ITEMS: StoreItem[] = [
     price: 2500,
     category: 'skin',
     value: 'gold'
-  },
-  {
-    id: 'skin-carbon',
-    name: 'Fibra de Carbono',
-    description: 'Ligero, resistente y táctico.',
-    price: 1500,
-    category: 'skin',
-    value: 'carbon'
-  },
-  {
-    id: 'skin-translucent',
-    name: 'Púrpura Translúcido',
-    description: 'Nostalgia pura de los años 90.',
-    price: 2000,
-    category: 'skin',
-    value: 'translucent'
   }
 ];

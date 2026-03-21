@@ -96,6 +96,60 @@ export const ACHIEVEMENTS: Achievement[] = [
     reward: 500
   },
   {
+    id: 'console_unlocker',
+    title: 'Console Unlocker',
+    description: 'Unlock your first premium console.',
+    icon: 'Monitor',
+    category: 'economy',
+    rarity: 'silver',
+    reward: 300
+  },
+  {
+    id: 'pack_collector',
+    title: 'Pack Collector',
+    description: 'Purchase a game pack from the marketplace.',
+    icon: 'Package',
+    category: 'economy',
+    rarity: 'silver',
+    reward: 200
+  },
+  {
+    id: 'marathon_gamer',
+    title: 'Marathon Gamer',
+    description: 'Play for a total of 60 minutes.',
+    icon: 'Clock',
+    category: 'mastery',
+    rarity: 'gold',
+    reward: 500
+  },
+  {
+    id: 'retro_fanatic',
+    title: 'Retro Fanatic',
+    description: 'Play games from 5 different systems.',
+    icon: 'LayoutGrid',
+    category: 'exploration',
+    rarity: 'silver',
+    reward: 300
+  },
+  {
+    id: 'high_roller',
+    title: 'High Roller',
+    description: 'Spend a total of 10,000 RetroCoins.',
+    icon: 'Zap',
+    category: 'economy',
+    rarity: 'gold',
+    reward: 1000
+  },
+  {
+    id: 'completionist',
+    title: 'Completionist',
+    description: 'Have 50 games in your library.',
+    icon: 'Star',
+    category: 'mastery',
+    rarity: 'gold',
+    reward: 1000
+  },
+  {
     id: 'perfectionist',
     title: 'Platinum Trophy',
     description: 'Unlock all other achievements.',
@@ -152,6 +206,19 @@ export class AchievementService {
     this.unlockedIds.add(id);
     await storage.saveAchievement({ id, unlockedAt: new Date().toISOString() });
     
+    // Sync to cloud if enabled
+    import('./supabase').then(({ supabase }) => {
+      if (supabase) {
+        supabase.auth.getUser().then(({ data: { user } }) => {
+          if (user) {
+            import('./profileSyncService').then(({ profileSync }) => {
+              profileSync.syncProfile(user.id);
+            });
+          }
+        });
+      }
+    });
+
     // Grant Reward
     if (achievement.reward > 0) {
       await economy.addCoins(achievement.reward, `Achievement Unlocked: ${achievement.title}`);

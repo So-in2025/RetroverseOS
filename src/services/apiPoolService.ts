@@ -56,6 +56,13 @@ class APIPoolService {
   }
 
   async getNextKey(): Promise<string | null> {
+    // 1. Check for BYOK (Bring Your Own Key) first
+    const byokKey = localStorage.getItem('retroos_gemini_key');
+    if (byokKey && byokKey.startsWith('AIza')) {
+      return byokKey;
+    }
+
+    // 2. Fallback to pool
     await this.loadPool();
     this.checkResets();
 

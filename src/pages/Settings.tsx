@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Monitor, Volume2, Gamepad2, Cpu, Save, RotateCcw, Check, Keyboard, LogOut, Trash2, Zap, User, Coins, ShieldCheck, Activity, AlertTriangle, Globe, Fingerprint } from 'lucide-react';
+import { Monitor, Volume2, Gamepad2, Cpu, Save, RotateCcw, Check, Keyboard, LogOut, Trash2, Zap, User, Coins, ShieldCheck, Activity, AlertTriangle, Globe, Fingerprint, Video } from 'lucide-react';
 import { storage } from '../services/storage';
 import { useAuthStore } from '../store/authStore';
 import { useAuth } from '../services/AuthContext';
@@ -16,7 +16,7 @@ export default function Settings() {
   const { user } = useAuth();
   const logout = useAuthStore((state) => state.logout);
   const sentinelStats = useGameStore((state) => state.sentinelStats);
-  const [activeTab, setActiveTab] = useState<'video' | 'audio' | 'controls' | 'system' | 'sentinel' | 'storage' | 'network'>('video');
+  const [activeTab, setActiveTab] = useState<'video' | 'audio' | 'controls' | 'system' | 'sentinel' | 'storage' | 'network' | 'streamer'>('video');
   const [saved, setSaved] = useState(false);
   const [credits, setCredits] = useState(0);
   const [isForcingRepair, setIsForcingRepair] = useState(false);
@@ -68,12 +68,24 @@ export default function Settings() {
     anonymityLevel: 'high' as 'low' | 'medium' | 'high',
   });
 
+  const [language, setLanguage] = useState('es');
+
+  const [streamerSettings, setStreamerSettings] = useState({
+    enabled: false,
+    hidePrivateInfo: true,
+    audienceInteraction: true,
+    showOverlay: false,
+    twitchIntegration: false,
+  });
+
   const handleSave = async () => {
     try {
       await economyService.saveVideoSettings(user?.id, videoSettings);
       await economyService.saveAudioSettings(user?.id, audioSettings);
       await economyService.saveControls(user?.id, controls);
       await economyService.saveSetting('networkSettings', networkSettings, user?.id);
+      await economyService.saveSetting('language', language, user?.id);
+      await economyService.saveSetting('streamerSettings', streamerSettings, user?.id);
       inputManager.updateKeyMapping(controls);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -96,6 +108,12 @@ export default function Settings() {
 
       const savedNetwork = await economyService.getSetting('networkSettings', user?.id);
       if (savedNetwork) setNetworkSettings(prev => ({ ...prev, ...savedNetwork }));
+
+      const savedLanguage = await economyService.getSetting('language', user?.id);
+      if (savedLanguage) setLanguage(savedLanguage);
+
+      const savedStreamer = await economyService.getSetting('streamerSettings', user?.id);
+      if (savedStreamer) setStreamerSettings(prev => ({ ...prev, ...savedStreamer }));
 
       const currentCredits = await economyService.getCredits(user?.id);
       setCredits(currentCredits);
@@ -149,6 +167,7 @@ export default function Settings() {
     { id: 'system', label: 'Sistema y Emulación', icon: Cpu },
     { id: 'sentinel', label: 'Motor Sentinel', icon: ShieldCheck },
     { id: 'network', label: 'Red y Privacidad', icon: Globe },
+    { id: 'streamer', label: 'Modo Streamer', icon: Video },
     { id: 'storage', label: 'Gestión de Almacenamiento', icon: Save },
   ];
 
@@ -659,6 +678,31 @@ export default function Settings() {
                     </div>
 
                     <div className="p-5 bg-black/20 rounded-xl border border-white/5 lg:col-span-2">
+                      <h3 className="font-black text-xs uppercase tracking-widest text-white mb-2">Idioma del Sistema</h3>
+                      <p className="text-[10px] text-zinc-500 mb-4">Selecciona el idioma de la interfaz y de la IA.</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { id: 'es', label: 'Español' },
+                          { id: 'en', label: 'English' },
+                          { id: 'pt', label: 'Português' },
+                          { id: 'jp', label: '日本語' }
+                        ].map((lang) => (
+                          <button 
+                            key={lang.id}
+                            onClick={() => setLanguage(lang.id)}
+                            className={`py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
+                              language === lang.id 
+                                ? 'bg-emerald-600 text-white' 
+                                : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                            }`}
+                          >
+                            {lang.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="p-5 bg-black/20 rounded-xl border border-white/5 lg:col-span-2">
                       <h3 className="font-black text-xs uppercase tracking-widest text-white mb-2">Selección de Núcleo</h3>
                       <p className="text-[10px] text-zinc-500 mb-4">Elige el núcleo de emulación predeterminado para sistemas específicos.</p>
                       <div className="space-y-3">
@@ -734,6 +778,102 @@ export default function Settings() {
                       >
                         {isForcingRepair ? 'Ejecutando Protocolo...' : 'Ejecutar Reparación Global'}
                       </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* STREAMER SETTINGS */}
+              {activeTab === 'streamer' && (
+                <motion.div 
+                  key="streamer"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="space-y-8"
+                >
+                  <h2 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2 border-b border-white/5 pb-4">
+                    <Video className="w-5 h-5 md:w-6 md:h-6 text-magenta-accent" /> Modo Streamer (Beta)
+                  </h2>
+                  
+                  <div className="p-6 bg-magenta-accent/5 border border-magenta-accent/20 rounded-2xl mb-8">
+                    <div className="flex items-center gap-4 mb-4">
+                      <div className="w-12 h-12 rounded-full bg-magenta-accent/20 flex items-center justify-center">
+                        <Video className="w-6 h-6 text-magenta-accent" />
+                      </div>
+                      <div>
+                        <h3 className="font-black text-sm uppercase tracking-widest text-white">Optimizado para Creadores</h3>
+                        <p className="text-[10px] text-zinc-400 mt-1">Activa herramientas diseñadas para compartir tu gameplay en Twitch, YouTube y TikTok.</p>
+                      </div>
+                    </div>
+                    
+                    <button 
+                      onClick={() => setStreamerSettings({...streamerSettings, enabled: !streamerSettings.enabled})}
+                      className={`w-full py-4 rounded-xl font-black text-xs uppercase tracking-widest transition-all border-2 ${
+                        streamerSettings.enabled 
+                          ? 'bg-magenta-accent text-white border-magenta-accent shadow-lg shadow-magenta-900/50' 
+                          : 'bg-transparent text-magenta-accent border-magenta-accent/30 hover:bg-magenta-accent/10'
+                      }`}
+                    >
+                      {streamerSettings.enabled ? 'MODO STREAMER ACTIVO' : 'ACTIVAR MODO STREAMER'}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/5">
+                        <div className="pr-4">
+                          <p className="font-black text-xs uppercase tracking-widest text-white">Ocultar Info Privada</p>
+                          <p className="text-[10px] text-zinc-500 mt-1">Oculta emails y nombres reales en la interfaz</p>
+                        </div>
+                        <button 
+                          onClick={() => setStreamerSettings({...streamerSettings, hidePrivateInfo: !streamerSettings.hidePrivateInfo})}
+                          className={`w-10 h-5 md:w-12 md:h-6 rounded-full transition-colors relative shrink-0 ${streamerSettings.hidePrivateInfo ? 'bg-magenta-accent' : 'bg-zinc-700'}`}
+                        >
+                          <div className={`w-3 h-3 md:w-4 md:h-4 bg-white rounded-full absolute top-1 transition-transform ${streamerSettings.hidePrivateInfo ? 'left-6 md:left-7' : 'left-1'}`} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/5">
+                        <div className="pr-4">
+                          <p className="font-black text-xs uppercase tracking-widest text-white">Interacción de Audiencia</p>
+                          <p className="text-[10px] text-zinc-500 mt-1">Permitir que los espectadores envíen items o retos</p>
+                        </div>
+                        <button 
+                          onClick={() => setStreamerSettings({...streamerSettings, audienceInteraction: !streamerSettings.audienceInteraction})}
+                          className={`w-10 h-5 md:w-12 md:h-6 rounded-full transition-colors relative shrink-0 ${streamerSettings.audienceInteraction ? 'bg-magenta-accent' : 'bg-zinc-700'}`}
+                        >
+                          <div className={`w-3 h-3 md:w-4 md:h-4 bg-white rounded-full absolute top-1 transition-transform ${streamerSettings.audienceInteraction ? 'left-6 md:left-7' : 'left-1'}`} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/5">
+                        <div className="pr-4">
+                          <p className="font-black text-xs uppercase tracking-widest text-white">Overlay de Stream</p>
+                          <p className="text-[10px] text-zinc-500 mt-1">Mostrar estadísticas de juego en pantalla</p>
+                        </div>
+                        <button 
+                          onClick={() => setStreamerSettings({...streamerSettings, showOverlay: !streamerSettings.showOverlay})}
+                          className={`w-10 h-5 md:w-12 md:h-6 rounded-full transition-colors relative shrink-0 ${streamerSettings.showOverlay ? 'bg-magenta-accent' : 'bg-zinc-700'}`}
+                        >
+                          <div className={`w-3 h-3 md:w-4 md:h-4 bg-white rounded-full absolute top-1 transition-transform ${streamerSettings.showOverlay ? 'left-6 md:left-7' : 'left-1'}`} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/5">
+                        <div className="pr-4">
+                          <p className="font-black text-xs uppercase tracking-widest text-white">Integración con Twitch</p>
+                          <p className="text-[10px] text-zinc-500 mt-1">Conectar cuenta para chat interactivo</p>
+                        </div>
+                        <button 
+                          onClick={() => setStreamerSettings({...streamerSettings, twitchIntegration: !streamerSettings.twitchIntegration})}
+                          className={`w-10 h-5 md:w-12 md:h-6 rounded-full transition-colors relative shrink-0 ${streamerSettings.twitchIntegration ? 'bg-magenta-accent' : 'bg-zinc-700'}`}
+                        >
+                          <div className={`w-3 h-3 md:w-4 md:h-4 bg-white rounded-full absolute top-1 transition-transform ${streamerSettings.twitchIntegration ? 'left-6 md:left-7' : 'left-1'}`} />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
