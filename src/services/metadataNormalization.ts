@@ -67,56 +67,20 @@ const SYSTEM_MAPPINGS: Record<string, { system: string; core: string; extensions
 // Helper to map Archive.org identifiers/collections to our systems
 const COLLECTION_TO_SYSTEM: Record<string, string> = {
   'Atari - 2600': 'atari_2600',
-  'softwarelibrary_atari_2600': 'atari_2600',
-  'no-intro-atari-2600': 'atari_2600',
   'Atari - 7800': 'atari_7800',
-  'softwarelibrary_atari_7800': 'atari_7800',
-  'no-intro-atari-7800': 'atari_7800',
   'Atari - Lynx': 'lynx',
-  'softwarelibrary_atari_lynx': 'lynx',
-  'no-intro-atari-lynx': 'lynx',
   'Nintendo - Nintendo Entertainment System': 'nes',
-  'softwarelibrary_nes': 'nes',
-  'no-intro-nes': 'nes',
   'Nintendo - Super Nintendo Entertainment System': 'snes',
-  'softwarelibrary_snes': 'snes',
-  'no-intro-snes': 'snes',
   'Sega - Mega Drive - Genesis': 'sega_genesis',
-  'softwarelibrary_sega_genesis': 'sega_genesis',
-  'no-intro-genesis': 'sega_genesis',
   'Nintendo - Game Boy Advance': 'gba',
-  'softwarelibrary_gba': 'gba',
-  'no-intro-gba': 'gba',
-  'Nintendo - Game Boy Color': 'gbc',
-  'softwarelibrary_gbc': 'gbc',
-  'no-intro-gbc': 'gbc',
-  'Nintendo - Game Boy': 'gb',
-  'softwarelibrary_gb': 'gb',
-  'no-intro-gb': 'gb',
   'Sony - PlayStation': 'psx',
-  'softwarelibrary_psx': 'psx',
-  'redump-sony-playstation': 'psx',
   'Sony - PlayStation 2': 'ps2',
-  'softwarelibrary_ps2': 'ps2',
-  'redump-sony-playstation-2': 'ps2',
   'Nintendo - Nintendo 64': 'n64',
-  'softwarelibrary_n64': 'n64',
-  'no-intro-n64': 'n64',
   'Sega - Master System - Mark III': 'mastersystem',
-  'softwarelibrary_ms': 'mastersystem',
-  'no-intro-ms': 'mastersystem',
   'Sega - Game Gear': 'gamegear',
-  'softwarelibrary_gg': 'gamegear',
-  'no-intro-gg': 'gamegear',
   'NEC - PC Engine - TurboGrafx 16': 'pcengine',
-  'softwarelibrary_pce': 'pcengine',
-  'no-intro-pce': 'pcengine',
   'Bandai - WonderSwan': 'wonderswan',
-  'softwarelibrary_wonderswan': 'wonderswan',
-  'SNK - Neo Geo Pocket': 'ngp',
-  'softwarelibrary_neogeopocket': 'ngp',
-  'softwarelibrary_mame': 'mame',
-  'softwarelibrary_neogeo': 'neogeo'
+  'SNK - Neo Geo Pocket': 'ngp'
 };
 
 /**
@@ -255,20 +219,12 @@ export class MetadataNormalizationEngine {
 
   public static normalizeFast(doc: any): GameObject | null {
     const identifier = doc.identifier;
-    const collections = Array.isArray(doc.collection) ? doc.collection : [doc.collection];
+    const collection = Array.isArray(doc.collection) ? doc.collection[0] : doc.collection;
     
     let systemKey = '';
-    
-    // 1. Try mapping from collections
-    for (const col of collections) {
-      if (col && COLLECTION_TO_SYSTEM[col]) {
-        systemKey = COLLECTION_TO_SYSTEM[col];
-        break;
-      }
-    }
-
-    // 2. Try mapping from subjects/keywords if collection mapping failed
-    if (!systemKey) {
+    if (collection && COLLECTION_TO_SYSTEM[collection]) {
+      systemKey = COLLECTION_TO_SYSTEM[collection];
+    } else {
       const subjects = Array.isArray(doc.subject) ? doc.subject : [doc.subject || ''];
       for (const s of subjects) {
         const lowerS = s?.toLowerCase() || '';
@@ -291,17 +247,6 @@ export class MetadataNormalizationEngine {
         else if (lowerS.includes('neo geo pocket')) systemKey = 'ngp';
         if (systemKey) break;
       }
-    }
-
-    // 3. Try mapping from title/identifier as last resort
-    if (!systemKey) {
-      const lowerTitle = (doc.title || identifier).toLowerCase();
-      if (lowerTitle.includes('nes')) systemKey = 'nes';
-      else if (lowerTitle.includes('snes')) systemKey = 'snes';
-      else if (lowerTitle.includes('genesis')) systemKey = 'sega_genesis';
-      else if (lowerTitle.includes('gba')) systemKey = 'gba';
-      else if (lowerTitle.includes('n64')) systemKey = 'n64';
-      else if (lowerTitle.includes('psx') || lowerTitle.includes('playstation')) systemKey = 'psx';
     }
 
     if (!systemKey) systemKey = 'Unknown';

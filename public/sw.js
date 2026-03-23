@@ -1,4 +1,4 @@
-const CACHE_NAME = 'retroos-shell-v3';
+const CACHE_NAME = 'retroos-shell-v2';
 const ROM_CACHE = 'retroos-roms-v1';
 const IMAGE_CACHE = 'retroos-images-v1';
 
@@ -32,7 +32,6 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// COOP/COEP Header Injection for SharedArrayBuffer support
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
@@ -48,36 +47,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Default: Network first with Cache fallback for Shell + COOP/COEP Injection
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request).then((response) => {
-        const newHeaders = new Headers(response.headers);
-        newHeaders.set('Cross-Origin-Embedder-Policy', 'require-corp');
-        newHeaders.set('Cross-Origin-Opener-Policy', 'same-origin');
-
-        return new Response(response.body, {
-          status: response.status,
-          statusText: response.statusText,
-          headers: newHeaders,
-        });
-      }).catch(() => {
-        return caches.match('/index.html').then(response => {
-          if (!response) return null;
-          const newHeaders = new Headers(response.headers);
-          newHeaders.set('Cross-Origin-Embedder-Policy', 'require-corp');
-          newHeaders.set('Cross-Origin-Opener-Policy', 'same-origin');
-          return new Response(response.body, {
-            status: response.status,
-            statusText: response.statusText,
-            headers: newHeaders,
-          });
-        });
-      })
-    );
-    return;
-  }
-
+  // Default: Network first with Cache fallback for Shell
   event.respondWith(
     fetch(event.request).then((networkResponse) => {
       if (event.request.method === 'GET' && networkResponse && networkResponse.status === 200) {
@@ -90,6 +60,9 @@ self.addEventListener('fetch', (event) => {
     }).catch(() => {
       return caches.match(event.request).then((response) => {
         if (response) return response;
+        if (event.request.mode === 'navigate') {
+          return caches.match('/index.html');
+        }
       });
     })
   );

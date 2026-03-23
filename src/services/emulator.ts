@@ -33,7 +33,7 @@ export interface EmulatorConfig {
 }
 
 const BIOS_MAP: Record<string, { filename: string, url: string }[]> = {
-  'gba': [], // HLE BIOS is used by default in mgba/vba_next
+  'gba': [{ filename: 'gba_bios.bin', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/gba_bios.bin' }],
   'psx': [
     { filename: 'scph5501.bin', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/scph5501.bin' },
     { filename: 'scph5500.bin', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/scph5500.bin' },
@@ -55,7 +55,7 @@ const CORE_MAP: Record<string, string> = {
   'nes': 'fceumm',
   'snes': isMobileDevice() ? 'snes9x2010' : 'snes9x',
   'sega_genesis': 'genesis_plus_gx',
-  'gba': 'vba_next',
+  'gba': isMobileDevice() ? 'vba_next' : 'mgba',
   'gbc': 'gambatte',
   'gb': 'gambatte',
   'psx': 'pcsx_rearmed',
@@ -112,9 +112,12 @@ export class EmulatorService {
     try {
       console.log(`[Emulator] Initializing ${config.gameId} with core ${config.core}`);
       
-      // SharedArrayBuffer check (Service Worker handles COOP/COEP now)
-      if (typeof SharedArrayBuffer === 'undefined') {
-        console.warn('[Emulator] SharedArrayBuffer is not available. 3D cores may fail.');
+      // Check for SharedArrayBuffer (Required for 3D cores like N64/PSX)
+      if (typeof SharedArrayBuffer === 'undefined' || !window.crossOriginIsolated) {
+        console.warn('[Emulator] SharedArrayBuffer or Cross-Origin Isolation is not available. 3D cores may fail.');
+        if (config.system === 'n64' || config.system === 'psx') {
+          onProgress?.('Warning: Browser security might block 3D games. Try reloading...');
+        }
       }
 
       // Force stop any existing instance and wait for it

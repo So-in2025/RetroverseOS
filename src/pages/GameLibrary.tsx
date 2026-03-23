@@ -19,7 +19,12 @@ const SYSTEM_FILTERS = [
   { id: 'All', name: 'TODAS', systems: [] },
   { id: 'nes', name: 'NINTENDO (NES)', systems: ['nes'] },
   { id: 'snes', name: 'SUPER NINTENDO', systems: ['snes'] },
+  { id: 'n64', name: 'NINTENDO 64', systems: ['n64'] },
+  { id: 'gameboy', name: 'GAME BOY', systems: ['gb', 'gbc', 'gba'] },
   { id: 'sega', name: 'SEGA', systems: ['sega_genesis', 'mastersystem', 'gamegear'] },
+  { id: 'playstation', name: 'PLAYSTATION', systems: ['psx'] },
+  { id: 'atari', name: 'ATARI', systems: ['atari_2600', 'atari_7800', 'lynx'] },
+  { id: 'otras', name: 'OTRAS CONSOLAS', systems: ['pcengine', 'wonderswan', 'ngp'] },
 ];
 
 import { LobbyList } from '../components/library/LobbyList';
@@ -46,7 +51,6 @@ export default function GameLibrary() {
   const [liveGames, setLiveGames] = useState<{ gameId: string, userId: string, timestamp: number }[]>([]);
   const [cachedGameIds, setCachedGameIds] = useState<Set<string>>(new Set());
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
-  const [isLoading, setIsLoading] = useState(true);
 
   const deferredGames = React.useDeferredValue(games);
 
@@ -220,12 +224,9 @@ export default function GameLibrary() {
 
   useEffect(() => {
     const loadData = async () => {
-      setIsLoading(true);
       const c = await storage.getCredits();
       setCredits(c);
 
-      // Ensure catalog is initialized
-      await gameCatalog.init();
       const allGames = gameCatalog.getAllGames();
       setGames(allGames);
       setIsBgmPlaying(AudioEngine.getIsPlayingBGM());
@@ -233,7 +234,6 @@ export default function GameLibrary() {
       // Load cached ROMs metadata
       const cachedRoms = await storage.getAllCachedRomsMetadata();
       setCachedGameIds(new Set(cachedRoms.map(r => r.gameId)));
-      setIsLoading(false);
     };
     loadData();
 
@@ -550,12 +550,7 @@ export default function GameLibrary() {
         <div className="w-full flex-1 relative flex flex-col overflow-hidden min-h-0">
             
             <div className="w-full h-full relative min-h-0">
-              {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-4 text-cyan-electric">
-                  <Loader2 className="w-12 h-12 animate-spin" />
-                  <span className="text-xs font-mono uppercase tracking-[0.3em] animate-pulse">Sincronizando Base de Datos...</span>
-                </div>
-              ) : isSearching ? (
+              {isSearching ? (
                 <div className="flex items-center gap-4 text-cyan-electric animate-pulse">
                   <Loader2 className="w-8 h-8 animate-spin" />
                   <span className="font-black uppercase tracking-widest">Decrypting Data...</span>
