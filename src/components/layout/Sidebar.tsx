@@ -9,15 +9,12 @@ import {
   Search,
   Database,
   Trophy,
-  Coins,
-  MessageSquare,
-  Scale
+  Coins
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../services/AuthContext';
 import { useUIStore } from '../../store/uiStore';
 import { useEconomy } from '../../hooks/useEconomy';
-import SentinelWidget from '../SentinelWidget';
 
 import { haptics } from '../../services/haptics';
 
@@ -131,25 +128,6 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {/* Achievements Button */}
-      <div className="mb-6 w-full px-2">
-        <button 
-          onClick={() => {
-            haptics.medium();
-            useUIStore.getState().setAchievementsModal(true);
-          }}
-          className="group relative w-full flex justify-center p-3 rounded-xl transition-all duration-300 hover:bg-white/5 text-zinc-500 hover:text-yellow-400"
-        >
-          <Trophy className="w-5 h-5" />
-          <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-zinc-900 border border-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white">
-              LOGROS
-            </span>
-            <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900" />
-          </div>
-        </button>
-      </div>
-
       {/* Navigation Rail */}
       <nav className="flex-1 flex flex-col gap-6 w-full px-2">
         {navItems.map((item) => {
@@ -191,51 +169,10 @@ export default function Sidebar() {
             </Link>
           );
         })}
-
-        {/* Support / Feedback */}
-        <div className="w-full px-2">
-          <button 
-            onClick={() => {
-              haptics.medium();
-              // In a real app, this would open a support modal
-              alert('Sistema de Soporte: Envía tu feedback a support@retroverse.os');
-            }}
-            className="group relative w-full flex justify-center p-3 rounded-xl transition-all duration-300 hover:bg-white/5 text-zinc-500 hover:text-emerald-400"
-          >
-            <MessageSquare className="w-5 h-5" />
-            <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-zinc-900 border border-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white">
-                SOPORTE Y FEEDBACK
-              </span>
-              <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900" />
-            </div>
-          </button>
-        </div>
-
-        {/* Legal Disclaimer */}
-        <div className="w-full px-2">
-          <button 
-            onClick={() => {
-              haptics.medium();
-              alert('Retroverse OS es un reproductor multimedia. Los usuarios son responsables de sus propios archivos legales.');
-            }}
-            className="group relative w-full flex justify-center p-3 rounded-xl transition-all duration-300 hover:bg-white/5 text-zinc-500 hover:text-amber-400"
-          >
-            <Scale className="w-5 h-5" />
-            <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-zinc-900 border border-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-              <span className="text-[10px] font-black uppercase tracking-widest text-white">
-                ESTADO LEGAL (BYOR)
-              </span>
-              <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900" />
-            </div>
-          </button>
-        </div>
       </nav>
 
       {/* Logout */}
       <div className="mt-auto pb-4 flex flex-col items-center gap-4">
-        <SentinelWidget />
-        
         <button 
           onClick={() => signOut()}
           className="group relative p-3 text-zinc-600 hover:text-rose-500 transition-colors"
@@ -245,26 +182,6 @@ export default function Sidebar() {
             <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">
               SALIR
             </span>
-          </div>
-        </button>
-
-        {/* Hidden Debug Trigger - Made more accessible for the user */}
-        <button 
-          onClick={() => {
-            setDebugPanel(true);
-            haptics.success();
-          }}
-          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-rose-500/10 transition-all group relative"
-          title="Neural Debugger"
-        >
-          <div className="w-1.5 h-1.5 bg-rose-500/20 rounded-full group-hover:bg-rose-500/50 transition-colors shadow-[0_0_10px_rgba(244,63,94,0.1)] group-hover:shadow-[0_0_15px_rgba(244,63,94,0.3)]" />
-          
-          {/* Tooltip for Debugger */}
-          <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-rose-950/90 border border-rose-500/30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-            <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">
-              NEURAL DEBUGGER
-            </span>
-            <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-rose-950/90" />
           </div>
         </button>
       </div>

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pause, Play, MonitorPlay, Maximize, Minimize, Bot, Volume2, VolumeX, Share2, Video, X, ShoppingBag, Coins } from 'lucide-react';
+import { Pause, Play, MonitorPlay, Maximize, Minimize, Bot, Volume2, VolumeX, Share2, Video, X, Coins, Wifi, WifiOff } from 'lucide-react';
+import { NetplayStatus } from '../../services/multiplayer';
 
 interface GameMenuProps {
   gameState: 'loading' | 'waiting' | 'playing' | 'paused' | 'error';
@@ -7,7 +8,8 @@ interface GameMenuProps {
   isFullscreen: boolean;
   voiceEnabled: boolean;
   isRecordingClip: boolean;
-  balance: number;
+  netplayStatus?: NetplayStatus;
+  netplayLatency?: number;
   onExit: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -15,16 +17,22 @@ interface GameMenuProps {
   onToggleFullscreen: () => void;
   onToggleVoice: () => void;
   onRecordClip: () => void;
-  onOpenStore: () => void;
   onTacticalAdvice: () => void;
   onShare: () => void;
   onToggleUi: () => void;
 }
 
 export default function GameMenu({
-  gameState, crtEnabled, isFullscreen, voiceEnabled, isRecordingClip, balance,
-  onExit, onPause, onResume, onToggleCrt, onToggleFullscreen, onToggleVoice, onRecordClip, onOpenStore, onTacticalAdvice,  onShare, onToggleUi
+  gameState, crtEnabled, isFullscreen, voiceEnabled, isRecordingClip, netplayStatus, netplayLatency,
+  onExit, onPause, onResume, onToggleCrt, onToggleFullscreen, onToggleVoice, onRecordClip, onTacticalAdvice,  onShare, onToggleUi
 }: GameMenuProps) {
+  
+  const getLatencyColor = (ms: number) => {
+    if (ms < 50) return 'text-emerald-400';
+    if (ms < 100) return 'text-amber-400';
+    return 'text-rose-500';
+  };
+
   return (
     <div className="absolute top-0 left-0 right-0 p-4 md:p-6 flex justify-between items-start z-30 pointer-events-none">
       <div className="flex flex-col gap-2">
@@ -36,20 +44,24 @@ export default function GameMenu({
           <h2 className="font-black text-white text-xs md:text-sm italic uppercase tracking-tighter hidden md:block">
             Retroverse
           </h2>
+          
+          {/* Netplay Status Indicator */}
+          {netplayStatus && netplayStatus !== 'disconnected' && (
+            <>
+              <div className="w-px h-4 md:h-5 bg-white/10 hidden md:block"></div>
+              <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-lg border border-white/5">
+                {netplayStatus === 'connected' ? (
+                  <Wifi className={`w-3 h-3 md:w-4 md:h-4 ${getLatencyColor(netplayLatency || 0)}`} />
+                ) : (
+                  <WifiOff className="w-3 h-3 md:w-4 md:h-4 text-zinc-500 animate-pulse" />
+                )}
+                <span className="text-[10px] md:text-xs font-mono font-bold text-zinc-300">
+                  {netplayStatus === 'connected' ? `${netplayLatency}ms` : netplayStatus.toUpperCase()}
+                </span>
+              </div>
+            </>
+          )}
         </div>
-        
-        <div className="pointer-events-auto bg-amber-500/10 backdrop-blur-md border border-amber-500/20 px-3 py-1 rounded-xl flex items-center gap-2 w-fit">
-          <Coins className="w-3 h-3 text-amber-500" />
-          <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">{balance}</span>
-        </div>
-
-        <button 
-          onClick={onOpenStore}
-          className="pointer-events-auto mt-2 bg-indigo-500/20 hover:bg-indigo-500/40 backdrop-blur-md border border-indigo-500/30 px-4 py-2 rounded-xl flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-500/10"
-        >
-          <ShoppingBag className="w-4 h-4 text-indigo-400" />
-          <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Store</span>
-        </button>
         
         <button 
           onClick={onToggleUi}

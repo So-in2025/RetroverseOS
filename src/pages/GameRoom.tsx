@@ -1,20 +1,19 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import React from 'react';
-import { Share2, Users, MessageSquare, Send, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video, Bot, Cloud, Zap, Target, Shield, Cpu, ShoppingBag, Settings } from 'lucide-react';
+import { Share2, Users, MessageSquare, Send, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video, Bot, Cloud, Zap, Target, Shield, Cpu, Settings } from 'lucide-react';
 import { emulator } from '../services/emulator';
 import { multiplayer } from '../services/multiplayer';
 import { inputManager, RetroButton } from '../services/inputManager';
 import { gameCatalog } from '../services/gameCatalog';
 import { storage } from '../services/storage';
 import { achievements } from '../services/achievements';
+import { economyService } from '../services/economyService';
 import { economy } from '../services/economy';
-import { useEconomy } from '../hooks/useEconomy';
 import { AudioEngine } from '../services/audioEngine';
-import { MetadataNormalizationEngine } from '../services/metadataNormalization';
 import { haptics } from '../services/haptics';
 import { quotaService } from '../services/quotaService';
-import { apiPoolService } from '../services/apiPoolService';
+import { MetadataNormalizationEngine } from '../services/metadataNormalization';
 import { neuralService } from '../services/neuralService';
 import GameOverlay from '../components/game/GameOverlay';
 import LobbyView from '../components/game/LobbyView';
@@ -26,8 +25,6 @@ import GameMenu from '../components/game/GameMenu';
 import CommunityTipsPanel from '../components/game/CommunityTipsPanel';
 import QuickChatWheel from '../components/game/QuickChatWheel';
 import TacticalOverlay from '../components/game/TacticalOverlay';
-import Store from '../components/game/Store';
-import { STORE_ITEMS, StoreItem } from '../constants/storeItems';
 import { motion, AnimatePresence } from 'motion/react';
 import { BYOKModal } from '../components/ai/BYOKModal';
 import ChatPanel from '../components/game/ChatPanel';
@@ -36,6 +33,7 @@ import EmulatorSettingsPanel from '../components/game/EmulatorSettingsPanel';
 import { saveService } from '../services/saveService';
 import { useAuth } from '../services/AuthContext';
 import { useCustomization } from '../hooks/useCustomization';
+import { useEconomy } from '../hooks/useEconomy';
 
 export default function GameRoom() {
   const { gameId } = useParams();
@@ -54,6 +52,8 @@ export default function GameRoom() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loadingStatus, setLoadingStatus] = useState('Initializing Systems...');
   const [matchmakingStatus, setMatchmakingStatus] = useState<string | null>(null);
+  const [netplayStatus, setNetplayStatus] = useState<'disconnected' | 'searching' | 'connecting' | 'connected' | 'reconnecting' | 'error'>('disconnected');
+  const [netplayLatency, setNetplayLatency] = useState<number>(0);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -63,50 +63,74 @@ export default function GameRoom() {
   const [isTipsPanelOpen, setIsTipsPanelOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
-  const [crtEnabled, setCrtEnabled] = useState(true);
-  const [bilinearEnabled, setBilinearEnabled] = useState(false);
-  const [scanlinesEnabled, setScanlinesEnabled] = useState(true);
-  const [activeFilter, setActiveFilter] = useState('classic');
+  const [videoSettings, setVideoSettings] = useState({
+    crtFilter: true,
+    bilinearFiltering: false,
+    scanlines: 50,
+    vsync: true,
+    activeFilter: 'classic'
+  });
+  const [audioSettings, setAudioSettings] = useState({
+    masterVolume: 80,
+    musicVolume: 60,
+    sfxVolume: 100,
+    latencyMode: 'ultra-low',
+  });
+  const [controls, setControls] = useState({
+    up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight',
+    a: '2', b: '1', x: '5', y: '4', l: '6', r: '3', start: 'Enter', select: '+'
+  });
   const { balance } = useEconomy();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isRecordingClip, setIsRecordingClip] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
-      const crt = await storage.getSetting('crtEnabled');
-      const bilinear = await storage.getSetting('bilinearEnabled');
-      const scanlines = await storage.getSetting('scanlinesEnabled');
-      const filter = await storage.getSetting('activeFilter');
+      const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const savedVideo = await economyService.getVideoSettings(user?.id);
+      if (savedVideo) {
+        setVideoSettings(prev => ({ 
+          ...prev, 
+          ...savedVideo,
+          crtFilter: savedVideo.crtFilter && !isTouch
+        }));
+      }
       
-      if (crt !== null) setCrtEnabled(crt);
-      if (bilinear !== null) setBilinearEnabled(bilinear);
-      if (scanlines !== null) setScanlinesEnabled(scanlines);
-      if (filter !== null) setActiveFilter(filter);
+      const savedAudio = await economyService.getAudioSettings(user?.id);
+      if (savedAudio) {
+        setAudioSettings(prev => ({ ...prev, ...savedAudio }));
+      }
+      
+      const savedControls = await economyService.getControls(user?.id);
+      if (savedControls) {
+        setControls(prev => ({ ...prev, ...savedControls }));
+      }
     };
     loadSettings();
-  }, []);
+  }, [user?.id]);
 
+  // Auto-save video settings when they change
   useEffect(() => {
-    storage.saveSetting('crtEnabled', crtEnabled);
-  }, [crtEnabled]);
+    if (mountedRef.current) {
+      economyService.saveVideoSettings(user?.id, videoSettings);
+    }
+  }, [videoSettings, user?.id]);
 
-  useEffect(() => {
-    storage.saveSetting('bilinearEnabled', bilinearEnabled);
-  }, [bilinearEnabled]);
-
-  useEffect(() => {
-    storage.saveSetting('scanlinesEnabled', scanlinesEnabled);
-  }, [scanlinesEnabled]);
-
-  useEffect(() => {
-    storage.saveSetting('activeFilter', activeFilter);
-  }, [activeFilter]);
   const [showClipModal, setShowClipModal] = useState(false);
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [showHypeNotification, setShowHypeNotification] = useState(false);
   const [isHost, setIsHost] = useState(true);
   const [showCloudSaveToast, setShowCloudSaveToast] = useState(false);
   const [isOpponentDisconnected, setIsOpponentDisconnected] = useState(false);
+
+  useEffect(() => {
+    if (netplayStatus === 'reconnecting') {
+      setIsOpponentDisconnected(true);
+    } else if (netplayStatus === 'connected') {
+      setIsOpponentDisconnected(false);
+    }
+  }, [netplayStatus]);
+
   const [tacticalAdvice, setTacticalAdvice] = useState('');
   const [isTacticalLoading, setIsTacticalLoading] = useState(false);
   const [isTacticalVisible, setIsTacticalVisible] = useState(false);
@@ -118,11 +142,8 @@ export default function GameRoom() {
   const [timeLeft, setTimeLeft] = useState<string>('');
   const [isPremium, setIsPremium] = useState(false);
   
-  // Store State
+  // UI State
   const [isUiVisible, setIsUiVisible] = useState(true);
-  const [isStoreOpen, setIsStoreOpen] = useState(false);
-  const [purchasedItems, setPurchasedItems] = useState<string[]>(['filter-classic', 'skin-default']);
-  const [activeSkin, setActiveSkin] = useState('default');
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -166,32 +187,6 @@ export default function GameRoom() {
     const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     setIsTouchDevice(isTouch);
     
-    // Load video settings
-    const loadVideoSettings = async () => {
-      const settings = await storage.getSetting('videoSettings');
-      if (settings) {
-        setCrtEnabled(settings.crtFilter && !isTouch);
-        setBilinearEnabled(settings.bilinearFiltering);
-      } else {
-        // Default to smooth/high quality
-        setCrtEnabled(false);
-        setBilinearEnabled(true);
-      }
-    };
-    loadVideoSettings();
-
-    // Load store settings
-    const loadStoreSettings = async () => {
-      const purchased = await storage.getSetting('purchased_items');
-      const filter = await storage.getSetting('active_filter');
-      const skin = await storage.getSetting('active_skin');
-      
-      if (purchased) setPurchasedItems(purchased);
-      if (filter) setActiveFilter(filter);
-      if (skin) setActiveSkin(skin);
-    };
-    loadStoreSettings();
-
     // Load initial quota status
     const updateQuota = async () => {
       const premium = achievements.isUnlocked('arcade_master');
@@ -245,31 +240,6 @@ export default function GameRoom() {
     }
     return () => clearInterval(interval);
   }, [gameState]);
-
-  const handlePurchase = async (item: StoreItem) => {
-    const newPurchased = [...purchasedItems, item.id];
-    setPurchasedItems(newPurchased);
-    await storage.saveSetting('purchased_items', newPurchased);
-    
-    // Auto-equip if it's the first of its kind or just for UX
-    handleSelect(item);
-    
-    haptics.success();
-    AudioEngine.playSelectSound();
-  };
-
-  const handleSelect = async (item: StoreItem) => {
-    if (item.category === 'filter') {
-      setActiveFilter(item.value);
-      await storage.saveSetting('active_filter', item.value);
-    } else if (item.category === 'skin') {
-      setActiveSkin(item.value as any);
-      await storage.saveSetting('active_skin', item.value);
-    }
-    
-    haptics.light();
-    AudioEngine.playSelectSound();
-  };
 
   const initializedRef = useRef(false);
 
@@ -430,6 +400,9 @@ export default function GameRoom() {
 
     // Start Matchmaking instead of direct connect - ONLY if user has license
     if (hasMultiplayerAccess) {
+      multiplayer.onStatusChange(setNetplayStatus);
+      multiplayer.onLatencyUpdate(setNetplayLatency);
+
       multiplayer.joinMatchmaking(
         gameId, 
         userId.current, 
@@ -438,9 +411,6 @@ export default function GameRoom() {
           setPlayers([opponentId]);
           setMatchmakingStatus('Opponent found! Connecting...');
           setIsHost(isHostValue);
-        },
-        (status) => {
-          setMatchmakingStatus(`Matchmaking: ${status}...`);
         }
       );
     } else {
@@ -467,12 +437,6 @@ export default function GameRoom() {
       if (msg.user === userId.current) return;
       const displayUser = `Player ${msg.user.slice(-4)}`;
       setMessages(prev => [...prev, { user: displayUser, text: msg.text }]);
-    });
-
-    multiplayer.onDisconnect(() => {
-      console.log('Opponent disconnected');
-      setIsOpponentDisconnected(true);
-      setTimeout(() => setIsOpponentDisconnected(false), 5000);
     });
 
     const handleFullscreenChange = () => {
@@ -761,39 +725,58 @@ export default function GameRoom() {
       {/* Full Surface Canvas */}
       <div 
         className={`absolute inset-0 flex items-center justify-center transition-all duration-500 
-          ${crtEnabled && !isTouchDevice ? 'scale-105' : 'scale-100'} 
+          ${videoSettings.crtFilter && !isTouchDevice ? 'scale-105' : 'scale-100'} 
           ${(gameState === 'playing' || gameState === 'paused') ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
       >
         <canvas 
           ref={canvasRef} 
           width={800} 
           height={600} 
-          className={`w-full h-full object-contain max-w-[100vw] max-h-[100dvh] ${crtEnabled ? 'contrast-125 saturate-150 brightness-110' : ''}`}
+          className={`w-full h-full object-contain max-w-[100vw] max-h-[100dvh] ${videoSettings.crtFilter ? 'contrast-125 saturate-150 brightness-110' : ''}`}
           style={{ 
-            imageRendering: (crtEnabled || bilinearEnabled) ? 'auto' : 'pixelated',
-            filter: crtEnabled ? 'blur(0.5px)' : 'none'
+            imageRendering: (videoSettings.crtFilter || videoSettings.bilinearFiltering) ? 'auto' : 'pixelated',
+            filter: videoSettings.crtFilter ? 'blur(0.5px)' : 'none'
           }}
         />
-        <CRTFilter enabled={crtEnabled} style={activeFilter as any} scanlines={scanlinesEnabled} />
+        <CRTFilter enabled={videoSettings.crtFilter} style={videoSettings.activeFilter as any} scanlines={videoSettings.scanlines > 0} />
       </div>
+
+      <AnimatePresence>
+        {isOpponentDisconnected && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="absolute top-20 left-1/2 -translate-x-1/2 z-50 pointer-events-none"
+          >
+            <div className="bg-rose-500/90 backdrop-blur-md text-white px-6 py-3 rounded-2xl shadow-2xl border border-rose-400/50 flex items-center gap-3">
+              <AlertTriangle className="w-6 h-6 animate-pulse" />
+              <div>
+                <h3 className="font-black uppercase tracking-widest text-sm">Conexión Perdida</h3>
+                <p className="text-xs font-medium text-rose-100">Esperando reconexión del oponente...</p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Game Menu */}
       {isUiVisible && (
         <GameMenu
           gameState={gameState}
-          crtEnabled={crtEnabled}
+          crtEnabled={videoSettings.crtFilter}
           isFullscreen={isFullscreen}
           voiceEnabled={voiceEnabled}
           isRecordingClip={isRecordingClip}
-          balance={balance}
+          netplayStatus={netplayStatus}
+          netplayLatency={netplayLatency}
           onExit={handleExit}
           onPause={handlePause}
           onResume={handleResume}
-          onToggleCrt={() => setCrtEnabled(!crtEnabled)}
+          onToggleCrt={() => setVideoSettings(prev => ({ ...prev, crtFilter: !prev.crtFilter }))}
           onToggleFullscreen={toggleFullscreen}
           onToggleVoice={handleToggleVoice}
           onRecordClip={handleRecordClip}
-          onOpenStore={() => setIsStoreOpen(true)}
           onTacticalAdvice={requestTacticalAdvice}
           onShare={handleInvite}
           onToggleUi={() => setIsUiVisible(false)}
@@ -910,12 +893,12 @@ export default function GameRoom() {
                         <span className="font-bold uppercase text-sm">Filtro CRT</span>
                       </div>
                       <button 
-                        onClick={() => setCrtEnabled(!crtEnabled)}
+                        onClick={() => setVideoSettings(prev => ({ ...prev, crtFilter: !prev.crtFilter }))}
                         className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                          crtEnabled ? 'bg-cyan-electric text-black' : 'bg-white/10 text-zinc-500'
+                          videoSettings.crtFilter ? 'bg-cyan-electric text-black' : 'bg-white/10 text-zinc-500'
                         }`}
                       >
-                        {crtEnabled ? 'ON' : 'OFF'}
+                        {videoSettings.crtFilter ? 'ON' : 'OFF'}
                       </button>
                     </div>
 
@@ -1067,7 +1050,6 @@ export default function GameRoom() {
       {isUiVisible && (
       <VirtualController 
         isVisible={isTouchDevice && gameState === 'playing'} 
-        skin={activeSkin as any}
       />
       )}
 
@@ -1149,14 +1131,8 @@ export default function GameRoom() {
       <EmulatorSettingsPanel
         isOpen={showSettingsPanel}
         onClose={() => setShowSettingsPanel(false)}
-        crtEnabled={crtEnabled}
-        onToggleCrt={setCrtEnabled}
-        activeFilter={activeFilter}
-        onChangeFilter={setActiveFilter}
-        bilinearEnabled={bilinearEnabled}
-        onToggleBilinear={setBilinearEnabled}
-        scanlinesEnabled={scanlinesEnabled}
-        onToggleScanlines={setScanlinesEnabled}
+        videoSettings={videoSettings}
+        onUpdateVideo={setVideoSettings}
       />
       )}
 
@@ -1376,18 +1352,6 @@ export default function GameRoom() {
           </motion.div>
         )}
       </AnimatePresence>
-      )}
-
-      {isUiVisible && (
-      <Store 
-        isOpen={isStoreOpen}
-        onClose={() => setIsStoreOpen(false)}
-        purchasedItems={purchasedItems}
-        onPurchase={handlePurchase}
-        activeFilter={activeFilter}
-        activeSkin={activeSkin}
-        onSelect={handleSelect}
-      />
       )}
 
       {isUiVisible && (

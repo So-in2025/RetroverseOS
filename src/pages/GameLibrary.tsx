@@ -19,12 +19,7 @@ const SYSTEM_FILTERS = [
   { id: 'All', name: 'TODAS', systems: [] },
   { id: 'nes', name: 'NINTENDO (NES)', systems: ['nes'] },
   { id: 'snes', name: 'SUPER NINTENDO', systems: ['snes'] },
-  { id: 'n64', name: 'NINTENDO 64', systems: ['n64'] },
-  { id: 'gameboy', name: 'GAME BOY', systems: ['gb', 'gbc', 'gba'] },
   { id: 'sega', name: 'SEGA', systems: ['sega_genesis', 'mastersystem', 'gamegear'] },
-  { id: 'playstation', name: 'PLAYSTATION', systems: ['psx'] },
-  { id: 'atari', name: 'ATARI', systems: ['atari_2600', 'atari_7800', 'lynx'] },
-  { id: 'otras', name: 'OTRAS CONSOLAS', systems: ['pcengine', 'wonderswan', 'ngp'] },
 ];
 
 import { LobbyList } from '../components/library/LobbyList';

@@ -35,6 +35,10 @@ export default function Settings() {
     aspectRatio: '4:3',
     resolution: '1080p',
     vsync: true,
+    activeFilter: 'none',
+    brightness: 100,
+    contrast: 100,
+    saturation: 100
   });
 
   const [audioSettings, setAudioSettings] = useState({
@@ -443,6 +447,30 @@ export default function Settings() {
                               }`}
                             >
                               {ratio}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-black/20 rounded-xl border border-white/5">
+                        <p className="font-black text-xs uppercase tracking-widest text-white mb-3">Estilo Visual (CRT)</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { id: 'classic', label: 'Clásico' },
+                            { id: 'cyberpunk', label: 'Cyberpunk' },
+                            { id: 'vhs', label: 'VHS Glitch' },
+                            { id: 'matrix', label: 'Matrix' }
+                          ].map((filter) => (
+                            <button 
+                              key={filter.id}
+                              onClick={() => setVideoSettings({...videoSettings, activeFilter: filter.id as any, qualityPreset: 'custom'})}
+                              className={`py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
+                                videoSettings.activeFilter === filter.id 
+                                  ? 'bg-emerald-600 text-white' 
+                                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                              }`}
+                            >
+                              {filter.label}
                             </button>
                           ))}
                         </div>

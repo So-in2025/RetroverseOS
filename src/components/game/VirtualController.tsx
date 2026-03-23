@@ -5,7 +5,6 @@ import { Settings, Check, RotateCcw } from 'lucide-react';
 
 interface VirtualControllerProps {
   isVisible: boolean;
-  skin?: 'default' | 'gold' | 'carbon' | 'translucent';
 }
 
 interface ButtonLayout {
@@ -14,7 +13,7 @@ interface ButtonLayout {
   size: number;
 }
 
-export default function VirtualController({ isVisible, skin = 'default' }: VirtualControllerProps) {
+export default function VirtualController({ isVisible }: VirtualControllerProps) {
   const [isCustomizing, setIsCustomizing] = useState(false);
   const [layout, setLayout] = useState<Record<string, ButtonLayout>>({});
 
@@ -57,48 +56,14 @@ export default function VirtualController({ isVisible, skin = 'default' }: Virtu
     await inputManager.saveVirtualLayout({});
   };
 
-  const getSkinClasses = () => {
-    switch (skin) {
-      case 'gold':
-        return {
-          dpad: 'bg-yellow-500/20 active:bg-yellow-500/40 border-yellow-500/50',
-          actionX: 'bg-blue-500/40 border-blue-500/60 text-blue-200',
-          actionB: 'bg-yellow-500/40 border-yellow-500/60 text-yellow-200',
-          actionY: 'bg-emerald-500/40 border-emerald-500/60 text-emerald-200',
-          actionA: 'bg-rose-500/40 border-rose-500/60 text-rose-200',
-          menu: 'bg-yellow-900/40 border-yellow-500/30 text-yellow-500'
-        };
-      case 'carbon':
-        return {
-          dpad: 'bg-zinc-800/60 active:bg-zinc-700/80 border-zinc-600/50',
-          actionX: 'bg-zinc-700/60 border-zinc-500/50 text-zinc-300',
-          actionB: 'bg-zinc-700/60 border-zinc-500/50 text-zinc-300',
-          actionY: 'bg-zinc-700/60 border-zinc-500/50 text-zinc-300',
-          actionA: 'bg-zinc-700/60 border-zinc-500/50 text-zinc-300',
-          menu: 'bg-zinc-900/80 border-zinc-700/50 text-zinc-500'
-        };
-      case 'translucent':
-        return {
-          dpad: 'bg-purple-500/10 active:bg-purple-500/30 border-purple-500/20 backdrop-blur-sm',
-          actionX: 'bg-blue-500/20 border-blue-500/30 text-blue-400',
-          actionB: 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400',
-          actionY: 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400',
-          actionA: 'bg-rose-500/20 border-rose-500/30 text-rose-400',
-          menu: 'bg-purple-900/20 border-purple-500/20 text-purple-400'
-        };
-      default:
-        return {
-          dpad: 'bg-white/20 active:bg-white/40 border-white/10',
-          actionX: 'bg-blue-500/20 border-blue-500/30 text-blue-400',
-          actionB: 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400',
-          actionY: 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400',
-          actionA: 'bg-rose-500/20 border-rose-500/30 text-rose-400',
-          menu: 'bg-black/60 border-white/10 text-zinc-400'
-        };
-    }
+  const skinClasses = {
+    dpad: 'bg-white/20 active:bg-white/40 border-white/10',
+    actionX: 'bg-blue-500/20 border-blue-500/30 text-blue-400',
+    actionB: 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400',
+    actionY: 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400',
+    actionA: 'bg-rose-500/20 border-rose-500/30 text-rose-400',
+    menu: 'bg-black/60 border-white/10 text-zinc-400'
   };
-
-  const skinClasses = getSkinClasses();
 
   // Helper for button styles
   const btnBase = "absolute flex items-center justify-center transition-all active:scale-95 touch-none select-none";
