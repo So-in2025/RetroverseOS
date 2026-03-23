@@ -33,16 +33,17 @@ export interface EmulatorConfig {
 }
 
 const BIOS_MAP: Record<string, { filename: string, url: string }[]> = {
+  'gba': [], // HLE BIOS is used by default in mgba/vba_next
   'psx': [
-    { filename: 'scph5501.bin', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/scph5501.bin' },
-    { filename: 'scph5500.bin', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/scph5500.bin' },
-    { filename: 'scph5502.bin', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/scph5502.bin' }
+    { filename: 'scph5501.bin', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/scph5501.bin' },
+    { filename: 'scph5500.bin', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/scph5500.bin' },
+    { filename: 'scph5502.bin', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/scph5502.bin' }
   ],
   'ps2': [{ filename: 'scph39001.bin', url: 'https://archive.org/download/ps2-bios-set-usa-japan-europe/SCPH-39001_USA_v01.60(07/02/2002)_v4.bin' }],
-  'sega_cd': [{ filename: 'bios_CD_U.bin', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/bios_CD_U.bin' }],
-  'atari_7800': [{ filename: '7800 BIOS (U).rom', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/7800%20BIOS%20(U).rom' }],
-  'lynx': [{ filename: 'lynxboot.img', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/lynxboot.img' }],
-  'pcengine': [{ filename: 'syscard3.pce', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/syscard3.pce' }]
+  'sega_cd': [{ filename: 'bios_CD_U.bin', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/bios_CD_U.bin' }],
+  'atari_7800': [{ filename: '7800 BIOS (U).rom', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/7800%20BIOS%20(U).rom' }],
+  'lynx': [{ filename: 'lynxboot.img', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/lynxboot.img' }],
+  'pcengine': [{ filename: 'syscard3.pce', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/syscard3.pce' }]
 };
 
 const isMobileDevice = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -111,12 +112,9 @@ export class EmulatorService {
     try {
       console.log(`[Emulator] Initializing ${config.gameId} with core ${config.core}`);
       
-      // Check for SharedArrayBuffer (Required for 3D cores like N64/PSX)
-      if (typeof SharedArrayBuffer === 'undefined' || !window.crossOriginIsolated) {
-        console.warn('[Emulator] SharedArrayBuffer or Cross-Origin Isolation is not available. 3D cores may fail.');
-        if (config.system === 'n64' || config.system === 'psx') {
-          onProgress?.('Warning: Browser security might block 3D games. Try reloading...');
-        }
+      // SharedArrayBuffer check (Service Worker handles COOP/COEP now)
+      if (typeof SharedArrayBuffer === 'undefined') {
+        console.warn('[Emulator] SharedArrayBuffer is not available. 3D cores may fail.');
       }
 
       // Force stop any existing instance and wait for it

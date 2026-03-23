@@ -175,8 +175,19 @@ export class ROMFetchService {
     };
 
     // 3. Fetch from Network with Progress and Validation
-    const response = await this.fetchWithProgress(finalUrl, onProgress, blobValidator);
-    let blob = await response.blob();
+    let response: Response;
+    let blob: Blob;
+    const isHeavySystem = system === 'n64' || system === 'psx' || system === 'ps2';
+
+    if (isHeavySystem && !finalUrl.includes('localhost') && !finalUrl.includes('127.0.0.1')) {
+      onProgress?.('Iniciando descarga por fragmentos (Omega Protocol)...');
+      const chunkedBlob = await this.fetchChunked(finalUrl, onProgress);
+      await blobValidator(chunkedBlob);
+      blob = chunkedBlob;
+    } else {
+      response = await this.fetchWithProgress(finalUrl, onProgress, blobValidator);
+      blob = await response.blob();
+    }
     
     // NEW: Robust ROM Validation
     if (system) {
@@ -207,6 +218,64 @@ export class ROMFetchService {
     return blob;
   }
 
+
+  private static async fetchChunked(url: string, onProgress?: (status: string) => void): Promise<Blob> {
+    const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
+    let totalSize = 0;
+    
+    // 1. Get total size using HEAD or initial GET
+    try {
+      const headResponse = await fetch(url, { method: 'HEAD' });
+      totalSize = parseInt(headResponse.headers.get('content-length') || '0');
+    } catch (e) {
+      // Fallback: try a small GET to see if it supports Range
+      const testResponse = await fetch(url, { headers: { 'Range': 'bytes=0-0' } });
+      totalSize = parseInt(testResponse.headers.get('content-range')?.split('/')?.[1] || '0');
+    }
+
+    if (!totalSize) {
+      console.warn('[ROM Fetch] Could not determine total size, falling back to standard fetch');
+      const res = await this.fetchWithProgress(url, onProgress);
+      return res.blob();
+    }
+
+    const chunks: Uint8Array[] = [];
+    let downloaded = 0;
+    const numChunks = Math.ceil(totalSize / CHUNK_SIZE);
+
+    for (let i = 0; i < numChunks; i++) {
+      const start = i * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE - 1, totalSize - 1);
+      
+      onProgress?.(`Descargando fragmento ${i + 1}/${numChunks} (${((downloaded / totalSize) * 100).toFixed(1)}%)`);
+      
+      let success = false;
+      let retries = 3;
+      
+      while (!success && retries > 0) {
+        try {
+          const response = await fetch(url, {
+            headers: { 'Range': `bytes=${start}-${end}` }
+          });
+          
+          if (!response.ok && response.status !== 206) throw new Error(`Status ${response.status}`);
+          
+          const buffer = await response.arrayBuffer();
+          chunks.push(new Uint8Array(buffer));
+          downloaded += buffer.byteLength;
+          success = true;
+        } catch (e) {
+          retries--;
+          console.warn(`[ROM Fetch] Chunk ${i} failed, retrying... (${retries} left)`, e);
+          await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+
+      if (!success) throw new Error(`Failed to download chunk ${i} after multiple attempts`);
+    }
+
+    return new Blob(chunks);
+  }
 
   private static async validateResponse(response: Response): Promise<void> {
     const contentType = response.headers.get('content-type');
@@ -243,8 +312,7 @@ export class ROMFetchService {
     try {
         console.log(`[ROM Fetch] Attempting Direct Connection: ${url}`);
         const controller = new AbortController();
-        // 5 minutes timeout for direct connection to allow large PSX/N64 games to download
-        const timeoutId = setTimeout(() => controller.abort(), 300000); 
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased to 5s timeout for direct
         
         response = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
