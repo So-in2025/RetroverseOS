@@ -1,175 +1,26 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
-import Sidebar from './components/layout/Sidebar';
-import SocialPanel from './components/layout/SocialPanel';
-import GameLibrary from './pages/GameLibrary';
-import Home from './pages/Home';
-import GameDetail from './pages/GameDetail';
-import GameRoom from './pages/GameRoom';
-import PremiumVault from './pages/PremiumVault';
-import Profile from './pages/Profile';
-import Marketplace from './pages/Marketplace';
-import Community from './pages/Community';
-import Achievements from './pages/Achievements';
-import Settings from './pages/Settings';
-import NetplayLobby from './pages/NetplayLobby';
-import Login from './pages/Login';
-import ProtectedRoute from './components/auth/ProtectedRoute';
-import NotificationSystem from './components/NotificationSystem';
-
-import { useLocation } from 'react-router-dom';
-import MobileNavbar from './components/layout/MobileNavbar';
-import MobileHeader from './components/layout/MobileHeader';
-import SearchModal from './components/layout/SearchModal';
-import AchievementsModal from './components/community/AchievementsModal';
-import DebugPanel from './components/game/DebugPanel';
-import { useUIStore } from './store/uiStore';
-import { useEffect, useState } from 'react';
-import { SentinelEngine } from './services/gcts';
-
-function Layout() {
-  const location = useLocation();
-  const isGameRoom = location.pathname.startsWith('/play/');
-  const { 
-    socialPanelOpen, 
-    searchModalOpen, 
-    setSearchModal, 
-    achievementsModalOpen, 
-    setAchievementsModal,
-    debugPanelOpen,
-    setDebugPanel
-  } = useUIStore();
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault();
-        setSearchModal(true);
-      }
-      
-      // Global Debug Shortcut: Shift + Alt + D
-      if (e.shiftKey && e.altKey && e.code === 'KeyD') {
-        e.preventDefault();
-        setDebugPanel(!debugPanelOpen);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setSearchModal, setDebugPanel, debugPanelOpen]);
-
-  useEffect(() => {
-    // Start Sentinel Engine in background
-    SentinelEngine.startBackgroundWorker();
-    return () => {
-      SentinelEngine.stopBackgroundWorker();
-    };
-  }, []);
-
-  return (
-    <>
-      <Sidebar />
-      {!isGameRoom && <MobileHeader />}
-      {!isGameRoom && <SocialPanel />}
-      {!isGameRoom && <MobileNavbar />}
-      <SearchModal isOpen={searchModalOpen} onClose={() => setSearchModal(false)} />
-      <AchievementsModal isOpen={achievementsModalOpen} onClose={() => setAchievementsModal(false)} />
-      <AnimatePresence>
-        {debugPanelOpen && <DebugPanel onClose={() => setDebugPanel(false)} />}
-      </AnimatePresence>
-      <main className={`${!isGameRoom ? 'lg:ml-20' : ''} ${!isGameRoom && socialPanelOpen ? 'xl:mr-64' : ''} min-h-screen relative ${!isGameRoom ? 'pt-16 lg:pt-0 pb-24 lg:pb-0' : ''} transition-all duration-300`}>
-        <Outlet />
-      </main>
-    </>
-  );
-}
-
-import { gameCatalog } from './services/gameCatalog';
-import { AuthProvider, useAuth } from './services/AuthContext';
-import { storage } from './services/storage';
-import OnboardingFlow from './components/onboarding/OnboardingFlow';
-import { recommendationEngine } from './services/recommendationEngine';
-import BootAnimation from './components/layout/BootAnimation';
+import React from 'react';
+import { Library } from './components/Library';
+import { Emulator } from './components/Emulator';
+import { useStore } from './store';
 import { AnimatePresence } from 'motion/react';
-import { economy } from './services/economy';
-import { customization } from './services/customization';
-import { achievements } from './services/achievements';
 
-function AppContent() {
-  const { user, loading } = useAuth();
-  const [showBoot, setShowBoot] = useState(true);
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [initialized, setInitialized] = useState(false);
-
-  useEffect(() => {
-    const checkOnboarding = async () => {
-      await economy.init();
-      await customization.init();
-      await gameCatalog.init(); // Initialize game catalog once
-      const completed = await storage.getSetting('onboarding_completed');
-      if (!completed) {
-        setShowOnboarding(true);
-      } else {
-        await recommendationEngine.init(user?.id);
-        setInitialized(true);
-      }
-    };
-    checkOnboarding();
-  }, [user]);
-
-  const handleOnboardingComplete = async () => {
-    setShowOnboarding(false);
-    await recommendationEngine.init(user?.id);
-    setInitialized(true);
-    // Force a re-render or notify components that recommendations are ready
-    window.dispatchEvent(new CustomEvent('recommendations_updated'));
-  };
+const App: React.FC = () => {
+  const { isPlaying } = useStore();
 
   return (
-    <>
-      <AnimatePresence>
-        {(showBoot || loading) && <BootAnimation onComplete={() => setShowBoot(false)} />}
-        {!showBoot && !loading && showOnboarding && (
-          <OnboardingFlow onComplete={handleOnboardingComplete} />
-        )}
-      </AnimatePresence>
-      <NotificationSystem />
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        
-        <Route element={<ProtectedRoute />}>
-          <Route element={<Layout />}>
-            <Route path="/" element={<GameLibrary />} />
-            <Route path="/dashboard" element={<Home />} />
-            <Route path="/game/:gameId" element={<GameDetail />} />
-            <Route path="/play/:gameId" element={<GameRoom />} />
-            <Route path="/premium" element={<PremiumVault />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/marketplace" element={<Marketplace />} />
-            <Route path="/community" element={<Community />} />
-            <Route path="/achievements" element={<Achievements />} />
-            <Route path="/tournaments" element={<Community />} />
-            <Route path="/netplay" element={<NetplayLobby />} />
-            <Route path="/settings" element={<Settings />} />
-          </Route>
-        </Route>
-      </Routes>
-    </>
-  );
-}
-
-export default function App() {
-  return (
-    <AuthProvider>
-      <Router>
-        <div className="min-h-screen bg-carbon text-white font-sans">
-          <AppContent />
+    <div className="h-screen w-screen overflow-hidden bg-black selection:bg-emerald-500 selection:text-black">
+      {!window.crossOriginIsolated && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-red-500/10 border-b border-red-500/20 px-4 py-1 text-[10px] font-mono text-red-400 text-center backdrop-blur-md">
+          SYSTEM WARNING: CROSS-ORIGIN ISOLATION DISABLED. EMULATOR PERFORMANCE MAY BE DEGRADED.
         </div>
-      </Router>
-    </AuthProvider>
+      )}
+      <Library />
+      
+      <AnimatePresence>
+        {isPlaying && <Emulator />}
+      </AnimatePresence>
+    </div>
   );
-}
+};
 
+export default App;

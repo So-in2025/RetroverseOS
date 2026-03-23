@@ -19,11 +19,39 @@ window.onerror = (message, source, lineno, colno, error) => {
   }
 };
 
-// Register Service Worker for Offline Support
+// Register Service Worker for Offline Support and COOP/COEP
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then(registration => {
       console.log('SW registered: ', registration);
+      
+      // If we're not cross-origin isolated, we need the service worker to take control and reload
+      if (!window.crossOriginIsolated && registration.active) {
+        // Prevent infinite reload loops
+        const reloadCount = parseInt(sessionStorage.getItem('coi_reload_count') || '0');
+        if (reloadCount < 3) {
+          sessionStorage.setItem('coi_reload_count', (reloadCount + 1).toString());
+          console.log(`Reloading to enable COOP/COEP isolation (attempt ${reloadCount + 1})...`);
+          window.location.reload();
+        } else {
+          console.error('Failed to enable COOP/COEP isolation after multiple attempts.');
+        }
+      } else if (window.crossOriginIsolated) {
+        // Reset reload count on success
+        sessionStorage.removeItem('coi_reload_count');
+      }
+      
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing;
+        if (newWorker) {
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // New version available, reload
+              window.location.reload();
+            }
+          });
+        }
+      });
     }).catch(registrationError => {
       console.log('SW registration failed: ', registrationError);
     });

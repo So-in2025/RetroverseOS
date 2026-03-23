@@ -33,17 +33,16 @@ export interface EmulatorConfig {
 }
 
 const BIOS_MAP: Record<string, { filename: string, url: string }[]> = {
-  'gba': [{ filename: 'gba_bios.bin', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/gba_bios.bin' }],
   'psx': [
-    { filename: 'scph5501.bin', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/scph5501.bin' },
-    { filename: 'scph5500.bin', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/scph5500.bin' },
-    { filename: 'scph5502.bin', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/scph5502.bin' }
+    { filename: 'scph5501.bin', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/scph5501.bin' },
+    { filename: 'scph5500.bin', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/scph5500.bin' },
+    { filename: 'scph5502.bin', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/scph5502.bin' }
   ],
   'ps2': [{ filename: 'scph39001.bin', url: 'https://archive.org/download/ps2-bios-set-usa-japan-europe/SCPH-39001_USA_v01.60(07/02/2002)_v4.bin' }],
-  'sega_cd': [{ filename: 'bios_CD_U.bin', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/bios_CD_U.bin' }],
-  'atari_7800': [{ filename: '7800 BIOS (U).rom', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/7800%20BIOS%20(U).rom' }],
-  'lynx': [{ filename: 'lynxboot.img', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/lynxboot.img' }],
-  'pcengine': [{ filename: 'syscard3.pce', url: 'https://raw.githubusercontent.com/Abdess/retroarch-assets/master/system/syscard3.pce' }]
+  'sega_cd': [{ filename: 'bios_CD_U.bin', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/bios_CD_U.bin' }],
+  'atari_7800': [{ filename: '7800 BIOS (U).rom', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/7800%20BIOS%20(U).rom' }],
+  'lynx': [{ filename: 'lynxboot.img', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/lynxboot.img' }],
+  'pcengine': [{ filename: 'syscard3.pce', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/syscard3.pce' }]
 };
 
 const isMobileDevice = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -55,7 +54,7 @@ const CORE_MAP: Record<string, string> = {
   'nes': 'fceumm',
   'snes': isMobileDevice() ? 'snes9x2010' : 'snes9x',
   'sega_genesis': 'genesis_plus_gx',
-  'gba': isMobileDevice() ? 'vba_next' : 'mgba',
+  'gba': 'vba_next',
   'gbc': 'gambatte',
   'gb': 'gambatte',
   'psx': 'pcsx_rearmed',

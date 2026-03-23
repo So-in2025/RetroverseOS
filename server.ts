@@ -339,6 +339,7 @@ async function startServer() {
         
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
         if (!response.body) throw new Error('Response body is null');
 

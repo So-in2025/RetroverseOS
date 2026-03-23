@@ -39,6 +39,7 @@ class GameCatalogService {
     }, 10000);
 
     try {
+      console.log('[GameCatalog] Initializing system...');
       // Load Favorites
       const savedFavorites = await storage.getSetting('favorites');
       if (savedFavorites && Array.isArray(savedFavorites)) {
@@ -46,30 +47,31 @@ class GameCatalogService {
       }
       
       // Force refresh for OMEGA SET 50K update
-      const CATALOG_VERSION = '18'; // Bumped version to force re-seed for Elite Top 15 fixes
+      const CATALOG_VERSION = '20'; // Bumped version for SW V20 and isolation fixes
       const currentVersion = localStorage.getItem('catalog_version');
       
       if (currentVersion !== CATALOG_VERSION) {
-        console.log('[GameCatalog] Detected old catalog version. Purging for Arcade/Atari fixes...');
+        console.log('[GameCatalog] Detected old catalog version. Purging for isolation fixes...');
         await storage.clearCatalog();
-        // DO NOT clear all ROMs, let LRU eviction handle old files.
-        // This preserves user downloads across catalog updates.
         localStorage.setItem('catalog_version', CATALOG_VERSION);
       }
 
       const storedGames = await storage.getCatalogGames();
+      console.log(`[GameCatalog] Stored games found: ${storedGames?.length || 0}`);
       
       // Check if catalog has the new 'playable' flag
-      const hasNewData = storedGames.some(g => g.playable !== undefined);
+      const hasNewData = storedGames && storedGames.length > 0 && storedGames.some(g => g.playable !== undefined);
       
       // Always inject FULL_CATALOG (The Master Manifest)
       console.log('[GameCatalog] Injecting MASTER MANIFEST (Verified Legends)...');
       await this.addGames(FULL_CATALOG);
 
       if (storedGames && storedGames.length > 0 && hasNewData) {
+        console.log(`[GameCatalog] Restoring ${storedGames.length} games from storage.`);
         storedGames.forEach(g => this.games.set(g.game_id, g));
       } else {
         if (storedGames && storedGames.length > 0) {
+          console.log('[GameCatalog] Data stale, clearing and re-initializing...');
           await storage.clearCatalog();
         }
         await this.initializeCatalog();
@@ -79,6 +81,7 @@ class GameCatalogService {
       this.startAutonomousIngestion();
       
       this.isInitialized = true;
+      console.log('[GameCatalog] Initialization complete.');
     } catch (error) {
       console.error('[GameCatalog] Initialization error:', error);
       this.isInitialized = true; // Still mark as initialized to unblock
@@ -202,8 +205,6 @@ class GameCatalogService {
 
     try {
       // 2. Fetch Data (500 games per cycle for MASSIVE CATALOG growth)
-      // LIMIT: Archive.org has a 10,000 results limit for advancedsearch.php
-      // With 500 rows, page 20 is the absolute limit.
       if (page > 20) {
         console.log(`[Autonomous Engine] Sector ${system.toUpperCase()} reached deep paging limit. Securing sector.`);
         this.ingestionSystems.splice(this.currentSystemIndex, 1);
@@ -217,17 +218,15 @@ class GameCatalogService {
       // 3. Add to Catalog
       const newGames = results.filter(game => !this.games.has(game.game_id));
       if (newGames.length > 0) {
+        console.log(`[Autonomous Engine] Secured ${newGames.length} new artifacts for ${system}.`);
         await this.addGames(newGames);
-        this.consecutiveEmptyCycles[system] = 0; // Reset counter if we found something new
+        this.consecutiveEmptyCycles[system] = 0; 
       } else {
+        console.log(`[Autonomous Engine] Sector ${system} (Page ${page}) already fully ingested.`);
         this.consecutiveEmptyCycles[system] = (this.consecutiveEmptyCycles[system] || 0) + 1;
       }
       
-      console.log(`[Autonomous Engine] Sector ${system.toUpperCase()} Report: ${newGames.length} new artifacts secured. (Consecutive empty: ${this.consecutiveEmptyCycles[system]})`);
-      
       // 4. Advance Pointers
-      // Only remove system if we get 0 results from the search API itself (not just filtered results)
-      // and we've tried multiple times or reached a high page.
       if (results.length === 0 && this.consecutiveEmptyCycles[system] > 3) {
         console.log(`[Autonomous Engine] Sector ${system.toUpperCase()} fully ingested or unreachable.`);
         this.ingestionSystems.splice(this.currentSystemIndex, 1);
@@ -257,7 +256,6 @@ class GameCatalogService {
           this.currentSystemIndex = this.currentSystemIndex % this.ingestionSystems.length;
         }
       } else {
-        // Move to next system anyway to avoid getting stuck on a failing one
         this.currentSystemIndex = (this.currentSystemIndex + 1) % this.ingestionSystems.length;
       }
       

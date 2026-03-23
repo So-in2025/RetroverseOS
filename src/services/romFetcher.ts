@@ -243,7 +243,8 @@ export class ROMFetchService {
     try {
         console.log(`[ROM Fetch] Attempting Direct Connection: ${url}`);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased to 5s timeout for direct
+        // 5 minutes timeout for direct connection to allow large PSX/N64 games to download
+        const timeoutId = setTimeout(() => controller.abort(), 300000); 
         
         response = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
