@@ -223,21 +223,30 @@ export class ROMFetchService {
     const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB chunks
     let totalSize = 0;
     
-    // 1. Get total size using HEAD or initial GET
+    // 1. Get total size using HEAD or initial GET via Tunnel
+    const tunnelUrl = `${window.location.origin}/api/tunnel?url=${encodeURIComponent(url)}`;
+    
     try {
-      const headResponse = await fetch(url, { method: 'HEAD' });
+      console.log(`[ROM Fetch] Determining size for chunked download: ${url}`);
+      const headResponse = await fetch(tunnelUrl, { method: 'HEAD' });
       totalSize = parseInt(headResponse.headers.get('content-length') || '0');
+      
+      if (!totalSize || isNaN(totalSize)) {
+        // Fallback: try a small GET to see if it supports Range
+        const testResponse = await fetch(tunnelUrl, { headers: { 'Range': 'bytes=0-0' } });
+        totalSize = parseInt(testResponse.headers.get('content-range')?.split('/')?.[1] || '0');
+      }
     } catch (e) {
-      // Fallback: try a small GET to see if it supports Range
-      const testResponse = await fetch(url, { headers: { 'Range': 'bytes=0-0' } });
-      totalSize = parseInt(testResponse.headers.get('content-range')?.split('/')?.[1] || '0');
+      console.warn('[ROM Fetch] Could not determine total size via tunnel:', e);
     }
 
-    if (!totalSize) {
+    if (!totalSize || isNaN(totalSize)) {
       console.warn('[ROM Fetch] Could not determine total size, falling back to standard fetch');
       const res = await this.fetchWithProgress(url, onProgress);
       return res.blob();
     }
+
+    console.log(`[ROM Fetch] Starting chunked download of ${totalSize} bytes (${(totalSize / (1024 * 1024)).toFixed(2)} MB)`);
 
     const chunks: Uint8Array[] = [];
     let downloaded = 0;
@@ -254,26 +263,39 @@ export class ROMFetchService {
       
       while (!success && retries > 0) {
         try {
-          const response = await fetch(url, {
+          // Use the tunnel for chunks as it now supports Range headers
+          const response = await fetch(tunnelUrl, {
             headers: { 'Range': `bytes=${start}-${end}` }
           });
           
-          if (!response.ok && response.status !== 206) throw new Error(`Status ${response.status}`);
+          if (!response.ok && response.status !== 206) {
+            throw new Error(`Status ${response.status}`);
+          }
           
           const buffer = await response.arrayBuffer();
+          
+          // Verify chunk size (except for the last chunk which might be smaller)
+          const expectedSize = (end - start) + 1;
+          if (buffer.byteLength !== expectedSize && i < numChunks - 1) {
+            console.warn(`[ROM Fetch] Chunk ${i} size mismatch: expected ${expectedSize}, got ${buffer.byteLength}. Retrying...`);
+            throw new Error('Chunk size mismatch');
+          }
+
           chunks.push(new Uint8Array(buffer));
           downloaded += buffer.byteLength;
           success = true;
         } catch (e) {
           retries--;
           console.warn(`[ROM Fetch] Chunk ${i} failed, retrying... (${retries} left)`, e);
-          await new Promise(r => setTimeout(r, 1000));
+          // Exponential backoff
+          await new Promise(r => setTimeout(r, 1000 * (3 - retries)));
         }
       }
 
       if (!success) throw new Error(`Failed to download chunk ${i} after multiple attempts`);
     }
 
+    console.log(`[ROM Fetch] Chunked download complete. Total: ${downloaded} bytes.`);
     return new Blob(chunks);
   }
 

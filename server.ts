@@ -306,22 +306,31 @@ async function startServer() {
     let attempt = 0;
     let lastError: any = null;
 
+    // Capture Range header from client
+    const rangeHeader = req.headers['range'];
+
     while (attempt < maxRetries) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 40000); 
       
       try {
+        const fetchHeaders: Record<string, string> = {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': '*/*',
+          'Connection': 'keep-alive'
+        };
+
+        if (rangeHeader) {
+          fetchHeaders['Range'] = rangeHeader as string;
+        }
+
         const response = await fetch(targetUrl, {
           signal: controller.signal,
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': '*/*',
-            'Connection': 'keep-alive'
-          }
+          headers: fetchHeaders
         });
         clearTimeout(timeoutId);
         
-        if (!response.ok) {
+        if (!response.ok && response.status !== 206) {
           if (response.status === 404) return res.status(404).send('Target not found');
           if ([503, 429, 408, 500].includes(response.status)) {
             const waitTime = 1000 * (attempt + 1) + Math.random() * 500;
@@ -333,13 +342,18 @@ async function startServer() {
 
         const contentType = response.headers.get('content-type');
         const contentLength = response.headers.get('content-length');
+        const contentRange = response.headers.get('content-range');
+        const acceptRanges = response.headers.get('accept-ranges');
         
         if (contentType) res.setHeader('Content-Type', contentType);
         if (contentLength) res.setHeader('Content-Length', contentLength);
+        if (contentRange) res.setHeader('Content-Range', contentRange);
+        if (acceptRanges) res.setHeader('Accept-Ranges', acceptRanges);
         
+        res.status(response.status);
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges');
 
         if (!response.body) throw new Error('Response body is null');
 

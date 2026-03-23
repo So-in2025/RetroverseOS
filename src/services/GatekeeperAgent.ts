@@ -4,12 +4,15 @@ export class ROMGatekeeperAgent implements GatekeeperAgent {
   async validate(candidate: ROMCandidate): Promise<boolean> {
     console.log(`[Gatekeeper] Validando ${candidate.url}...`);
     
+    // Use the tunnel for validation to bypass CORS and ensure we can reach the target
+    const tunnelUrl = `${window.location.origin}/api/tunnel?url=${encodeURIComponent(candidate.url)}`;
+    
     try {
       // Usamos HEAD para no descargar el archivo, solo verificar cabeceras
-      const response = await fetch(candidate.url, { method: 'HEAD' });
+      const response = await fetch(tunnelUrl, { method: 'HEAD' });
       
       if (!response.ok) {
-        console.warn(`[Gatekeeper] URL muerta: ${candidate.url} (Status: ${response.status})`);
+        console.warn(`[Gatekeeper] URL muerta o inaccesible vía túnel: ${candidate.url} (Status: ${response.status})`);
         return false;
       }
 
@@ -22,7 +25,7 @@ export class ROMGatekeeperAgent implements GatekeeperAgent {
 
       return true;
     } catch (e) {
-      console.error(`[Gatekeeper] Error validando ${candidate.url}:`, e);
+      console.error(`[Gatekeeper] Error validando ${candidate.url} vía túnel:`, e);
       return false;
     }
   }
