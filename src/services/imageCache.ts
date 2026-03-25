@@ -3,8 +3,8 @@ export const ImageCache = {
     if (!url) return '';
     
     try {
-      const cache = await caches.open('retroos-covers-v1');
-      const cachedResponse = await cache.match(url, { ignoreSearch: true });
+      const cache = await caches.open('retroos-covers-v2');
+      const cachedResponse = await cache.match(url);
       
       if (cachedResponse) {
         const blob = await cachedResponse.blob();

@@ -649,11 +649,19 @@ export class MetadataNormalizationEngine {
    * También elimina guiones bajos y extensiones.
    */
   private static cleanTitle(rawTitle: string): string {
-    return rawTitle
+    if (!rawTitle) return 'Unknown Game';
+    
+    let title = rawTitle
       .replace(/_/g, ' ') // Replace underscores with spaces
-      .replace(/\.[^/.]+$/, '') // Remove extension
-      .replace(/\s*[(\[].*?[)\]]/g, '') // Remove content in parentheses or brackets
+      .replace(/\.(nes|sfc|smc|bin|iso|gba|gbc|gb|gen|md|a26|a78|lnx|n64|z64|zip|7z|chd|cue)$/i, '') // Remove extension
+      .replace(/\s*[(\[].*?[)\]]/g, ' ') // Remove content in parentheses or brackets but keep a space
+      .replace(/\s+/g, ' ') // Normalize spaces
       .trim();
+
+    // Remove common Archive.org prefixes like "001 - "
+    title = title.replace(/^\d+\s*-\s*/, '');
+    
+    return title;
   }
 
   /**

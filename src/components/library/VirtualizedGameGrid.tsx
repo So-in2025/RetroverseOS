@@ -40,26 +40,44 @@ export const VirtualizedGameGrid: React.FC<VirtualizedGameGridProps> = ({
         <Link 
           to={`/play/${game.game_id}?url=${encodeURIComponent(game.rom_url)}&system=${game.system_id}`}
           onClick={() => AudioEngine.playSelectSound()}
-          className="group relative w-full h-full bg-zinc-900 rounded-xl overflow-hidden border border-white/10 hover:border-cyan-electric hover:shadow-[0_0_20px_rgba(0,242,255,0.2)] transition-all block"
+          className="group relative w-full h-full bg-zinc-900/80 rounded-xl overflow-hidden border border-white/5 hover:border-cyan-electric/50 hover:shadow-[0_0_30px_rgba(0,242,255,0.15)] transition-all duration-500 block backdrop-blur-sm"
         >
+          {/* Subtle Inner Glow */}
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none bg-[radial-gradient(circle_at_50%_0%,rgba(0,242,255,0.1),transparent_70%)]" />
+          
           <GameCover 
             gameId={game.game_id}
             primaryUrl={game.cover_url || game.artwork_url} 
             title={game.title}
             systemId={game.system_id}
-            className="w-full h-full transition-transform duration-500 group-hover:scale-110"
+            className="w-full h-full transition-transform duration-700 ease-out group-hover:scale-105 group-hover:brightness-110"
           />
-          <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-4 text-center">
-            <Play className="w-10 h-10 text-cyan-electric fill-current mb-3 drop-shadow-[0_0_10px_rgba(0,242,255,0.8)] transform scale-90 group-hover:scale-100 transition-transform" />
-            <h4 className="font-black text-[10px] uppercase tracking-tight leading-tight text-white mb-2 line-clamp-2">
-              {game.title}
-            </h4>
-            <DownloadButton 
-              gameId={game.game_id} 
-              romUrl={game.rom_url} 
-              systemId={game.system_id}
-              onStatusChange={(isCached) => onCacheChange?.(game.game_id, isCached)}
-            />
+          
+          {/* Overlay Info */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-all duration-500 flex flex-col items-center justify-end p-4 text-center pb-8">
+            <div className="transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500 flex flex-col items-center">
+              <div className="w-12 h-12 rounded-full bg-cyan-electric/20 border border-cyan-electric/40 flex items-center justify-center mb-4 backdrop-blur-md shadow-[0_0_20px_rgba(0,242,255,0.3)]">
+                <Play className="w-6 h-6 text-cyan-electric fill-current" />
+              </div>
+              
+              <h4 className="font-black text-[11px] uppercase tracking-tighter leading-tight text-white mb-3 line-clamp-2 max-w-[140px] drop-shadow-lg">
+                {game.title}
+              </h4>
+              
+              <div className="flex items-center gap-2">
+                <DownloadButton 
+                  gameId={game.game_id} 
+                  romUrl={game.rom_url} 
+                  systemId={game.system_id}
+                  onStatusChange={(isCached) => onCacheChange?.(game.game_id, isCached)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* System Badge (Always Visible but subtle) */}
+          <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/40 backdrop-blur-md rounded-md text-[7px] font-bold uppercase tracking-[0.2em] text-white/50 border border-white/5 group-hover:text-cyan-electric group-hover:border-cyan-electric/30 transition-colors">
+            {game.system_id.replace(/_/g, ' ')}
           </div>
         </Link>
       </div>

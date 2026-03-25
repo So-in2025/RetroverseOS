@@ -160,7 +160,10 @@ export const GameCover: React.FC<GameCoverProps> = ({
   };
 
   return (
-    <div className={`relative overflow-hidden bg-zinc-900/50 ${aspectClasses[aspectRatio]} ${className}`}>
+    <div className={`relative overflow-hidden bg-zinc-900/50 group shadow-2xl ${aspectClasses[aspectRatio]} ${className}`}>
+      {/* Reflection Effect */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none z-10" />
+      
       {status === 'loading' && showLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-zinc-900 z-20">
           <Loader2 className="w-6 h-6 text-emerald-500 animate-spin opacity-20" />
@@ -172,16 +175,48 @@ export const GameCover: React.FC<GameCoverProps> = ({
           key="placeholder"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="absolute inset-0 flex flex-col items-center justify-center bg-zinc-900 overflow-hidden"
+          className="absolute inset-0 flex flex-col items-center justify-center overflow-hidden"
+          style={{
+            background: `linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%)`,
+          }}
         >
-          <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(0,255,255,0.05)_50%,transparent_75%,transparent_100%)] bg-[length:250%_250%,100%_100%] animate-shimmer" />
-          <div className="absolute top-0 left-0 w-full h-1 bg-cyan-electric shadow-[0_0_10px_#00f2ff]" />
-          <Gamepad2 className="w-12 h-12 text-cyan-electric opacity-30 mb-3" />
-          <h3 className="text-white font-black text-center px-3 uppercase tracking-tighter text-sm leading-tight z-10 line-clamp-3">
-            {title}
-          </h3>
-          <div className="mt-2 px-2 py-0.5 bg-black/50 rounded text-[9px] text-cyan-electric/80 font-mono tracking-widest z-10 border border-cyan-electric/20">
-            {systemId.toUpperCase()}
+          {/* Retro Grid Background */}
+          <div className="absolute inset-0 opacity-10" 
+            style={{ 
+              backgroundImage: `linear-gradient(#333 1px, transparent 1px), linear-gradient(90deg, #333 1px, transparent 1px)`,
+              backgroundSize: '20px 20px'
+            }} 
+          />
+          
+          {/* Decorative Elements */}
+          <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(0,255,255,0.03)_50%,transparent_75%,transparent_100%)] bg-[length:250%_250%,100%_100%] animate-shimmer" />
+          
+          {/* Top Bar (System Specific Color) */}
+          <div className={`absolute top-0 left-0 w-full h-1.5 shadow-[0_0_15px_rgba(0,242,255,0.5)] ${
+            systemId.includes('nintendo') || systemId.includes('nes') || systemId.includes('snes') ? 'bg-red-600' :
+            systemId.includes('sega') || systemId.includes('genesis') ? 'bg-blue-600' :
+            systemId.includes('sony') || systemId.includes('ps') ? 'bg-zinc-400' :
+            'bg-cyan-electric'
+          }`} />
+
+          {/* Center Icon */}
+          <div className="relative z-10 mb-4 p-4 rounded-full bg-white/5 border border-white/10 backdrop-blur-sm">
+            <Gamepad2 className="w-10 h-10 text-white/40" />
+          </div>
+
+          {/* Title with Retro Typography */}
+          <div className="relative z-10 px-4 text-center">
+            <h3 className="text-white font-black uppercase tracking-tighter text-xs sm:text-sm leading-tight drop-shadow-md line-clamp-3">
+              {title}
+            </h3>
+            <div className="mt-3 inline-block px-3 py-1 bg-white/10 rounded-full border border-white/20 text-[8px] text-white/60 font-mono uppercase tracking-[0.2em]">
+              {systemId.replace(/_/g, ' ')}
+            </div>
+          </div>
+
+          {/* Bottom "Seal of Quality" style element */}
+          <div className="absolute bottom-4 right-4 w-8 h-8 rounded-full border-2 border-yellow-500/30 flex items-center justify-center">
+            <div className="w-5 h-5 rounded-full bg-yellow-500/10" />
           </div>
         </motion.div>
       ) : (
@@ -198,13 +233,16 @@ export const GameCover: React.FC<GameCoverProps> = ({
             transition={{ duration: 0.3 }}
             onLoad={handleLoad}
             onError={handleError}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
             referrerPolicy="no-referrer"
           />
         )
       )}
 
-      <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur-md rounded text-[8px] font-black uppercase tracking-widest text-white/70 border border-white/10">
+      {/* Glossy Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-black/20 pointer-events-none z-10" />
+
+      <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur-md rounded text-[8px] font-black uppercase tracking-widest text-white/70 border border-white/10 z-20">
         {systemId.toUpperCase()}
       </div>
     </div>

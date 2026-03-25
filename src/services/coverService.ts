@@ -59,25 +59,22 @@ export class CoverService {
   public static normalizeTitle(title: string): string {
     if (!title) return '';
     
-    // Si el título tiene muchos paréntesis o corchetes, probablemente es un nombre de archivo de Archive.org
-    // Intentamos quedarnos solo con la primera parte.
     let baseTitle = title;
     
-    // Si detectamos patrones típicos de Archive.org (muchos tags), limpiamos agresivamente
-    if ((title.match(/\(/g) || []).length + (title.match(/\[/g) || []).length > 1) {
-      // Intentamos extraer la parte antes del primer tag que parezca "ruido"
-      const parts = title.split(/[(\[]/);
-      baseTitle = parts[0].trim();
-    }
+    // 1. Remove common file extensions
+    baseTitle = baseTitle.replace(/\.(nes|sfc|smc|bin|iso|gba|gbc|gb|gen|md|a26|a78|lnx|n64|z64|zip|7z|chd|cue)$/i, '');
 
+    // 2. Remove common tags in parentheses or brackets
+    // But keep things like (USA) if we want to try specific matches later
+    baseTitle = baseTitle.replace(/\s*[(\[].*?[)\]]/g, ' ').trim();
+
+    // 3. Remove non-game keywords and special characters
+    // NOTE: We keep '-' because Libretro uses it for subtitles (e.g. "Game - Subtitle")
     return baseTitle
-      .replace(/\.(nes|sfc|smc|bin|iso|gba|gbc|gb|gen|md|a26|a78|lnx|n64|z64|zip|7z|chd|cue)$/i, '') // Remove extensions
-      .replace(/\([^)]*\)/g, '') // Remove (USA), (Europe), etc.
-      .replace(/\[[^\]]*\]/g, '') // Remove [!], [b1], etc.
-      .replace(/Screenshot|Official|Beta|Demo|Sample|Promo|Review|Preview|Debug|Build|v\d+\.\d+|V\d+/gi, '') // Remove non-game keywords
-      .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
-      .trim()
-      .replace(/\s+/g, ' '); // Keep spaces (Libretro uses spaces)
+      .replace(/Screenshot|Official|Beta|Demo|Sample|Promo|Review|Preview|Debug|Build|v\d+\.\d+|V\d+/gi, '')
+      .replace(/[^a-zA-Z0-9\s-]/g, '') 
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   /**
@@ -97,10 +94,11 @@ export class CoverService {
     // ? -> _
     // | -> _
     // " -> _
+    // # -> _
     const libretroClean = str.replace(/[&*/:`<>?\|"#]/g, '_');
 
     return encodeURIComponent(libretroClean)
-      .replace(/%20/g, '%20') // Ensure spaces are encoded
+      .replace(/%20/g, '%20') 
       .replace(/%28/g, '(')
       .replace(/%29/g, ')')
       .replace(/%2C/g, ',')
@@ -123,66 +121,75 @@ export class CoverService {
 
     const libretroSystem = LIBRETRO_SYSTEM_MAP[system] || system.replace(/\s+/g, '_');
     const libretroBase = `https://raw.githubusercontent.com/libretro-thumbnails/${libretroSystem}/master/Named_Boxarts`;
+    const libretroTitlesBase = `https://raw.githubusercontent.com/libretro-thumbnails/${libretroSystem}/master/Named_Titles`;
+    const libretroSnapsBase = `https://raw.githubusercontent.com/libretro-thumbnails/${libretroSystem}/master/Named_Snaps`;
 
     // 1. Libretro thumbnails (GitHub CDN)
-    // Try original title first
     const titleWithoutExt = title.replace(/\.(nes|sfc|smc|bin|iso|gba|gbc|gb|gen|md|a26|a78|lnx|n64|z64|zip|7z|chd|cue)$/i, '').trim();
-    const firstLibretro = `${libretroBase}/${this.safeEncode(titleWithoutExt)}.png`;
-    sources.push(firstLibretro);
     
-    // Add proxied version of the first source immediately as it's the most likely to work but might have CORS/Network issues
-    sources.push(`https://wsrv.nl/?url=${encodeURIComponent(firstLibretro)}&w=400&output=webp&n=-1`);
-
-    // Handle multiple regions like (USA, Europe)
-    if (titleWithoutExt.includes('(USA, Europe)')) {
-      sources.push(`${libretroBase}/${this.safeEncode(titleWithoutExt.replace('(USA, Europe)', '(USA)'))}.png`);
-      sources.push(`${libretroBase}/${this.safeEncode(titleWithoutExt.replace('(USA, Europe)', '(World)'))}.png`);
-    }
-
-    // Try clean title (without parentheses)
-    const cleanTitle = titleWithoutExt.replace(/\([^)]*\)/g, '').replace(/\[[^\]]*\]/g, '').trim();
+    // Try exact title from Archive.org (often contains (USA) etc)
+    sources.push(`${libretroBase}/${this.safeEncode(titleWithoutExt)}.png`);
+    sources.push(`${libretroTitlesBase}/${this.safeEncode(titleWithoutExt)}.png`);
     
-    sources.push(`${libretroBase}/${this.safeEncode(cleanTitle + ' (USA)')}.png`);
-    sources.push(`${libretroBase}/${this.safeEncode(cleanTitle + ' (World)')}.png`);
-    sources.push(`${libretroBase}/${this.safeEncode(cleanTitle)}.png`);
+    // Try clean title (without tags)
+    const cleanTitle = titleWithoutExt.replace(/\s*[(\[].*?[)\]]/g, '').trim();
+    
+    // Try common region variations
+    const regions = [' (USA)', ' (World)', ' (Europe)', ' (Japan) (En)', ' (Japan)', ''];
+    regions.forEach(region => {
+      sources.push(`${libretroBase}/${this.safeEncode(cleanTitle + region)}.png`);
+      sources.push(`${libretroTitlesBase}/${this.safeEncode(cleanTitle + region)}.png`);
+    });
 
-    // Try fully normalized title
+    // Try normalized title
     const normalizedTitle = this.normalizeTitle(title);
     sources.push(`${libretroBase}/${this.safeEncode(normalizedTitle)}.png`);
     sources.push(`${libretroBase}/${this.safeEncode(normalizedTitle + ' (USA)')}.png`);
+    
+    // Try with " - " replacement (some games use ":" which Libretro replaces with " - ")
+    if (titleWithoutExt.includes(':')) {
+      const dashTitle = titleWithoutExt.replace(/:/g, ' -');
+      sources.push(`${libretroBase}/${this.safeEncode(dashTitle)}.png`);
+    }
 
     // 2. Archive.org
     if (archiveIdentifier) {
+      // Archive.org auto-generated thumb (usually the best fallback)
       sources.push(`https://archive.org/services/img/${archiveIdentifier}`);
-      // Try to find a PNG in the download folder (common for some sets)
+      
+      // Try specific common filenames in the item
       const archiveTitle = normalizedTitle.replace(/\s+/g, '_');
       sources.push(`https://archive.org/download/${archiveIdentifier}/${archiveTitle}.png`);
+      sources.push(`https://archive.org/download/${archiveIdentifier}/cover.jpg`);
+      sources.push(`https://archive.org/download/${archiveIdentifier}/boxart.jpg`);
+      sources.push(`https://archive.org/download/${archiveIdentifier}/front.jpg`);
+      
+      // Try the __ia_thumb.jpg which is almost always present
+      sources.push(`https://archive.org/download/${archiveIdentifier}/__ia_thumb.jpg`);
     }
 
-    // 3. GitHub mirrors alternativos
+    // 3. Alternative CDN (Libretro official)
     sources.push(`https://cdn.libretro.com/thumbnails/${libretroSystem}/Named_Boxarts/${this.safeEncode(cleanTitle)} (USA).png`);
     sources.push(`https://cdn.libretro.com/thumbnails/${libretroSystem}/Named_Boxarts/${this.safeEncode(titleWithoutExt)}.png`);
+    sources.push(`${libretroSnapsBase}/${this.safeEncode(cleanTitle)}.png`);
 
-    // 4. wsrv.nl (Proxy para fuentes externas)
-    // Añadimos versiones proxied de las fuentes más probables
-    const topSources = sources.slice(0, 5);
-    topSources.forEach(src => {
-      if (src.startsWith('http')) {
-        sources.push(`https://wsrv.nl/?url=${encodeURIComponent(src)}&w=400&output=webp&n=-1`);
-      }
-    });
-
-    // 4.5 Backend Tunnel (Last resort proxy if wsrv.nl is blocked or fails)
-    topSources.forEach(src => {
-      if (src.startsWith('http')) {
-        sources.push(`/api/tunnel?url=${encodeURIComponent(src)}`);
-      }
-    });
+    // 4. OpenGameArt / IGDB Proxy
+    // Use wsrv.nl to proxy and resize everything for better performance and CORS bypass
+    const finalSources: string[] = [];
     
-    // 5. Placeholder local
-    sources.push('/placeholder-cover.png');
+    // Add original sources but wrapped in wsrv.nl for CORS and speed
+    sources.forEach(src => {
+      if (src && src.startsWith('http')) {
+        // We prioritize the proxied version because it's more reliable for CORS
+        finalSources.push(`https://wsrv.nl/?url=${encodeURIComponent(src)}&w=400&output=webp&n=-1`);
+        finalSources.push(src);
+      }
+    });
 
-    return [...new Set(sources.filter(Boolean))]; // Remove duplicates and nulls
+    // 5. Placeholder local
+    finalSources.push('/placeholder-cover.png');
+
+    return [...new Set(finalSources.filter(Boolean))];
   }
 
   /**
