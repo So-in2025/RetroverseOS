@@ -31,6 +31,7 @@ export default function ChatPanel({ isOpen, onClose, gameId }: ChatPanelProps) {
 
     // Load recent messages
     const fetchMessages = async () => {
+      if (!supabase) return;
       const { data } = await supabase
         .from('game_chat')
         .select('*')
@@ -47,6 +48,7 @@ export default function ChatPanel({ isOpen, onClose, gameId }: ChatPanelProps) {
     fetchMessages();
 
     // Subscribe to new messages
+    if (!supabase) return;
     const channel = supabase
       .channel(`chat_${gameId}`)
       .on('postgres_changes', { 
@@ -69,7 +71,9 @@ export default function ChatPanel({ isOpen, onClose, gameId }: ChatPanelProps) {
       });
 
     return () => {
-      supabase.removeChannel(channel);
+      if (supabase && channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [isOpen, gameId, user]);
 
@@ -87,12 +91,14 @@ export default function ChatPanel({ isOpen, onClose, gameId }: ChatPanelProps) {
     setNewMessage('');
     haptics.light();
 
-    await supabase.from('game_chat').insert([{
-      game_id: gameId,
-      user_id: user.id,
-      user_name: user.user_metadata?.name || 'Ronin',
-      content
-    }]);
+    if (supabase) {
+      await supabase.from('game_chat').insert([{
+        game_id: gameId,
+        user_id: user.id,
+        user_name: user.user_metadata?.name || 'Ronin',
+        content
+      }]);
+    }
   };
 
   return (

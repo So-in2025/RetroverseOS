@@ -77,6 +77,7 @@ export default function GameDetail() {
       {/* Hero Background */}
       <div className="absolute inset-0 z-0">
         <GameCover 
+          key={game.game_id}
           gameId={game.game_id}
           primaryUrl={game.cover_url || game.artwork_url} 
           title={game.title}
@@ -100,6 +101,7 @@ export default function GameDetail() {
             className="w-64 md:w-80 shrink-0 rounded-lg shadow-2xl shadow-black/50 overflow-hidden border border-white/10"
           >
             <GameCover 
+              key={game.game_id}
               gameId={game.game_id}
               primaryUrl={game.cover_url || game.artwork_url} 
               title={game.title}
@@ -278,7 +280,7 @@ export default function GameDetail() {
       </div>
 
       {/* AI Intel Modal */}
-      <AnimatePresence>
+      <AnimatePresence mode="popLayout">
         {isModalOpen && (
           <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4">
             <motion.div 

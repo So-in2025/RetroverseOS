@@ -4,15 +4,20 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../services/AuthContext';
 import { supabase } from '../services/supabase';
 import { Gamepad2, Lock, ArrowRight, Power, Cpu, ShieldCheck, Terminal, Scan, Loader2, User as UserIcon } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Login() {
+  console.log('📦 [Login] Rendering');
   const [error, setError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [bootSequence, setBootSequence] = useState(true);
   const [bootStep, setBootStep] = useState(0);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
   
-  const { signInWithGoogle, user } = useAuth();
+  const { signInWithGoogle, signInAnonymously, signInAsDeveloper, signInWithEmail, signUpWithEmail, user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -49,11 +54,42 @@ export default function Login() {
     }
   };
 
-  const handleTestLogin = async () => {
+  const handleGuestLogin = async () => {
     try {
       setIsLoggingIn(true);
       setError('');
-      await signInWithGoogle(); // This now calls mockSignIn if supabase is null
+      await signInAnonymously();
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed');
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleDevLogin = async () => {
+    try {
+      setIsLoggingIn(true);
+      setError('');
+      await signInAsDeveloper();
+    } catch (err: any) {
+      setError(err.message || 'Authentication failed');
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) return;
+    
+    try {
+      setIsLoggingIn(true);
+      setError('');
+      if (isSignUp) {
+        await signUpWithEmail(email, password);
+        setError('Check your email for confirmation link');
+        setIsLoggingIn(false);
+      } else {
+        await signInWithEmail(email, password);
+      }
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
       setIsLoggingIn(false);
@@ -69,7 +105,7 @@ export default function Login() {
       {/* Ambient Glow */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-cyan-electric/5 rounded-full blur-[120px] pointer-events-none" />
 
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="popLayout">
         {bootSequence ? (
           <motion.div 
             key="boot"
@@ -152,7 +188,7 @@ export default function Login() {
                     Puerta de Enlace Segura v2.0 // OAuth 2.0 Habilitado
                   </p>
 
-                  <div className="w-full space-y-6">
+                  <div className="w-full space-y-4">
                     <AnimatePresence>
                       {error && (
                         <motion.div 
@@ -166,35 +202,115 @@ export default function Login() {
                       )}
                     </AnimatePresence>
 
-                    <button
-                      onClick={handleGoogleLogin}
-                      disabled={isLoggingIn}
-                      className="group w-full py-5 bg-white text-black rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-cyan-electric transition-all shadow-lg hover:shadow-[0_0_40px_rgba(0,242,255,0.4)] flex items-center justify-center gap-3 relative overflow-hidden mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <span className="relative z-10 flex items-center gap-2">
-                        {isLoggingIn ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Conectando...
-                          </>
-                        ) : (
-                          <>
-                            Iniciar sesión con Google <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                          </>
-                        )}
-                      </span>
-                    </button>
+                    {!showEmailForm ? (
+                      <div className="space-y-4">
+                        <button
+                          onClick={handleGoogleLogin}
+                          disabled={isLoggingIn}
+                          className="group w-full py-5 bg-white text-black rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-cyan-electric transition-all shadow-lg hover:shadow-[0_0_40px_rgba(0,242,255,0.4)] flex items-center justify-center gap-3 relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <span className="relative z-10 flex items-center gap-2">
+                            {isLoggingIn ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Conectando...
+                              </>
+                            ) : (
+                              <>
+                                Iniciar sesión con Google <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                              </>
+                            )}
+                          </span>
+                        </button>
 
-                    {!supabase && (
-                      <button
-                        onClick={handleTestLogin}
-                        className="group w-full py-5 bg-zinc-800 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-zinc-700 transition-all shadow-lg flex items-center justify-center gap-3 relative overflow-hidden mt-4"
+                        <button
+                          onClick={() => setShowEmailForm(true)}
+                          disabled={isLoggingIn}
+                          className="group w-full py-5 bg-zinc-900 border border-white/10 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-zinc-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                        >
+                          <Terminal className="w-4 h-4" />
+                          Usar Correo Electrónico
+                        </button>
+
+                        <div className="flex items-center gap-4 py-2">
+                          <div className="h-px flex-1 bg-white/10" />
+                          <span className="text-[8px] text-zinc-600 uppercase tracking-widest">O</span>
+                          <div className="h-px flex-1 bg-white/10" />
+                        </div>
+
+                        <button
+                          onClick={handleGuestLogin}
+                          disabled={isLoggingIn}
+                          className="group w-full py-4 bg-transparent border border-white/5 text-zinc-500 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:text-white hover:border-white/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                        >
+                          <UserIcon className="w-3 h-3" />
+                          Entrar como Invitado
+                        </button>
+
+                        <button
+                          onClick={handleDevLogin}
+                          disabled={isLoggingIn}
+                          className="group w-full py-4 bg-transparent border border-cyan-electric/20 text-cyan-electric rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-cyan-electric/10 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                        >
+                          <Terminal className="w-3 h-3" />
+                          Entrar como Desarrollador
+                        </button>
+                      </div>
+                    ) : (
+                      <motion.form 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        onSubmit={handleEmailAuth} 
+                        className="space-y-4"
                       >
-                        <span className="relative z-10 flex items-center gap-2">
-                          <UserIcon className="w-4 h-4" />
-                          Iniciar sesión de prueba <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                        </span>
-                      </button>
+                        <div className="space-y-2">
+                          <label className="text-[9px] text-zinc-500 uppercase tracking-widest ml-1">Terminal_ID (Email)</label>
+                          <input 
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                            className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-cyan-electric/50 transition-colors"
+                            placeholder="user@retroverse.os"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[9px] text-zinc-500 uppercase tracking-widest ml-1">Access_Code (Password)</label>
+                          <input 
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-cyan-electric/50 transition-colors"
+                            placeholder="••••••••"
+                          />
+                        </div>
+                        
+                        <button
+                          type="submit"
+                          disabled={isLoggingIn}
+                          className="w-full py-4 bg-cyan-electric text-black rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-cyan-400 transition-all shadow-lg disabled:opacity-50"
+                        >
+                          {isLoggingIn ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (isSignUp ? 'Crear Cuenta' : 'Acceder')}
+                        </button>
+
+                        <div className="flex flex-col gap-2 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => setIsSignUp(!isSignUp)}
+                            className="text-[9px] text-zinc-500 uppercase tracking-widest hover:text-cyan-electric transition-colors"
+                          >
+                            {isSignUp ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowEmailForm(false)}
+                            className="text-[9px] text-zinc-400 uppercase tracking-widest hover:text-white transition-colors flex items-center justify-center gap-1"
+                          >
+                            <ArrowRight className="w-3 h-3 rotate-180" /> Volver
+                          </button>
+                        </div>
+                      </motion.form>
                     )}
 
                     <p className="text-[9px] text-zinc-600 text-center uppercase tracking-widest leading-relaxed">

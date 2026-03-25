@@ -1,4 +1,4 @@
-import { motion } from 'motion/react';
+import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Play, Users, Zap, Trophy, Clock, Star, ArrowRight, Flame, Globe, Swords, Sparkles } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
@@ -73,6 +73,7 @@ export default function Home() {
         <section className="relative h-[60vh] md:h-[70vh] w-full overflow-hidden">
           <div className="absolute inset-0 z-0">
             <GameCover 
+              key={featuredGame.game_id}
               gameId={featuredGame.game_id}
               primaryUrl={featuredGame.cover_url || featuredGame.artwork_url} 
               title={featuredGame.title}

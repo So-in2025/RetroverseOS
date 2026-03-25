@@ -1,9 +1,10 @@
 {
-  "name": "Retroverse OS",
+  "name": "Remix: Retroverse OS",
   "description": "The elite, zero-install retro gaming ecosystem. Play instantly, compete online, and access the premium vault of legendary titles with AI-powered tactical coaching.",
   "requestFramePermissions": [
     "camera",
     "microphone",
-    "geolocation"
+    "geolocation",
+    "screen-wake-lock"
   ]
 }

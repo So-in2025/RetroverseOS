@@ -148,7 +148,7 @@ export class MetadataNormalizationEngine {
         if (response && response.ok) {
           const text = await response.text();
           
-          if (!text || text.trim().startsWith('<!DOCTYPE')) {
+          if (!text || text.trim().toLowerCase().startsWith('<!doctype')) {
              throw new Error("Received HTML instead of JSON from Archive.org");
           }
 
@@ -312,16 +312,19 @@ export class MetadataNormalizationEngine {
       'psx': 'Sony - PlayStation',
       'ps2': 'Sony - PlayStation 2',
       'atari_2600': 'Atari - 2600',
-      'n64': 'Nintendo - Nintendo 64'
+      'atari_7800': 'Atari - 7800',
+      'n64': 'Nintendo - Nintendo 64',
+      'mastersystem': 'Sega - Master System - Mark III',
+      'gamegear': 'Sega - Game Gear',
+      'pcengine': 'NEC - PC Engine - TurboGrafx 16',
+      'wonderswan': 'Bandai - WonderSwan',
+      'ngp': 'SNK - Neo Geo Pocket'
     };
 
-      const libretroSystem = ((mapping as any).system_id ? libretroSystemNames[(mapping as any).system_id] : (libretroSystemNames[systemKey] || mapping.system)).replace(/ /g, '_');
-      let bestTitleForLibretro = doc.title || identifier;
-      bestTitleForLibretro = bestTitleForLibretro.replace(/_/g, ' ');
-      const libretroTitle = bestTitleForLibretro.replace(/[&*/:`<>?\|"]/g, '_');
-
-      const coverUrl = `https://raw.githubusercontent.com/libretro-thumbnails/${encodeURIComponent(libretroSystem)}/master/Named_Boxarts/${encodeURIComponent(libretroTitle)}.png`;
-      const artworkUrl = `https://raw.githubusercontent.com/libretro-thumbnails/${encodeURIComponent(libretroSystem)}/master/Named_Snaps/${encodeURIComponent(libretroTitle)}.png`;
+    const libretroSystem = ((mapping as any).system_id ? libretroSystemNames[(mapping as any).system_id] : (libretroSystemNames[systemKey] || mapping.system));
+    const sources = CoverService.getCoverSources(doc.title || identifier, systemKey, identifier);
+    const coverUrl = sources[0];
+    const artworkUrl = sources.find(s => s.includes('Named_Snaps')) || sources[1] || null;
 
     let genre = null;
     if (doc.subject) {
@@ -475,96 +478,8 @@ export class MetadataNormalizationEngine {
     const romUrl = `https://archive.org/download/${rawData.identifier}/${encodeURIComponent(romFile.name)}`;
     
     // --- TRIPLE ART CASCADE ENGINE ---
-    
-    // 1. Libretro Master (High Quality)
-    // Mapping for Libretro System Names (Official thumbnails.libretro.com format)
-    const libretroSystemNames: Record<string, string> = {
-      'nes': 'Nintendo - Nintendo Entertainment System',
-      'snes': 'Nintendo - Super Nintendo Entertainment System',
-      'sega_genesis': 'Sega - Mega Drive - Genesis',
-      'gba': 'Nintendo - Game Boy Advance',
-      'gbc': 'Nintendo - Game Boy Color',
-      'gb': 'Nintendo - Game Boy',
-      'psx': 'Sony - PlayStation',
-      'ps2': 'Sony - PlayStation 2',
-      'atari_2600': 'Atari - 2600',
-      'atari_7800': 'Atari - 7800',
-      'n64': 'Nintendo - Nintendo 64',
-      'lynx': 'Atari - Lynx',
-      'pcengine': 'NEC - PC Engine - TurboGrafx 16'
-    };
-
-    const libretroSystem = ((mapping as any).system_id ? libretroSystemNames[(mapping as any).system_id] : (libretroSystemNames[systemKey] || mapping.system)).replace(/ /g, '_');
-    
-    // Libretro uses "No-Intro" naming convention which INCLUDES the region (e.g. "(USA)").
-    // We must use the RAW title (or close to it) but sanitized for their file naming rules.
-    // Rules: Replace &*/:`<>?\|"# with _
-    // We should NOT use the 'cleanTitle' (which strips regions) for Libretro.
-    
-    // Try to use the title from the file name if possible, as it usually matches No-Intro best.
-    let bestTitleForLibretro = rawData.title || rawData.identifier;
-    
-    // If we found a ROM file, its name (minus extension) is often the best No-Intro match
-    if (romFile && romFile.name) {
-        bestTitleForLibretro = romFile.name.replace(/\.[^/.]+$/, ""); // Remove extension
-    }
-
-    // SPECIAL CASE FOR ARCADE: Arcade games often have short names (mslug).
-    if ((systemKey === 'mame' || systemKey === 'neogeo') && bestTitleForLibretro.length < 10) {
-        if (rawData.title && rawData.title.length > bestTitleForLibretro.length) {
-            bestTitleForLibretro = rawData.title;
-        } else {
-            bestTitleForLibretro = cleanTitle;
-        }
-    }
-
-    // Archive.org files often use underscores instead of spaces. We must revert them for Libretro.
-    bestTitleForLibretro = bestTitleForLibretro.replace(/_/g, ' ');
-
-    // Libretro sanitization rules: replace special characters with underscore
-    const libretroTitle = bestTitleForLibretro.replace(/[&*/:`<>?\|"#]/g, '_'); 
-
-    const libretroCoverUrl = `https://raw.githubusercontent.com/libretro-thumbnails/${encodeURIComponent(libretroSystem)}/master/Named_Boxarts/${encodeURIComponent(libretroTitle)}.png`;
-    const libretroArtworkUrl = `https://raw.githubusercontent.com/libretro-thumbnails/${encodeURIComponent(libretroSystem)}/master/Named_Snaps/${encodeURIComponent(libretroTitle)}.png`;
-    const libretroTitleUrl = `https://raw.githubusercontent.com/libretro-thumbnails/${encodeURIComponent(libretroSystem)}/master/Named_Titles/${encodeURIComponent(libretroTitle)}.png`;
-    
-    // 2. Archive.org Native (Thumbnail)
-    // Archive.org often has a __ia_thumb.jpg or similar. We can try to guess it or use the generic service.
-    // The generic service is `https://archive.org/services/img/{identifier}`
-    const archiveThumbnailUrl = `https://archive.org/services/img/${rawData.identifier}`;
-    
-    // 3. OpenGameArt Fallback (Generic Cartridge)
-    // We'll use a placeholder service that generates a cartridge style image if possible, 
-    // or a high-quality static asset. For now, we use a reliable placeholder service with text.
-    const fallbackCoverUrl = `https://placehold.co/400x600/1a1a1a/00f2ff?text=${encodeURIComponent(cleanTitle)}&font=roboto`;
-
-    // We return the Libretro URL as primary. The UI component (GameCover) 
-    // MUST be updated to handle the fallback if this 404s. 
-    // However, since we can't change the UI logic from here, we will try to be smart.
-    // But the user requested "Triple Cascada de Arte" logic here.
-    // Ideally, we provide a list, but the interface expects a string.
-    // We will stick to Libretro as the "Master" URL. 
-    // The UI *should* have an onError handler that tries the Archive thumbnail.
-    // UPDATE: To ensure the "Archive Native" works if Libretro fails, we can't verify it here without fetching.
-    // But we can return a special URL structure or just the Libretro one and hope the UI handles it.
-    // Wait, the user said "Implementa un sistema de Triple Cascada".
-    // If I can't change the UI to handle the cascade, I have to do it here? No, doing it here means 3 fetches per game. Too slow.
-    // The "GameCover" component is the right place for the *execution* of the cascade.
-    // But I will provide the Libretro URL here as it is the "Master".
-    
-    // Actually, let's look at the user request again: "Implementa un sistema de Triple Cascada de Arte... 1. Libretro... 2. Archive... 3. OpenGameArt".
-    // I will construct the URL to point to Libretro.
-    // I will ALSO update the `GameCover` component (if I can) or `GameLibrary` to handle the error.
-    // But for this file, I will set `cover_url` to Libretro.
-    
-    let coverUrl = libretroCoverUrl;
-    
-    // If we have a definitive archive cover file, we might want to use it as a backup?
-    // The user said "Si falla la 1, descarga el thumbnail interno".
-    // I will attach the archive thumbnail URL as `artwork_url` if no other artwork is found, 
-    // so the UI can potentially swap to it? No, `artwork_url` is for background.
-    
-    // Let's just set the coverUrl to Libretro.
+    const sources = CoverService.getCoverSources(rawData.title || rawData.identifier, systemKey, rawData.identifier);
+    const coverUrl = sources[0];
     
     let artworkUrl = null;
     const priorityArtwork = rawData.files?.find(f => 
@@ -576,21 +491,14 @@ export class MetadataNormalizationEngine {
     if (priorityArtwork) {
       artworkUrl = `https://archive.org/download/${rawData.identifier}/${encodeURIComponent(priorityArtwork.name)}`;
     } else {
-      // Use Libretro Named_Snaps for artwork/background
-      artworkUrl = libretroArtworkUrl;
-    }
-    
-    // Fallback if artwork is missing, try title screen
-    if (!artworkUrl) {
-        artworkUrl = libretroTitleUrl;
+      // Use Libretro Named_Snaps for artwork/background if available in sources
+      artworkUrl = sources.find(s => s.includes('Named_Snaps')) || sources[1] || null;
     }
     
     // 6. Buscar video preview o gif
     // Priority: Archive.org mp4 > screenscraper (not implemented yet)
     const videoFile = rawData.files?.find(f => f.name.endsWith('.mp4') || f.name.endsWith('.gif'));
     const videoPreviewUrl = videoFile ? `https://archive.org/download/${rawData.identifier}/${encodeURIComponent(videoFile.name)}` : null;
-
-    // ... rest of logic
 
     // 7. Extraer género
     let genre = null;
@@ -613,7 +521,7 @@ export class MetadataNormalizationEngine {
     }
 
     return {
-      game_id: rawData.identifier,
+      game_id: rawData.identifier.replace(/\s+/g, '_'),
       title: cleanTitle,
       system: mapping.system,
       system_id: systemKey,
@@ -848,9 +756,6 @@ export class MetadataNormalizationEngine {
 
     let q = `mediatype:(software)`;
     
-    // Exclude obvious non-games
-    q += ` AND NOT title:(BIOS OR Soundtrack OR Manual OR Demo OR "Not Working" OR "Update" OR Magazine OR Guide OR Romset OR "Rom Set" OR "Rom Pack" OR "CHD Pack" OR "Full Set" OR Collection OR Emulator OR "MAME 0.*" OR "PC World" OR "PC Gamer" OR "PC Magazine" OR Coverdisc OR "Cover Disc" OR "Demo Disc" OR "Preview Disc" OR "Review Disc" OR "GOG Edition" OR "Steam Edition" OR Repack OR Installer OR Setup OR Utility OR Driver OR Software OR Shareware OR Freeware OR Patch OR Crack OR Trainer OR Portable OR Rip OR "Full Game" OR "Disc 1" OR "Disc 2" OR "Disc 3" OR "Disc 4" OR "Disc 5" OR "CD-ROM" OR CDROM OR "DVD-ROM" OR DVDROM)`;
-    
     if (query) {
       // Escape special characters for Archive.org
       const escapedQuery = query.replace(/[():]/g, '\\$&');
@@ -880,13 +785,12 @@ export class MetadataNormalizationEngine {
 
     // Primary and Fallback Queries
     const queries = [q];
-    const notFilters = `NOT title:(BIOS OR Soundtrack OR Manual OR Demo OR "Not Working" OR "Update" OR Magazine OR Guide OR Romset OR "Rom Set" OR "Rom Pack" OR "CHD Pack" OR "Full Set" OR Collection OR Emulator OR "MAME 0.*" OR "PC World" OR "PC Gamer" OR "PC Magazine" OR Coverdisc OR "Cover Disc" OR "Demo Disc" OR "Preview Disc" OR "Review Disc" OR "GOG Edition" OR "Steam Edition" OR Repack OR Installer OR Setup OR Utility OR Driver OR Software OR Shareware OR Freeware OR Patch OR Crack OR Trainer OR Portable OR Rip OR "Full Game" OR "Disc 1" OR "Disc 2" OR "Disc 3" OR "Disc 4" OR "Disc 5" OR "CD-ROM" OR CDROM OR "DVD-ROM" OR DVDROM)`;
     
     if (query && system && system !== 'All') {
       // Fallback 1: Just title and system (less restrictive subject)
-      queries.push(`mediatype:(software) AND title:(${query.replace(/[():]/g, '\\$&')}) AND subject:(${system}) AND ${notFilters}`);
+      queries.push(`mediatype:(software) AND title:(${query.replace(/[():]/g, '\\$&')}) AND subject:(${system})`);
       // Fallback 2: Just title and software mediatype
-      queries.push(`mediatype:(software) AND title:(${query.replace(/[():]/g, '\\$&')}) AND ${notFilters}`);
+      queries.push(`mediatype:(software) AND title:(${query.replace(/[():]/g, '\\$&')})`);
     }
 
     let searchData: any = null;
@@ -898,13 +802,13 @@ export class MetadataNormalizationEngine {
     for (const currentQ of queries) {
       if (searchData || (Date.now() - startTime > globalTimeout)) break;
 
-      const endpoints = [
-        `https://archive.org/advancedsearch.php?q=${encodeURIComponent(currentQ)}&${flParams}&sort[]=${sort}&rows=${rows}&page=${page}&output=json`
-      ];
+      const endpoints = [];
       
       if (page === 1) {
         endpoints.push(`https://archive.org/services/search/v1/scrape?q=${encodeURIComponent(currentQ)}&fields=identifier,title,description,creator,date,subject,collection&count=${scrapeCount}`);
       }
+      
+      endpoints.push(`https://archive.org/advancedsearch.php?q=${encodeURIComponent(currentQ)}&${flParams}&sort[]=${sort}&rows=${rows}&page=${page}&output=json`);
 
       for (const endpoint of endpoints) {
         if (searchData || (Date.now() - startTime > globalTimeout)) break;
@@ -915,7 +819,12 @@ export class MetadataNormalizationEngine {
           if (Date.now() - startTime > globalTimeout) break;
           
           try {
-            const fetchUrl = proxy.url ? `${proxy.url}${encodeURIComponent(endpoint)}` : endpoint;
+            let fetchUrl = endpoint;
+            if (proxy.name === 'CorsProxy') {
+              fetchUrl = `${proxy.url}${endpoint}`;
+            } else if (proxy.url) {
+              fetchUrl = `${proxy.url}${encodeURIComponent(endpoint)}`;
+            }
             console.log(`[Archive.org Search] Attempting via ${proxy.name} (${currentQ.substring(0, 20)}...): ${proxy.name === 'LocalTunnel' ? 'tunneling' : fetchUrl}`);
             
             const controller = new AbortController();

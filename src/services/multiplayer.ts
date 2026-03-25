@@ -1,4 +1,5 @@
-import { io, Socket } from 'socket.io-client';
+import { supabase } from './supabase';
+import { sentinel } from './sentinel';
 
 type SignalPayload = {
   target: string;
@@ -10,11 +11,13 @@ type SignalPayload = {
 export type NetplayStatus = 'disconnected' | 'searching' | 'connecting' | 'connected' | 'reconnecting' | 'error';
 
 export class MultiplayerService {
-  private socket: Socket | null = null;
+  private channel: any = null;
+  private matchmakingChannel: any = null;
   private peerConnection: RTCPeerConnection | null = null;
   private dataChannel: RTCDataChannel | null = null;
   private roomId: string | null = null;
   private userId: string | null = null;
+  private isHost: boolean = false;
   
   private statusCallback: ((status: NetplayStatus) => void) | null = null;
   private onInputCallback: ((input: any) => void) | null = null;
@@ -30,18 +33,15 @@ export class MultiplayerService {
     iceServers: [
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:global.stun.twilio.com:3478' },
-      // Note: In a real production environment, you MUST use a paid TURN server 
-      // (like Twilio, Xirsys, or Metered) because public TURN servers are unreliable.
-      // This is a placeholder for where the TURN server config goes.
-      { 
-        urls: 'turn:openrelay.metered.ca:80',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
+      {
+        urls: 'turn:global.turn.twilio.com:3478?transport=udp',
+        username: 'retroverse_guest', // Placeholder for production
+        credential: 'guest_password'
       },
-      { 
-        urls: 'turn:openrelay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
+      {
+        urls: 'turn:global.turn.twilio.com:3478?transport=tcp',
+        username: 'retroverse_guest',
+        credential: 'guest_password'
       }
     ]
   };
@@ -56,6 +56,7 @@ export class MultiplayerService {
 
   private setStatus(status: NetplayStatus) {
     if (this.statusCallback) this.statusCallback(status);
+    sentinel.logMultiplayer(status);
   }
 
   public onStatusChange(callback: (status: NetplayStatus) => void) {
@@ -66,87 +67,70 @@ export class MultiplayerService {
     this.onLatencyCallback = callback;
   }
 
-  // --- MATCHMAKING ---
-  public joinMatchmaking(gameId: string, userId: string, onMatchFound: (roomId: string, opponentId: string, isHost: boolean) => void) {
-    this.setStatus('searching');
-    
-    if (!this.socket) {
-      this.socket = io({ transports: ['websocket'] }); // Force WS for lower latency
-      this.setupWebRTCListeners();
-    }
-    
-    this.userId = userId;
-
-    this.socket.on('match-found', (data) => {
-      this.roomId = data.roomId;
-      onMatchFound(data.roomId, data.opponentId, data.isHost);
-      this.setStatus('connecting');
-      this.socket?.emit('join-room', data.roomId, userId);
-    });
-
-    this.socket.emit('join-matchmaking', { gameId, userId });
-  }
-
-  public leaveMatchmaking() {
-    if (this.socket) {
-      this.socket.emit('leave-matchmaking');
-      this.socket.off('match-found');
-      this.setStatus('disconnected');
-    }
-  }
-
   // --- ROOM CONNECTION ---
-  public connect(roomId: string, userId: string) {
+  public async connect(roomId: string, userId: string, isHost: boolean = true) {
+    if (!supabase) {
+      console.warn('Supabase not initialized');
+      return;
+    }
+    
     this.roomId = roomId;
     this.userId = userId;
+    this.isHost = isHost;
     this.setStatus('connecting');
+    sentinel.logMultiplayer('connecting', { roomId, userId, isHost });
+    console.log(`[Netplay] Conectando a sala ${roomId} como ${userId} (Host: ${isHost})`);
 
-    if (!this.socket) {
-      this.socket = io({ transports: ['websocket'] });
-      this.setupWebRTCListeners();
-    }
+    this.channel = supabase.channel(`room:${roomId}`, {
+      config: {
+        broadcast: { ack: true },
+        presence: { key: userId }
+      }
+    });
 
-    this.socket.on('connect', () => {
-      console.log('[Netplay] Conectado al servidor de señalización');
-      this.socket?.emit('join-room', roomId, userId);
+    this.setupWebRTCListeners();
+
+    this.channel.subscribe(async (status: string) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('[Netplay] Conectado al canal de Supabase');
+        await this.channel.track({ user_id: userId, joined_at: new Date().toISOString() });
+      }
     });
   }
 
   private setupWebRTCListeners() {
-    this.socket?.on('user-connected', (remoteUserId: string) => {
-      console.log('[Netplay] Oponente conectado:', remoteUserId);
-      this.initiatePeerConnection(remoteUserId);
-    });
+    this.channel
+      .on('presence', { event: 'join' }, ({ newPresences }: any) => {
+        newPresences.forEach((presence: any) => {
+          if (presence.user_id !== this.userId && this.isHost) {
+            console.log('[Netplay] Oponente conectado, iniciando WebRTC:', presence.user_id);
+            this.initiatePeerConnection(presence.user_id);
+          }
+        });
+      })
+      .on('presence', { event: 'leave' }, ({ leftPresences }: any) => {
+        leftPresences.forEach((presence: any) => {
+          if (presence.user_id !== this.userId) {
+            console.log('[Netplay] Oponente desconectado:', presence.user_id);
+            this.setStatus('reconnecting');
+          }
+        });
+      })
+      .on('broadcast', { event: 'signal' }, async ({ payload }: any) => {
+        if (payload.target !== this.userId) return; // Not for me
 
-    this.socket?.on('peer-disconnected', (remoteUserId: string) => {
-      console.log('[Netplay] Oponente desconectado (Grace period iniciado):', remoteUserId);
-      this.setStatus('reconnecting');
-    });
-
-    this.socket?.on('peer-reconnected', (remoteUserId: string) => {
-      console.log('[Netplay] Oponente reconectado:', remoteUserId);
-      this.setStatus('connected');
-    });
-
-    this.socket?.on('room-closed', () => {
-      console.log('[Netplay] Sala cerrada por timeout');
-      this.disconnect();
-      this.setStatus('error');
-    });
-
-    this.socket?.on('offer', async (payload: SignalPayload) => {
-      console.log('[Netplay] Oferta SDP recibida');
-      await this.handleOffer(payload);
-    });
-
-    this.socket?.on('answer', async (payload: SignalPayload) => {
-      console.log('[Netplay] Respuesta SDP recibida');
-      await this.handleAnswer(payload);
-    });
-
-    this.socket?.on('ice-candidate', async (payload: SignalPayload) => {
-      await this.handleIceCandidate(payload);
-    });
+        if (payload.sdp) {
+          if (payload.sdp.type === 'offer') {
+            console.log('[Netplay] Oferta SDP recibida');
+            await this.handleOffer(payload);
+          } else if (payload.sdp.type === 'answer') {
+            console.log('[Netplay] Respuesta SDP recibida');
+            await this.handleAnswer(payload);
+          }
+        } else if (payload.candidate) {
+          await this.handleIceCandidate(payload);
+        }
+      });
   }
 
   // --- WEBRTC PEER CONNECTION ---
@@ -159,7 +143,11 @@ export class MultiplayerService {
 
     this.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        this.socket?.emit('ice-candidate', { target: targetUserId, candidate: event.candidate });
+        this.channel.send({
+          type: 'broadcast',
+          event: 'signal',
+          payload: { target: targetUserId, caller: this.userId, candidate: event.candidate }
+        });
       }
     };
 
@@ -167,7 +155,6 @@ export class MultiplayerService {
       console.log('[Netplay] Estado de conexión:', this.peerConnection?.connectionState);
       if (this.peerConnection?.connectionState === 'connected') {
         this.setStatus('connected');
-        this.socket?.emit('peer-ready', this.roomId, this.userId);
       } else if (this.peerConnection?.connectionState === 'disconnected' || this.peerConnection?.connectionState === 'failed') {
         this.setStatus('reconnecting');
       }
@@ -176,7 +163,11 @@ export class MultiplayerService {
     const offer = await this.peerConnection.createOffer();
     await this.peerConnection.setLocalDescription(offer);
 
-    this.socket?.emit('offer', { target: targetUserId, caller: this.userId, sdp: offer });
+    this.channel.send({
+      type: 'broadcast',
+      event: 'signal',
+      payload: { target: targetUserId, caller: this.userId, sdp: offer }
+    });
   }
 
   private async handleOffer(payload: SignalPayload) {
@@ -188,14 +179,17 @@ export class MultiplayerService {
 
     this.peerConnection.onicecandidate = (event) => {
       if (event.candidate) {
-        this.socket?.emit('ice-candidate', { target: payload.caller!, candidate: event.candidate });
+        this.channel.send({
+          type: 'broadcast',
+          event: 'signal',
+          payload: { target: payload.caller!, caller: this.userId, candidate: event.candidate }
+        });
       }
     };
 
     this.peerConnection.onconnectionstatechange = () => {
       if (this.peerConnection?.connectionState === 'connected') {
         this.setStatus('connected');
-        this.socket?.emit('peer-ready', this.roomId, this.userId);
       } else if (this.peerConnection?.connectionState === 'disconnected' || this.peerConnection?.connectionState === 'failed') {
         this.setStatus('reconnecting');
       }
@@ -205,7 +199,11 @@ export class MultiplayerService {
     const answer = await this.peerConnection.createAnswer();
     await this.peerConnection.setLocalDescription(answer);
 
-    this.socket?.emit('answer', { target: payload.caller!, sdp: answer });
+    this.channel.send({
+      type: 'broadcast',
+      event: 'signal',
+      payload: { target: payload.caller!, caller: this.userId, sdp: answer }
+    });
   }
 
   private async handleAnswer(payload: SignalPayload) {
@@ -284,7 +282,6 @@ export class MultiplayerService {
 
   public sendInput(input: any) {
     if (this.dataChannel?.readyState === 'open') {
-      // Add timestamp to input for rollback/lockstep logic on the receiver side
       const payload = {
         ...input,
         _ts: Date.now()
@@ -297,21 +294,88 @@ export class MultiplayerService {
     return this.currentLatency;
   }
 
+  // --- MATCHMAKING ---
+  public async joinMatchmaking(gameId: string, userId: string, onMatch: (roomId: string, opponentId: string, isHost: boolean) => void) {
+    if (!supabase) {
+      console.warn('Supabase not initialized');
+      return;
+    }
+    this.userId = userId;
+    this.setStatus('searching');
+    
+    // Create a matchmaking channel for this game
+    const matchmakingChannel = supabase.channel(`matchmaking:${gameId}`, {
+      config: {
+        presence: { key: userId }
+      }
+    });
+
+    matchmakingChannel.on('presence', { event: 'sync' }, () => {
+      const state = matchmakingChannel.presenceState();
+      const users = Object.keys(state);
+      
+      // If there's another user, the one with the "smaller" ID becomes the host
+      if (users.length >= 2) {
+        const sortedUsers = users.sort();
+        const myIndex = sortedUsers.indexOf(userId);
+        const opponentId = sortedUsers[myIndex === 0 ? 1 : 0];
+        const isHost = myIndex === 0;
+        const roomId = `game_${gameId}_${sortedUsers[0]}_${sortedUsers[1]}`;
+        
+        console.log(`[Netplay] Match found! Room: ${roomId}, Opponent: ${opponentId}, Host: ${isHost}`);
+        
+        // Stop matchmaking and connect to the game room
+        if (supabase) {
+          supabase.removeChannel(matchmakingChannel);
+        }
+        this.matchmakingChannel = null;
+        onMatch(roomId, opponentId, isHost);
+        this.connect(roomId, userId, isHost);
+      }
+    });
+
+    matchmakingChannel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await matchmakingChannel.track({ user_id: userId, joined_at: new Date().toISOString() });
+      }
+    });
+
+    this.matchmakingChannel = matchmakingChannel;
+  }
+
+  public leaveMatchmaking() {
+    if (this.matchmakingChannel && supabase) {
+      supabase.removeChannel(this.matchmakingChannel);
+      this.matchmakingChannel = null;
+      this.setStatus('disconnected');
+    }
+  }
+
   // --- CHAT ---
   public sendChatMessage(room: string, message: { user: string, text: string }) {
-    this.socket?.emit('chat-message', { room, ...message });
+    if (this.channel) {
+      this.channel.send({
+        type: 'broadcast',
+        event: 'chat-message',
+        payload: { room, ...message }
+      });
+    }
   }
 
   public onChatMessage(callback: (message: { user: string, text: string }) => void) {
-    this.socket?.on('chat-message', callback);
+    if (this.channel) {
+      this.channel.on('broadcast', { event: 'chat-message' }, ({ payload }: any) => {
+        callback(payload);
+      });
+    }
   }
 
   // --- CLEANUP ---
   public disconnect() {
     this.stopPingInterval();
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
+    if (this.channel && supabase) {
+      supabase.removeChannel(this.channel);
+      this.channel = null;
     }
     if (this.peerConnection) {
       this.peerConnection.close();

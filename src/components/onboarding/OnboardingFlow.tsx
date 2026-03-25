@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Gamepad2, Sparkles, Rocket, ChevronRight, Check, Heart, Zap, Trophy, History } from 'lucide-react';
 import { economyService } from '../../services/economyService';
 import { useAuth } from '../../services/AuthContext';
@@ -26,6 +26,7 @@ const ERAS = [
 ];
 
 const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) => {
+  console.log('📦 [OnboardingFlow] Rendering');
   const { user } = useAuth();
   const [step, setStep] = useState(0);
   const [preferences, setPreferences] = useState<{
@@ -159,7 +160,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) => {
       </div>
 
       <div className="relative w-full max-w-lg flex flex-col items-center">
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout">
           <motion.div
             key={step}
             initial={{ opacity: 0, x: 20 }}

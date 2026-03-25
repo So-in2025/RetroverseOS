@@ -17,7 +17,7 @@ export default defineConfig(({mode}) => {
     },
     build: {
       rollupOptions: {
-        external: ['better-sqlite3'],
+        external: [],
       },
     },
     server: {

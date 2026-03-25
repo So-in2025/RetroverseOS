@@ -41,11 +41,13 @@ const STORE_RECENT = 'recent_games';
 const STORE_SRAM = 'sram_saves'; // Keeping this as it wasn't explicitly renamed but needed for functionality
 const STORE_GCTS = 'gcts_results'; // Keeping this too
 const STORE_STATS = 'game_stats';
+const STORE_PARTIAL_ROMS = 'partial_roms'; // For "Play Instantly" pre-caching
 
 export class StorageService {
   private db: IDBDatabase | null = null;
   private initPromise: Promise<void>;
   private static STORAGE_LIMIT = 3 * 1024 * 1024 * 1024; // 3GB
+  private static PARTIAL_LIMIT = 500 * 1024 * 1024; // 500MB for partials
 
   constructor() {
     this.initPromise = this.initDB();
@@ -55,12 +57,10 @@ export class StorageService {
     return new Promise((resolve, reject) => {
       const timeoutId = setTimeout(() => {
         console.error('[Storage] IndexedDB initialization timed out');
-        // We don't reject here to allow the app to boot without storage if needed
-        // but we log it clearly
         resolve(); 
       }, 5000);
 
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      const request = indexedDB.open(DB_NAME, DB_VERSION + 1); // Increment version
 
       request.onerror = () => {
         clearTimeout(timeoutId);
@@ -77,67 +77,72 @@ export class StorageService {
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result;
         
-        // 1. Games (Catalog)
-        if (!db.objectStoreNames.contains(STORE_GAMES)) {
-          db.createObjectStore(STORE_GAMES, { keyPath: 'game_id' });
-        }
+        // ... (existing stores) ...
+        const stores = [
+          { name: STORE_GAMES, key: 'game_id' },
+          { name: STORE_ROMS, key: 'gameId', index: 'lastAccessed' },
+          { name: STORE_SAVES, key: 'id', indices: ['gameId', 'timestamp'] },
+          { name: STORE_BIOS, key: 'filename' },
+          { name: STORE_SETTINGS, key: 'key' },
+          { name: STORE_CREDITS, key: 'id' },
+          { name: STORE_ACHIEVEMENTS, key: 'id' },
+          { name: STORE_RECENT, key: 'gameId' },
+          { name: STORE_STATS, key: 'gameId' },
+          { name: STORE_SRAM, key: 'gameId' },
+          { name: STORE_GCTS, key: 'gameId' },
+          { name: STORE_PARTIAL_ROMS, key: 'gameId', index: 'timestamp' }
+        ];
 
-        // 2. ROMs (Cache)
-        if (!db.objectStoreNames.contains(STORE_ROMS)) {
-          const romStore = db.createObjectStore(STORE_ROMS, { keyPath: 'gameId' });
-          romStore.createIndex('lastAccessed', 'lastAccessed', { unique: false });
-        }
-
-        // 3. Saves (States)
-        if (!db.objectStoreNames.contains(STORE_SAVES)) {
-          const stateStore = db.createObjectStore(STORE_SAVES, { keyPath: 'id' });
-          stateStore.createIndex('gameId', 'gameId', { unique: false });
-          stateStore.createIndex('timestamp', 'timestamp', { unique: false });
-        }
-
-        // 4. BIOS
-        if (!db.objectStoreNames.contains(STORE_BIOS)) {
-          db.createObjectStore(STORE_BIOS, { keyPath: 'filename' });
-        }
-
-        // 5. Settings
-        if (!db.objectStoreNames.contains(STORE_SETTINGS)) {
-          db.createObjectStore(STORE_SETTINGS, { keyPath: 'key' });
-        }
-
-        // 6. Credits
-        if (!db.objectStoreNames.contains(STORE_CREDITS)) {
-          db.createObjectStore(STORE_CREDITS, { keyPath: 'id' });
-        }
-
-        // 7. Achievements
-        if (!db.objectStoreNames.contains(STORE_ACHIEVEMENTS)) {
-          db.createObjectStore(STORE_ACHIEVEMENTS, { keyPath: 'id' });
-        }
-
-        // 8. Recent Games
-        if (!db.objectStoreNames.contains(STORE_RECENT)) {
-          db.createObjectStore(STORE_RECENT, { keyPath: 'gameId' });
-        }
-
-        // 9. Stats
-        if (!db.objectStoreNames.contains(STORE_STATS)) {
-          db.createObjectStore(STORE_STATS, { keyPath: 'gameId' });
-        }
-
-        // Legacy/Other Stores
-        if (!db.objectStoreNames.contains(STORE_SRAM)) {
-          db.createObjectStore(STORE_SRAM, { keyPath: 'gameId' });
-        }
-
-        if (!db.objectStoreNames.contains(STORE_GCTS)) {
-          db.createObjectStore(STORE_GCTS, { keyPath: 'gameId' });
-        }
+        stores.forEach(s => {
+          if (!db.objectStoreNames.contains(s.name)) {
+            const store = db.createObjectStore(s.name, { keyPath: s.key });
+            if (s.index) store.createIndex(s.index, s.index, { unique: false });
+            if (s.indices) {
+              s.indices.forEach(idx => store.createIndex(idx, idx, { unique: false }));
+            }
+          }
+        });
       };
     });
   }
 
-  // --- BIOS Cache ---
+  // --- Partial ROM Cache (Pre-caching) ---
+
+  async savePartialRom(gameId: string, blob: Blob): Promise<void> {
+    await this.initPromise;
+    if (!this.db) return;
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(STORE_PARTIAL_ROMS, 'readwrite');
+      const store = transaction.objectStore(STORE_PARTIAL_ROMS);
+      const request = store.put({ gameId, blob, timestamp: Date.now() });
+      request.onsuccess = () => resolve();
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getPartialRom(gameId: string): Promise<Blob | null> {
+    await this.initPromise;
+    if (!this.db) return null;
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(STORE_PARTIAL_ROMS, 'readonly');
+      const store = transaction.objectStore(STORE_PARTIAL_ROMS);
+      const request = store.get(gameId);
+      request.onsuccess = () => resolve(request.result?.blob || null);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async isPartialRomCached(gameId: string): Promise<boolean> {
+    await this.initPromise;
+    if (!this.db) return false;
+    return new Promise((resolve) => {
+      const transaction = this.db!.transaction(STORE_PARTIAL_ROMS, 'readonly');
+      const store = transaction.objectStore(STORE_PARTIAL_ROMS);
+      const request = store.count(gameId);
+      request.onsuccess = () => resolve(request.result > 0);
+      request.onerror = () => resolve(false);
+    });
+  }
 
   async cacheBios(filename: string, blob: Blob): Promise<void> {
     await this.initPromise;
@@ -153,6 +158,7 @@ export class StorageService {
 
   async getBios(filename: string): Promise<Blob | null> {
     await this.initPromise;
+    if (!this.db) return null;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_BIOS, 'readonly');
       const store = transaction.objectStore(STORE_BIOS);
@@ -167,6 +173,7 @@ export class StorageService {
 
   async cacheRom(rom: CachedRom): Promise<void> {
     await this.initPromise;
+    if (!this.db) return;
     
     // Check quota and enforce 3GB limit
     await this.enforceStorageLimit(rom.size);
@@ -182,6 +189,7 @@ export class StorageService {
   }
 
   private async enforceStorageLimit(newSize: number) {
+    if (!this.db) return;
     const currentSize = await this.getTotalRomCacheSize();
     if (currentSize + newSize <= StorageService.STORAGE_LIMIT) return;
 
@@ -202,6 +210,7 @@ export class StorageService {
 
   async getCachedRom(gameId: string): Promise<CachedRom | undefined> {
     await this.initPromise;
+    if (!this.db) return undefined;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_ROMS, 'readonly');
       const store = transaction.objectStore(STORE_ROMS);
@@ -214,6 +223,7 @@ export class StorageService {
 
   async isRomCached(gameId: string): Promise<boolean> {
     await this.initPromise;
+    if (!this.db) return false;
     return new Promise((resolve) => {
       const transaction = this.db!.transaction(STORE_ROMS, 'readonly');
       const store = transaction.objectStore(STORE_ROMS);
@@ -224,6 +234,7 @@ export class StorageService {
   }
 
   async updateRomAccessTime(gameId: string): Promise<void> {
+    if (!this.db) return;
     const rom = await this.getCachedRom(gameId);
     if (rom) {
       rom.lastAccessed = Date.now();
@@ -233,6 +244,7 @@ export class StorageService {
 
   async deleteCachedRom(gameId: string): Promise<void> {
     await this.initPromise;
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_ROMS, 'readwrite');
       const store = transaction.objectStore(STORE_ROMS);
@@ -245,6 +257,7 @@ export class StorageService {
 
   async getAllCachedRomsMetadata(): Promise<CachedRomMetadata[]> {
     await this.initPromise;
+    if (!this.db) return [];
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_ROMS, 'readonly');
       const store = transaction.objectStore(STORE_ROMS);
@@ -263,6 +276,7 @@ export class StorageService {
   }
 
   async getTotalRomCacheSize(): Promise<number> {
+    if (!this.db) return 0;
     const metadata = await this.getAllCachedRomsMetadata();
     return metadata.reduce((total, rom) => total + rom.size, 0);
   }
@@ -271,6 +285,7 @@ export class StorageService {
 
   async saveState(state: SaveState): Promise<void> {
     await this.initPromise;
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_SAVES, 'readwrite');
       const store = transaction.objectStore(STORE_SAVES);
@@ -283,6 +298,7 @@ export class StorageService {
 
   async getStates(gameId: string): Promise<SaveState[]> {
     await this.initPromise;
+    if (!this.db) return [];
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_SAVES, 'readonly');
       const store = transaction.objectStore(STORE_SAVES);
@@ -300,6 +316,7 @@ export class StorageService {
 
   async deleteState(id: string): Promise<void> {
     await this.initPromise;
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_SAVES, 'readwrite');
       const store = transaction.objectStore(STORE_SAVES);
@@ -314,6 +331,7 @@ export class StorageService {
 
   async incrementPlayCount(gameId: string): Promise<void> {
     await this.initPromise;
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_STATS, 'readwrite');
       const store = transaction.objectStore(STORE_STATS);
@@ -332,6 +350,7 @@ export class StorageService {
 
   async getAllStats(): Promise<{ gameId: string, playCount: number, lastPlayed: number }[]> {
     await this.initPromise;
+    if (!this.db) return [];
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_STATS, 'readonly');
       const store = transaction.objectStore(STORE_STATS);
@@ -345,6 +364,7 @@ export class StorageService {
 
   async saveSRAM(sram: SramSave): Promise<void> {
     await this.initPromise;
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_SRAM, 'readwrite');
       const store = transaction.objectStore(STORE_SRAM);
@@ -357,6 +377,7 @@ export class StorageService {
 
   async getSRAM(gameId: string): Promise<SramSave | null> {
     await this.initPromise;
+    if (!this.db) return null;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_SRAM, 'readonly');
       const store = transaction.objectStore(STORE_SRAM);
@@ -371,6 +392,7 @@ export class StorageService {
 
   async clearCatalog(): Promise<void> {
     await this.initPromise;
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction([STORE_GAMES, STORE_SETTINGS], 'readwrite');
       const gameStore = transaction.objectStore(STORE_GAMES);
@@ -386,6 +408,7 @@ export class StorageService {
 
   async clearAllRoms(): Promise<void> {
     await this.initPromise;
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_ROMS, 'readwrite');
       const store = transaction.objectStore(STORE_ROMS);
@@ -398,6 +421,7 @@ export class StorageService {
 
   async saveCatalogGame(game: any): Promise<void> {
     await this.initPromise;
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_GAMES, 'readwrite');
       const store = transaction.objectStore(STORE_GAMES);
@@ -410,6 +434,7 @@ export class StorageService {
 
   async saveCatalogGames(games: any[]): Promise<void> {
     await this.initPromise;
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_GAMES, 'readwrite');
       const store = transaction.objectStore(STORE_GAMES);
@@ -434,6 +459,7 @@ export class StorageService {
 
   async getCatalogGames(): Promise<any[]> {
     await this.initPromise;
+    if (!this.db) return [];
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_GAMES, 'readonly');
       const store = transaction.objectStore(STORE_GAMES);
@@ -448,6 +474,7 @@ export class StorageService {
 
   async saveGCTSResult(result: any): Promise<void> {
     await this.initPromise;
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_GCTS, 'readwrite');
       const store = transaction.objectStore(STORE_GCTS);
@@ -460,6 +487,7 @@ export class StorageService {
 
   async getGCTSResults(): Promise<any[]> {
     await this.initPromise;
+    if (!this.db) return [];
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_GCTS, 'readonly');
       const store = transaction.objectStore(STORE_GCTS);
@@ -474,6 +502,7 @@ export class StorageService {
   
   async getSetting(key: string): Promise<any> {
     await this.initPromise;
+    if (!this.db) return null;
     return new Promise((resolve) => {
       const transaction = this.db!.transaction(STORE_SETTINGS, 'readonly');
       const store = transaction.objectStore(STORE_SETTINGS);
@@ -485,6 +514,7 @@ export class StorageService {
 
   async saveSetting(key: string, value: any): Promise<void> {
     await this.initPromise;
+    if (!this.db) return;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_SETTINGS, 'readwrite');
       const store = transaction.objectStore(STORE_SETTINGS);
@@ -498,6 +528,7 @@ export class StorageService {
 
   async getCredits(): Promise<number> {
     await this.initPromise;
+    if (!this.db) return 0;
     return new Promise((resolve) => {
       const transaction = this.db!.transaction(STORE_CREDITS, 'readonly');
       const store = transaction.objectStore(STORE_CREDITS);
@@ -511,6 +542,7 @@ export class StorageService {
     const current = await this.getCredits();
     const newValue = current + amount;
     await this.initPromise;
+    if (!this.db) return newValue;
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_CREDITS, 'readwrite');
       const store = transaction.objectStore(STORE_CREDITS);

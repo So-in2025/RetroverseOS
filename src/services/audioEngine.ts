@@ -162,6 +162,81 @@ export class AudioEngine {
     osc.stop(now + 0.6);
   }
 
+  public static playBootSound() {
+    this.init();
+    if (!this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    
+    // Low hum rising to a bright chime
+    const osc1 = this.ctx.createOscillator();
+    const osc2 = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc1.type = 'sine';
+    osc2.type = 'square';
+    
+    osc1.frequency.setValueAtTime(55, now);
+    osc1.frequency.exponentialRampToValueAtTime(220, now + 1.5);
+    
+    osc2.frequency.setValueAtTime(440, now + 1.0);
+    osc2.frequency.exponentialRampToValueAtTime(880, now + 1.5);
+    
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.2, now + 1.0);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 2.0);
+    
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(this.sfxGain);
+    
+    osc1.start(now);
+    osc2.start(now + 1.0);
+    osc1.stop(now + 2.0);
+    osc2.stop(now + 2.0);
+  }
+
+  public static playNotificationSound() {
+    this.init();
+    if (!this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(880, now);
+    osc.frequency.exponentialRampToValueAtTime(1760, now + 0.1);
+    
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+    
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    
+    osc.start(now);
+    osc.stop(now + 0.3);
+  }
+
+  public static playErrorSound() {
+    this.init();
+    if (!this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, now);
+    osc.frequency.linearRampToValueAtTime(110, now + 0.2);
+    
+    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.linearRampToValueAtTime(0, now + 0.3);
+    
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    
+    osc.start(now);
+    osc.stop(now + 0.3);
+  }
+
   public static toggleBGM() {
     if (this.isPlayingBGM) {
       this.stopBGM();

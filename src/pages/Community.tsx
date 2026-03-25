@@ -148,7 +148,7 @@ export default function Community() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 md:px-8 pb-40 lg:pb-12">
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout">
           
           {/* FEED TAB */}
           {activeTab === 'feed' && (

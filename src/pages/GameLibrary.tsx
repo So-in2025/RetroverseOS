@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { Search, AlertTriangle, Loader2, Trash2, Coins, Trophy, Play, Star, Disc, Gamepad2, Volume2, VolumeX, Heart, Zap, User, Users, Radio, Download } from 'lucide-react';
+import { Search, AlertTriangle, Loader2, Trash2, Coins, Trophy, Play, Star, Disc, Gamepad2, Volume2, VolumeX, Heart, Zap, User, Users, Radio, Download, LayoutGrid, LayoutList, Columns } from 'lucide-react';
 import { gameCatalog } from '../services/gameCatalog';
 import { storage } from '../services/storage';
 import { GameObject, ELITE_TOP_20 } from '../services/metadataNormalization';
@@ -13,7 +13,12 @@ import GameSection from '../components/library/GameSection';
 import { ExpandableTopList } from '../components/library/ExpandableTopList';
 import { LiveRoomsList } from '../components/library/LiveRoomsList';
 import { RecommendedSection } from '../components/library/RecommendedSection';
-import { io } from 'socket.io-client';
+import { netplayService } from '../services/netplayService';
+import { VirtualizedGameGrid } from '../components/library/VirtualizedGameGrid';
+import { romPreloader } from '../services/romPreloader';
+import { useResizeObserver } from '../hooks/useResizeObserver';
+import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
+import SystemDiagnostics from '../components/game/SystemDiagnostics';
 
 const SYSTEM_FILTERS = [
   { id: 'All', name: 'TODAS', systems: [] },
@@ -50,63 +55,14 @@ export default function GameLibrary() {
   const [specialFilter, setSpecialFilter] = useState<null | 'elite' | 'online'>(null);
   const [liveGames, setLiveGames] = useState<{ gameId: string, userId: string, timestamp: number }[]>([]);
   const [cachedGameIds, setCachedGameIds] = useState<Set<string>>(new Set());
+  const [containerRef, { width, height }] = useResizeObserver<HTMLDivElement>();
+
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const libraryRef = useRef<HTMLDivElement>(null);
+  useKeyboardNavigation(libraryRef, '[data-nav-item="true"]');
 
   const deferredGames = React.useDeferredValue(games);
-
-  // Offline detection
-  useEffect(() => {
-    const handleOnline = () => setIsOffline(false);
-    const handleOffline = () => setIsOffline(true);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  // Initialize Elite Top 20
-  useEffect(() => {
-    const elite = gameCatalog.getEliteTop20(); // This function returns 20 games
-    setEliteTop20(elite);
-  }, [deferredGames]);
-
-  const popularGames = useMemo(() => gameCatalog.getEliteTop20(), [games]);
-  const recentGames = useMemo(() => {
-    return [...games].sort((a, b) => (b.year || 0) - (a.year || 0)).slice(0, 20);
-  }, [games]);
-
-  // Initialize Socket for Live Games
-  useEffect(() => {
-    const socket = io(window.location.origin);
-    
-    socket.on('live-games-update', (games) => {
-      setLiveGames(games);
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, []);
-
-  // Sync mobileTab with URL
-  useEffect(() => {
-    const tab = searchParams.get('tab');
-    if (tab === 'search' || tab === 'favorites') {
-      setMobileTab(tab);
-    } else {
-      setMobileTab('library');
-    }
-    // Reset visible count when tab changes
-    setVisibleMobileCount(24);
-  }, [searchParams]);
-
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
-  // Carousel State
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const carouselRef = useRef<HTMLDivElement>(null);
 
   const filteredGames = useMemo(() => {
     let result = deferredGames;
@@ -133,14 +89,16 @@ export default function GameLibrary() {
       const filter = SYSTEM_FILTERS.find(f => f.id === selectedSystem);
       if (filter && filter.systems.length > 0) {
         result = result.filter(g => filter.systems.includes(g.system_id));
-      } else {
-        result = result.filter(g => g.system_id === selectedSystem);
       }
     }
 
-    // 3. Filter by Search
+    // 3. Search Query
     if (searchQuery) {
-      result = result.filter(g => g.title.toLowerCase().includes(searchQuery.toLowerCase()));
+      const query = searchQuery.toLowerCase();
+      result = result.filter(g => 
+        g.title.toLowerCase().includes(query) || 
+        g.system.toLowerCase().includes(query)
+      );
     }
 
     // 4. Filter by Year
@@ -158,7 +116,72 @@ export default function GameLibrary() {
     }
 
     return result;
-  }, [games, selectedSystem, searchQuery, mobileTab, yearFilter, playersFilter, specialFilter]);
+  }, [deferredGames, searchQuery, selectedSystem, mobileTab, cachedGameIds, specialFilter, yearFilter, playersFilter]);
+
+  // Pre-cachear juegos visibles al cambiar
+  useEffect(() => {
+    if (filteredGames.length > 0) {
+      // Pre-cachear los primeros 20 juegos de la lista filtrada
+      romPreloader.addToQueue(filteredGames.slice(0, 20));
+    }
+  }, [filteredGames]);
+
+  // Offline detection
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Initialize Elite Top 20
+  useEffect(() => {
+    const elite = gameCatalog.getEliteTop20(); // This function returns 20 games
+    setEliteTop20(elite);
+  }, [deferredGames]);
+
+  const popularGames = useMemo(() => gameCatalog.getEliteTop20(), [games]);
+  const recentGames = useMemo(() => {
+    return [...games].sort((a, b) => (b.year || 0) - (a.year || 0)).slice(0, 20);
+  }, [games]);
+
+  // Initialize Socket for Live Games
+  useEffect(() => {
+    const unsubscribe = netplayService.subscribeToRooms((rooms) => {
+      const activeGames = rooms.map(room => ({
+        gameId: room.game_id,
+        userId: room.host_id,
+        timestamp: new Date(room.created_at).getTime()
+      }));
+      setLiveGames(activeGames);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Sync mobileTab with URL
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'search' || tab === 'favorites') {
+      setMobileTab(tab);
+    } else {
+      setMobileTab('library');
+    }
+    // Reset visible count when tab changes
+    setVisibleMobileCount(24);
+  }, [searchParams]);
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Carousel State
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const carouselRef = useRef<HTMLDivElement>(null);
 
   // Optimized games by system grouping
   const gamesBySystem = useMemo(() => {
@@ -209,7 +232,19 @@ export default function GameLibrary() {
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.altKey && e.key === 'D') {
+        e.preventDefault();
+        setShowDiagnostics(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleGlobalKeyDown);
+    };
   }, [filteredGames, viewMode, selectedIndex, navigate]);
 
   useEffect(() => {
@@ -351,7 +386,7 @@ export default function GameLibrary() {
     <div className="h-[100dvh] w-full bg-black text-white overflow-hidden flex flex-col relative selection:bg-cyan-electric selection:text-black">
       {/* Dynamic Background based on Hero Game */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout">
           {viewMode === 'carousel' && heroGame && (heroGame.artwork_url || heroGame.cover_url) && (
             <motion.div
               key={heroGame.game_id}
@@ -376,6 +411,8 @@ export default function GameLibrary() {
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 mix-blend-overlay z-20" />
       </div>
 
+      <SystemDiagnostics isOpen={showDiagnostics} onClose={() => setShowDiagnostics(false)} />
+
       {/* Desktop Header */}
       <header className="hidden lg:flex relative z-20 px-8 py-6 bg-gradient-to-b from-black/80 to-transparent">
         <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-4">
@@ -385,6 +422,17 @@ export default function GameLibrary() {
                 <Gamepad2 className="w-8 h-8 text-cyan-electric" />
                 RETROVERSE <span className="text-cyan-electric">OS</span>
               </h1>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                  <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">CORES: OK</span>
+                </div>
+                <div className="w-px h-2 bg-white/10" />
+                <div className="flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-cyan-electric shadow-[0_0_8px_rgba(0,242,255,0.5)]" />
+                  <span className="text-[8px] font-black text-cyan-electric uppercase tracking-widest">ARCHIVE: CONNECTED</span>
+                </div>
+              </div>
             </div>
 
             {/* View Mode Switcher */}
@@ -477,7 +525,10 @@ export default function GameLibrary() {
     </header>
 
       {/* Main Content Area */}
-      <div className={`relative z-10 flex-1 flex flex-col overflow-hidden px-0 lg:px-8 max-w-7xl mx-auto w-full`}>
+      <div 
+        ref={libraryRef}
+        className={`relative z-10 flex-1 flex flex-col overflow-hidden px-0 lg:px-8 max-w-7xl mx-auto w-full`}
+      >
         
         {/* Desktop Category Selection - Compact Dropdown */}
         <div className="hidden lg:flex items-center justify-center py-4 z-30 shrink-0">
@@ -505,7 +556,7 @@ export default function GameLibrary() {
         {/* Desktop Hero Info */}
         {viewMode === 'carousel' && (
           <div className="hidden lg:flex flex-col items-center justify-center mb-4 z-20 pointer-events-none h-[160px] w-full shrink-0">
-            <AnimatePresence mode="wait">
+            <AnimatePresence mode="popLayout">
               {heroGame ? (
                 <motion.div 
                   key={heroGame.game_id}
@@ -536,9 +587,15 @@ export default function GameLibrary() {
                   </div>
                 </motion.div>
               ) : (
-                <div className="h-24 flex items-center text-zinc-500 font-mono text-sm uppercase tracking-widest">
+                <motion.div 
+                  key="fallback"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="h-24 flex items-center text-zinc-500 font-mono text-sm uppercase tracking-widest"
+                >
                   {isSearching ? "ESCANER ARCHIVOS..." : "SELECCIONA UN CARTUCHO"}
-                </div>
+                </motion.div>
               )}
             </AnimatePresence>
           </div>
@@ -611,7 +668,9 @@ export default function GameLibrary() {
                     {filteredGames.slice(0, visibleMobileCount).map((game) => (
                       <div 
                         key={game.game_id}
-                        className="flex flex-col gap-3 bg-zinc-900/60 backdrop-blur-md border border-white/10 p-4 rounded-2xl shadow-lg relative group"
+                        data-nav-item="true"
+                        tabIndex={0}
+                        className="flex flex-col gap-3 bg-zinc-900/60 backdrop-blur-md border border-white/10 p-4 rounded-2xl shadow-lg relative group focus:border-cyan-electric focus:ring-1 focus:ring-cyan-electric outline-none"
                       >
                         <div className="flex items-start gap-4">
                           <Link 
@@ -620,6 +679,7 @@ export default function GameLibrary() {
                             className="w-20 h-28 flex-shrink-0 bg-black rounded-xl overflow-hidden border border-white/10 shadow-lg relative"
                           >
                              <GameCover 
+                                key={game.game_id}
                                 gameId={game.game_id}
                                 primaryUrl={game.cover_url || game.artwork_url} 
                                 title={game.title}
@@ -730,7 +790,9 @@ export default function GameLibrary() {
                     {liveGames.length > 0 && (
                       <GameSection 
                         title="EMPAREJAMIENTO EN VIVO" 
-                        games={liveGames.map(lg => games.find(g => g.game_id === lg.gameId)).filter(Boolean) as GameObject[]} 
+                        games={Array.from(new Set(liveGames.map(lg => lg.gameId)))
+                          .map(gameId => games.find(g => g.game_id === gameId))
+                          .filter(Boolean) as GameObject[]} 
                         variant="live"
                       />
                     )}
@@ -787,6 +849,7 @@ export default function GameLibrary() {
                               }`}
                             >
                               <GameCover 
+                                key={game.game_id}
                                 gameId={game.game_id}
                                 primaryUrl={game.cover_url || game.artwork_url} 
                                 title={game.title}
@@ -911,98 +974,57 @@ export default function GameLibrary() {
                     </div>
 
                     {/* Grid Content */}
-                    <div className="flex-1 overflow-y-auto pb-32 pt-6 px-4 lg:px-0 hide-scrollbar min-h-0">
-                      {(() => {
-                        return (
-                          <div className="space-y-12">
-                            {SYSTEM_FILTERS.filter(f => f.id !== 'All').map(filter => {
-                              const sysGames = filteredGames.filter(game => 
-                                filter.systems.length === 0 ? true : filter.systems.includes(game.system_id)
-                              );
-                              
-                              if (sysGames.length === 0) return null;
+                    <div ref={containerRef} className="flex-1 overflow-y-auto pb-32 pt-6 px-4 lg:px-0 hide-scrollbar min-h-0">
+                      {viewMode === 'systems' && (
+                        <div className="space-y-12">
+                          {SYSTEM_FILTERS.filter(f => f.id !== 'All').map(filter => {
+                            const sysGames = filteredGames.filter(game => 
+                              filter.systems.length === 0 ? true : filter.systems.includes(game.system_id)
+                            );
+                            
+                            if (sysGames.length === 0) return null;
 
-                              const sysName = filter.name;
-                              const visibleCount = visibleCounts[filter.id] || 48;
-                              const visibleGames = sysGames.slice(0, visibleCount);
-                              const hasMore = sysGames.length > visibleCount;
+                            const sysName = filter.name;
+                            const collapsed = collapsedSystems.has(filter.id);
 
-                              return (
-                                <div key={filter.id} className="space-y-6 animate-in fade-in duration-500">
-                                  <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-2 cursor-pointer" onClick={() => toggleSystem(filter.id)}>
-                                    <div className="flex items-center gap-4">
-                                      <h3 className="text-2xl font-black italic uppercase tracking-tighter text-cyan-electric">
-                                        {sysName} BASE DE DATOS
-                                      </h3>
-                                      <span className="text-xs font-mono text-zinc-500 bg-white/5 px-2 py-1 rounded">
-                                        {sysGames.length} TÍTULOS ASEGURADOS
-                                      </span>
-                                    </div>
-                                    <button className="text-xs font-black uppercase tracking-widest text-zinc-500 hover:text-cyan-electric transition-colors">
-                                      {collapsedSystems.has(filter.id) ? 'EXPANDIR' : 'CONTRAER'}
-                                    </button>
+                            return (
+                              <div key={filter.id} className="space-y-6 animate-in fade-in duration-500">
+                                <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-2 cursor-pointer" onClick={() => toggleSystem(filter.id)}>
+                                  <div className="flex items-center gap-4">
+                                    <h3 className="text-2xl font-black italic uppercase tracking-tighter text-cyan-electric">
+                                      {sysName} BASE DE DATOS
+                                    </h3>
+                                    <span className="text-xs font-mono text-zinc-500 bg-white/5 px-2 py-1 rounded">
+                                      {sysGames.length} TÍTULOS ASEGURADOS
+                                    </span>
                                   </div>
-                                  
-                                  {!collapsedSystems.has(filter.id) && (
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-4 lg:gap-6">
-                                      {visibleGames.map((game) => (
-                                        <Link 
-                                          key={game.game_id}
-                                          to={`/play/${game.game_id}?url=${encodeURIComponent(game.rom_url)}&system=${game.system_id}`}
-                                          onClick={() => AudioEngine.playSelectSound()}
-                                          className="group relative aspect-[2/3] bg-zinc-900 rounded-xl overflow-hidden border border-white/10 hover:border-cyan-electric hover:shadow-[0_0_20px_rgba(0,242,255,0.2)] transition-all"
-                                        >
-                                          <GameCover 
-                                             gameId={game.game_id}
-                                             primaryUrl={game.cover_url || game.artwork_url} 
-                                             title={game.title}
-                                             systemId={game.system_id}
-                                             className="w-full h-full transition-transform duration-500 group-hover:scale-110"
-                                           />
-                                           <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-4 text-center">
-                                              <Play className="w-10 h-10 text-cyan-electric fill-current mb-3 drop-shadow-[0_0_10px_rgba(0,242,255,0.8)] transform scale-90 group-hover:scale-100 transition-transform" />
-                                              <h4 className="font-black text-xs uppercase tracking-tight leading-tight text-white mb-2">
-                                                {game.title}
-                                              </h4>
-                                              <DownloadButton 
-                                                gameId={game.game_id} 
-                                                romUrl={game.rom_url} 
-                                                systemId={game.system_id}
-                                                onStatusChange={(isCached) => {
-                                                  if (isCached) {
-                                                    setCachedGameIds(prev => new Set([...prev, game.game_id]));
-                                                  } else {
-                                                    setCachedGameIds(prev => {
-                                                      const next = new Set(prev);
-                                                      next.delete(game.game_id);
-                                                      return next;
-                                                    });
-                                                  }
-                                                }}
-                                              />
-                                           </div>
-                                        </Link>
-                                      ))}
-                                    </div>
-                                  )}
-                                  
-                                  {!collapsedSystems.has(filter.id) && hasMore && (
-                                    <div className="flex justify-center mt-8 pb-8">
-                                       <button 
-                                         onClick={() => setVisibleCounts(prev => ({...prev, [filter.id]: (prev[filter.id] || 48) + 48}))}
-                                         className="px-8 py-3 bg-zinc-900 border border-white/10 hover:border-cyan-electric hover:text-cyan-electric text-zinc-400 rounded-xl font-black text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-lg flex items-center gap-2"
-                                       >
-                                         <Zap className="w-4 h-4" />
-                                         DESCIFRAR MÁS TÍTULOS ({sysGames.length - visibleCount} RESTANTES)
-                                       </button>
-                                    </div>
-                                  )}
+                                  <button className="text-xs font-black uppercase tracking-widest text-zinc-500 hover:text-cyan-electric transition-colors">
+                                    {collapsed ? 'EXPANDIR' : 'CONTRAER'}
+                                  </button>
                                 </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })()}
+                                
+                                {!collapsed && (
+                                  <div className="h-[600px] w-full">
+                                    <VirtualizedGameGrid 
+                                      games={sysGames}
+                                      width={width || 1200}
+                                      height={600}
+                                      onCacheChange={(id, cached) => {
+                                        setCachedGameIds(prev => {
+                                          const next = new Set(prev);
+                                          if (cached) next.add(id);
+                                          else next.delete(id);
+                                          return next;
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

@@ -307,7 +307,7 @@ export default function Settings() {
 
           {/* Content Area */}
           <div className="flex-1 bg-zinc-900/50 border border-white/5 rounded-2xl p-5 md:p-8 min-h-0 md:min-h-[500px]">
-            <AnimatePresence mode="wait">
+            <AnimatePresence mode="popLayout">
               
               {/* VIDEO SETTINGS */}
               {activeTab === 'video' && (

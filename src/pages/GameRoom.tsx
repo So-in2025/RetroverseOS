@@ -29,11 +29,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { BYOKModal } from '../components/ai/BYOKModal';
 import ChatPanel from '../components/game/ChatPanel';
 import EmulatorSettingsPanel from '../components/game/EmulatorSettingsPanel';
+import PerformanceHUD from '../components/game/PerformanceHUD';
+import { notify } from '../components/game/ConsoleNotification';
 
 import { saveService } from '../services/saveService';
 import { useAuth } from '../services/AuthContext';
 import { useCustomization } from '../hooks/useCustomization';
 import { useEconomy } from '../hooks/useEconomy';
+import { telemetry } from '../services/telemetry';
 
 export default function GameRoom() {
   const { gameId } = useParams();
@@ -83,6 +86,9 @@ export default function GameRoom() {
   const { balance } = useEconomy();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isRecordingClip, setIsRecordingClip] = useState(false);
+  const [showPerformanceHUD, setShowPerformanceHUD] = useState(false);
+  const [isRewinding, setIsRewinding] = useState(false);
+  const [isFastForwarding, setIsFastForwarding] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -120,6 +126,10 @@ export default function GameRoom() {
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [showHypeNotification, setShowHypeNotification] = useState(false);
   const [isHost, setIsHost] = useState(true);
+  const isHostRef = useRef(isHost);
+  useEffect(() => {
+    isHostRef.current = isHost;
+  }, [isHost]);
   const [showCloudSaveToast, setShowCloudSaveToast] = useState(false);
   const [isOpponentDisconnected, setIsOpponentDisconnected] = useState(false);
 
@@ -157,10 +167,56 @@ export default function GameRoom() {
       if (e.key.toLowerCase() === 'h') {
         setIsUiVisible(prev => !prev);
       }
+      
+      // Performance HUD Shortcut: Shift + Alt + P
+      if (e.shiftKey && e.altKey && e.code === 'KeyP') {
+        e.preventDefault();
+        setShowPerformanceHUD(prev => !prev);
+      }
+
+      // Rewind Shortcut: Shift + R
+      if (e.shiftKey && e.code === 'KeyR' && gameStateRef.current === 'playing') {
+        e.preventDefault();
+        handleRewind(true);
+      }
+
+      // Fast Forward Shortcut: Shift + F
+      if (e.shiftKey && e.code === 'KeyF' && gameStateRef.current === 'playing') {
+        e.preventDefault();
+        handleFastForward(true);
+      }
     };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'KeyR') {
+        handleRewind(false);
+      }
+      if (e.code === 'KeyF') {
+        handleFastForward(false);
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
   }, []);
+
+  const handleRewind = async (active: boolean) => {
+    if (gameStateRef.current !== 'playing') return;
+    setIsRewinding(active);
+    await emulator.setRewind(active);
+    if (active) haptics.light();
+  };
+
+  const handleFastForward = async (active: boolean) => {
+    if (gameStateRef.current !== 'playing') return;
+    setIsFastForwarding(active);
+    await emulator.setFastForward(active);
+    if (active) haptics.light();
+  };
 
   // Simulate AI Hype Detection
   useEffect(() => {
@@ -316,6 +372,14 @@ export default function GameRoom() {
           setLoadingStatus('Iniciando sistema...');
           setLoadingProgress(100);
           
+          notify({
+            type: 'elite',
+            title: 'SYSTEM READY',
+            message: `CORE: ${gameData.system.toUpperCase()} INITIALIZED`
+          });
+          
+          telemetry.trackGameStart(gameId, gameData.system_id, currentCore);
+          
           setTimeout(async () => {
             if (mountedRef.current) {
               setGameState('waiting');
@@ -337,38 +401,49 @@ export default function GameRoom() {
           }, 800);
 
           if (gameData.compatibility_status !== 'compatible') {
-            gameData.compatibility_status = 'compatible';
-            await gameCatalog.addGame(gameData);
-          }
-          return;
-        } catch (err) {
-          console.error(`Failed to start emulator with core ${currentCore}:`, err);
-          
-          if (retries < MAX_RETRIES && mountedRef.current) {
-            const altCore = getAlternativeCore(gameData.system, currentCore);
-            if (altCore) {
-              currentCore = altCore;
-              retries++;
-              setLoadingStatus(`Sector de Datos Dañado. Protocolo de recuperación ${retries}/${MAX_RETRIES}...`);
-              // Wait 1.5s before hot-swap
-              await new Promise(resolve => setTimeout(resolve, 1500));
-              continue;
-            }
-          }
-          
-          if (mountedRef.current) {
-            setGameState('error');
-            setErrorMessage(`Sector de Datos Dañado. Fallo crítico tras ${MAX_RETRIES + 1} intentos.`);
-            
-            if (gameData.compatibility_status !== 'broken') {
-              gameData.compatibility_status = 'broken';
-              await gameCatalog.addGame(gameData);
-            }
-          }
-          break;
+        gameData.compatibility_status = 'compatible';
+        await gameCatalog.addGame(gameData);
+      }
+      return;
+    } catch (err: any) {
+      console.error(`Failed to start emulator with core ${currentCore}:`, err);
+      
+      if (retries < MAX_RETRIES && mountedRef.current) {
+        const altCore = getAlternativeCore(gameData.system, currentCore);
+        if (altCore) {
+          currentCore = altCore;
+          retries++;
+          setLoadingStatus(`Sector de Datos Dañado. Protocolo de recuperación ${retries}/${MAX_RETRIES}...`);
+          // Wait 1.5s before hot-swap
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          continue;
         }
       }
-    };
+      
+      if (mountedRef.current) {
+        setGameState('error');
+        const isNetworkError = err.message?.includes('fetch') || err.message?.includes('Network');
+        const isCacheError = err.message?.includes('Cache') || err.message?.includes('IndexedDB');
+        
+        if (isNetworkError) {
+          setErrorMessage('Error de red: No se pudo descargar la ROM. Verifica tu conexión.');
+        } else if (isCacheError) {
+          setErrorMessage('Error de almacenamiento: El caché local está dañado.');
+        } else {
+          setErrorMessage(`Fallo crítico: ${err.message || 'Error desconocido'}`);
+        }
+        
+        telemetry.trackGameError(gameId, err.message || 'Unknown error', currentCore);
+        
+        if (gameData.compatibility_status !== 'broken') {
+          gameData.compatibility_status = 'broken';
+          await gameCatalog.addGame(gameData);
+        }
+      }
+      break;
+    }
+  }
+};
 
     const getAlternativeCore = (system: string, currentCore: string): string | null => {
       const alternatives: Record<string, string[]> = {
@@ -411,6 +486,7 @@ export default function GameRoom() {
           setPlayers([opponentId]);
           setMatchmakingStatus('Opponent found! Connecting...');
           setIsHost(isHostValue);
+          telemetry.trackNetplayMatch(gameId, roomId, 0); // Latency will be updated later
         }
       );
     } else {
@@ -420,7 +496,7 @@ export default function GameRoom() {
     inputManager.start();
     const cleanupInput = inputManager.onInput((button: RetroButton, isPressed: boolean) => {
       if (gameStateRef.current === 'playing') {
-        const playerIndex = isHost ? 0 : 1;
+        const playerIndex = isHostRef.current ? 0 : 1;
         emulator.sendInput(button, isPressed, playerIndex);
         multiplayer.sendInput({ button, isPressed, playerIndex });
       }
@@ -428,7 +504,7 @@ export default function GameRoom() {
 
     multiplayer.onInput((input: { button: RetroButton, isPressed: boolean, playerIndex: number }) => {
       if (gameStateRef.current === 'playing') {
-        const remotePlayerIndex = isHost ? 1 : 0;
+        const remotePlayerIndex = isHostRef.current ? 1 : 0;
         emulator.sendInput(input.button, input.isPressed, remotePlayerIndex);
       }
     });
@@ -610,11 +686,21 @@ export default function GameRoom() {
   const handlePause = async () => {
     await emulator.pause();
     setGameState('paused');
+    notify({
+      type: 'system',
+      title: 'GAME PAUSED',
+      message: 'EMULATION SUSPENDED'
+    });
   };
 
   const handleResume = async () => {
     await emulator.resume();
     setGameState('playing');
+    notify({
+      type: 'system',
+      title: 'GAME RESUMED',
+      message: 'EMULATION ACTIVE'
+    });
   };
 
   const handleExit = async () => {
@@ -669,8 +755,95 @@ export default function GameRoom() {
     alert('Invite link copied to clipboard!');
   };
 
+  const handleRetry = async () => {
+    if (!gameId) return;
+    setGameState('loading');
+    setErrorMessage(null);
+    setLoadingProgress(0);
+    setLoadingStatus('Limpiando caché corrupto...');
+    
+    try {
+      // Clear cache for this specific game to force re-download
+      await storage.deleteCachedRom(gameId);
+      initializedRef.current = false;
+      // The useEffect will trigger again because initializedRef is false
+      // But we need to manually call it or trigger a re-render
+      window.location.reload(); // Simplest way to ensure clean state
+    } catch (e) {
+      console.error('Retry failed:', e);
+      setGameState('error');
+      setErrorMessage('No se pudo limpiar el caché. Intenta reiniciar la app.');
+    }
+  };
+
   return (
     <div ref={containerRef} className="fixed inset-0 bg-carbon flex flex-col overflow-hidden z-50">
+      {/* Performance HUD */}
+      <PerformanceHUD isVisible={showPerformanceHUD} />
+
+      {/* Rewind/Fast-Forward HUD Indicators */}
+      <AnimatePresence>
+        {isRewinding && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="absolute top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-6 py-3 bg-rose-600/80 border border-rose-400/30 rounded-full backdrop-blur-md"
+          >
+            <div className="flex gap-1">
+              <motion.div animate={{ opacity: [1, 0.3, 1] }} transition={{ repeat: Infinity, duration: 0.5 }} className="w-2 h-2 bg-white rounded-full" />
+              <motion.div animate={{ opacity: [1, 0.3, 1] }} transition={{ repeat: Infinity, duration: 0.5, delay: 0.1 }} className="w-2 h-2 bg-white rounded-full" />
+            </div>
+            <span className="text-xs font-black uppercase tracking-[0.2em] text-white">REWINDING</span>
+          </motion.div>
+        )}
+        {isFastForwarding && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            className="absolute top-20 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-6 py-3 bg-cyan-600/80 border border-cyan-400/30 rounded-full backdrop-blur-md"
+          >
+            <Zap className="w-4 h-4 text-white animate-pulse" />
+            <span className="text-xs font-black uppercase tracking-[0.2em] text-white">FAST FORWARD</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Error State */}
+      {gameState === 'error' && (
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl p-6">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="max-w-md w-full bg-zinc-900 border border-rose-500/30 rounded-3xl p-8 text-center shadow-2xl"
+          >
+            <div className="w-20 h-20 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle className="w-10 h-10 text-rose-500" />
+            </div>
+            <h2 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">Fallo de Sistema</h2>
+            <p className="text-zinc-400 mb-8 leading-relaxed">
+              {errorMessage || 'Se ha detectado una anomalía crítica en el sector de datos.'}
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleRetry}
+                className="w-full py-4 bg-rose-500 hover:bg-rose-600 text-white font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                <Zap className="w-5 h-5" />
+                Reintentar (Limpiar Caché)
+              </button>
+              <button
+                onClick={() => navigate('/')}
+                className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95"
+              >
+                Volver a la Biblioteca
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Loading Screen */}
       {gameState === 'loading' && (
         <LoadingScreen 

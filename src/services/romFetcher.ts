@@ -1,6 +1,8 @@
 import { storage } from './storage';
 import * as fflate from 'fflate';
 import { ROMValidator } from './romValidator';
+import { sentinel } from './sentinel';
+import { ROMDiscoveryBrain } from './DiscoveryBrain';
 
 const CORS_PROXY = "https://corsproxy.io/?";
 
@@ -66,8 +68,20 @@ export class ROMFetchService {
       };
 
       // 5. Fetch from Network (without progress callback)
-      const response = await this.fetchWithProgress(url, undefined, blobValidator);
-      let blob = await response.blob();
+      const response = await this.fetchWithProgress(url, undefined);
+      
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Response body is not readable');
+      
+      const chunks: Uint8Array[] = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) chunks.push(value);
+      }
+      
+      let blob = new Blob(chunks);
+      await blobValidator(blob);
       
       // 6. Validate
       if (system) {
@@ -99,15 +113,28 @@ export class ROMFetchService {
    * Fetches a ROM, either from the local IndexedDB cache or from the network.
    */
   public static async fetchRom(gameId: string, url: string, onProgress?: (status: string) => void, system?: string): Promise<Blob> {
+    // 0. Sanitizar URL de entrada
+    if (url.includes('f:/') || url.includes('c:/') || url.includes('d:/')) {
+      // Si la URL contiene una ruta local, intentamos extraer solo el nombre del archivo
+      const parts = url.split(/[/\\]/);
+      const filename = parts.pop();
+      const identifier = parts.find(p => p.length > 5 && !p.includes(':'));
+      if (identifier && filename) {
+        url = `https://archive.org/download/${identifier}/${filename}`;
+        console.log(`[ROM Fetch] Sanitized malformed URL to: ${url}`);
+      }
+    }
+
     // 0. Agentic Discovery Engine (NEW)
     let finalUrl = url;
+    let usedDiscovery = false;
     try {
-        const { ROMDiscoveryBrain } = await import('./DiscoveryBrain');
         const brain = new ROMDiscoveryBrain();
         const candidate = await brain.findBestCandidate(gameId, system || '');
         if (candidate) {
             console.log(`[ROM Fetch] Discovery Engine found better URL: ${candidate.url}`);
             finalUrl = candidate.url;
+            usedDiscovery = true;
         }
     } catch (e) {
         console.warn('[ROM Fetch] Discovery Engine failed, falling back to original URL:', e);
@@ -148,63 +175,120 @@ export class ROMFetchService {
       console.warn(`[ROM Fetch] Cache hit for ${gameId} but file is too small (${cachedRom.blob.size} bytes). Re-downloading...`);
     }
 
-    console.log(`[ROM Fetch] Cache miss for ${gameId}. Downloading from ${finalUrl}...`);
-    onProgress?.('Iniciando descarga...');
-    
-    // 2. Define Validator for Zip Integrity and HTML errors
-    const blobValidator = async (blob: Blob) => {
-      // Validation: Discard if < 4KB
-      if (blob.size < 4096) {
-        throw new Error(`Downloaded ROM is too small (${blob.size} bytes). Sector de Datos Dañado.`);
-      }
-      const header = await blob.slice(0, 100).text();
-      if (header.trim().toLowerCase().startsWith('<') || header.toLowerCase().includes('<!doctype html>')) {
-        throw new Error('Downloaded ROM is an HTML error page. Sector de Datos Dañado.');
-      }
-      if (finalUrl.toLowerCase().endsWith('.zip') || header.startsWith('PK')) {
-        try {
-           // Attempt to unzip header to verify integrity
-           // Only unzip if not arcade
-           if (system !== 'mame' && system !== 'neogeo') {
-             await this.extractMainFileFromZip(blob, system);
-           }
-        } catch (e) {
-           throw new Error('Corrupt ZIP data. Sector de Datos Dañado.');
+    const doFetch = async (targetUrl: string) => {
+      console.log(`[ROM Fetch] Cache miss for ${gameId}. Downloading from ${targetUrl}...`);
+      onProgress?.('Iniciando descarga...');
+      sentinel.logRomFetch(gameId, targetUrl, 'start');
+      
+      // 2. Define Validator for Zip Integrity and HTML errors
+      const blobValidator = async (blob: Blob) => {
+        // Validation: Discard if < 4KB
+        if (blob.size < 4096) {
+          throw new Error(`Downloaded ROM is too small (${blob.size} bytes). Sector de Datos Dañado.`);
+        }
+        const header = await blob.slice(0, 100).text();
+        if (header.trim().toLowerCase().startsWith('<') || header.toLowerCase().includes('<!doctype html>')) {
+          throw new Error('Downloaded ROM is an HTML error page. Sector de Datos Dañado.');
+        }
+        if (targetUrl.toLowerCase().endsWith('.zip') || header.startsWith('PK')) {
+          try {
+             // Attempt to unzip header to verify integrity
+             // Only unzip if not arcade
+             if (system !== 'mame' && system !== 'neogeo') {
+               await this.extractMainFileFromZip(blob, system);
+             }
+          } catch (e) {
+             throw new Error('Corrupt ZIP data. Sector de Datos Dañado.');
+          }
+        }
+      };
+
+      // 3. Fetch from Network with Progress
+      const response = await this.fetchWithProgress(targetUrl, onProgress);
+      
+      // Read stream to report progress
+      const contentLength = response.headers.get('content-length');
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
+      let loaded = 0;
+      
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Response body is not readable');
+      
+      const chunks: Uint8Array[] = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          chunks.push(value);
+          loaded += value.length;
+          if (total && onProgress) {
+            const percent = Math.round((loaded / total) * 100);
+            onProgress(`Descargando... ${percent}%`);
+          } else if (onProgress) {
+            onProgress(`Descargando... ${(loaded / 1024 / 1024).toFixed(2)} MB`);
+          }
         }
       }
+      
+      let blob = new Blob(chunks);
+      
+      // 3.5 Validate the downloaded blob
+      await blobValidator(blob);
+      
+      // NEW: Robust ROM Validation
+      if (system) {
+          const validation = await ROMValidator.validate(blob, system);
+          if (!validation.isValid) {
+              throw new Error(`ROM Validation Failed: ${validation.error}`);
+          }
+      }
+
+      // 4. Handle Compressed Files (.zip, .7z)
+      // Sometimes URLs don't end in .zip but the content is actually a zip file.
+      // We check the magic number (PK\x03\x04) to be sure.
+      const magic = await blob.slice(0, 4).text();
+      const isZip = targetUrl.toLowerCase().endsWith('.zip') || magic.startsWith('PK');
+
+      if (isZip && system !== 'mame' && system !== 'neogeo') {
+        onProgress?.('Extrayendo archivo principal...');
+        blob = await this.extractMainFileFromZip(blob, system);
+      }
+
+      // 5. Save to Cache
+      try {
+        await this.saveToCache(gameId, blob);
+        sentinel.logRomFetch(gameId, targetUrl, 'success', { size: blob.size });
+      } catch (e) {
+        console.warn(`[ROM Fetch] Failed to cache ROM ${gameId}:`, e);
+      }
+
+      return blob;
     };
 
-    // 3. Fetch from Network with Progress and Validation
-    const response = await this.fetchWithProgress(finalUrl, onProgress, blobValidator);
-    let blob = await response.blob();
-    
-    // NEW: Robust ROM Validation
-    if (system) {
-        const validation = await ROMValidator.validate(blob, system);
-        if (!validation.isValid) {
-            throw new Error(`ROM Validation Failed: ${validation.error}`);
-        }
-    }
-
-    // 4. Handle Compressed Files (.zip, .7z)
-    // Sometimes URLs don't end in .zip but the content is actually a zip file.
-    // We check the magic number (PK\x03\x04) to be sure.
-    const magic = await blob.slice(0, 4).text();
-    const isZip = finalUrl.toLowerCase().endsWith('.zip') || magic.startsWith('PK');
-
-    if (isZip && system !== 'mame' && system !== 'neogeo') {
-      onProgress?.('Extrayendo archivo principal...');
-      blob = await this.extractMainFileFromZip(blob, system);
-    }
-
-    // 5. Save to Cache
     try {
-      await this.saveToCache(gameId, blob);
+      return await doFetch(finalUrl);
     } catch (e) {
-      console.warn(`[ROM Fetch] Failed to cache ROM ${gameId}:`, e);
+      if (usedDiscovery && system) {
+        console.warn(`[ROM Fetch] Discovered URL failed: ${e}. Clearing cache and trying original URL...`);
+        const { DiscoveryCache } = await import('./DiscoveryCache');
+        await DiscoveryCache.clear(gameId, system);
+        
+        let fallbackUrl = url;
+        if (fallbackUrl.startsWith('archive:')) {
+            const { MetadataNormalizationEngine } = await import('./metadataNormalization');
+            const identifier = fallbackUrl.replace('archive:', '');
+            const resolvedUrl = await MetadataNormalizationEngine.resolveRomUrl(identifier, system);
+            if (resolvedUrl) {
+                fallbackUrl = resolvedUrl;
+            } else {
+                throw new Error(`No se pudo resolver el enlace de la ROM: ${fallbackUrl}`);
+            }
+        }
+        
+        return await doFetch(fallbackUrl);
+      }
+      throw e;
     }
-
-    return blob;
   }
 
 
@@ -222,80 +306,30 @@ export class ROMFetchService {
     }
   }
 
-  private static async fetchWithProgress(url: string, onProgress?: (status: string) => void, validator?: (blob: Blob) => Promise<void>): Promise<Response> {
+  private static async fetchWithProgress(url: string, onProgress?: (status: string) => void): Promise<Response> {
     let response: Response;
     
-    // STOCHASTIC TUNNEL SELECTOR
-    // We prioritize LocalTunnel (our server) as it's the most reliable and supports streaming.
-    const baseProxies = [
-        { name: 'LocalTunnel', url: `${window.location.origin}/api/tunnel?url=${encodeURIComponent(url)}` },
-        { name: 'CorsProxy', url: `https://corsproxy.io/?${encodeURIComponent(url)}` },
-        { name: 'AllOrigins', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}` },
-        { name: 'CodeTabs', url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}` },
-        { name: 'ThingProxy', url: `https://thingproxy.freeboard.io/fetch/${encodeURIComponent(url)}` },
-        { name: 'CorsAnywhere', url: `https://cors-anywhere.herokuapp.com/${url}` }
-    ];
+    // Use our own backend proxy
+    const backendProxyUrl = `/api/tunnel?url=${encodeURIComponent(url)}`;
 
-    // Strictly: LocalTunnel -> CorsProxy -> AllOrigins -> Codetabs -> ThingProxy -> CorsAnywhere
-    const proxies = baseProxies;
-
-    // Try direct fetch first if it's HTTPS (some Archive.org nodes support CORS)
     try {
-        console.log(`[ROM Fetch] Attempting Direct Connection: ${url}`);
+        console.log(`[ROM Fetch] Tunneling via Backend: ${backendProxyUrl}`);
+        
+        // 120 Second Timeout for proxies (More generous for large ROMs like PSX)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased to 5s timeout for direct
-        
-        response = await fetch(url, { signal: controller.signal });
+        const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+        response = await fetch(backendProxyUrl, { signal: controller.signal });
         clearTimeout(timeoutId);
+
+        if (!response.ok) throw new Error(`Backend proxy failed: ${response.status}`);
         
-        if (response.ok) {
-            await this.validateResponse(response.clone());
-            if (validator) {
-                const blob = await response.clone().blob();
-                await validator(blob);
-            }
-            return response;
-        }
-    } catch (e) {
-        if (e instanceof Error && e.name !== 'AbortError') {
-            console.warn(`[ROM Fetch] Direct connection failed, engaging Omega Tunnel...`);
-        }
+        return response; // Success
+    } catch (e: any) {
+      console.error(`[ROM Fetch] Backend proxy collapsed:`, e);
+      sentinel.logRomFetch('unknown', url, 'error', { error: e.message });
+      throw new Error('Download failed: Backend proxy collapsed.');
     }
-
-    for (const proxy of proxies) {
-        try {
-            console.log(`[ROM Fetch] Tunneling via ${proxy.name}: ${proxy.url}`);
-            
-            // 120 Second Timeout for proxies (More generous for large ROMs like PSX)
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 120000);
-
-            response = await fetch(proxy.url, { signal: controller.signal });
-            clearTimeout(timeoutId);
-
-            if (!response.ok) throw new Error(`Proxy ${proxy.name} failed: ${response.status}`);
-            
-            // Clone to validate headers without consuming the body
-            await this.validateResponse(response.clone());
-            
-            // If validator provided, read body and validate
-            if (validator) {
-                const blob = await response.clone().blob();
-                await validator(blob);
-            }
-            
-            return response; // Success
-        } catch (e) {
-            if (e instanceof Error && e.name !== 'AbortError') {
-                console.warn(`[ROM Fetch] ${proxy.name} collapsed:`, e);
-                onProgress?.(`Tunnel ${proxy.name} collapsed, rerouting...`);
-                // Delay before next attempt
-                await new Promise(resolve => setTimeout(resolve, 1000));
-            }
-        }
-    }
-
-    throw new Error('Download failed: All tunnels collapsed. Target is locked.');
   }
 
   private static async extractMainFileFromZip(zipBlob: Blob, system?: string): Promise<Blob> {

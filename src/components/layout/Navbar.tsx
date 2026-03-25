@@ -15,7 +15,7 @@ export default function Navbar() {
               <div className="p-1.5 bg-emerald-500/10 rounded-lg group-hover:bg-emerald-500/20 transition-colors border border-emerald-500/20">
                 <Gamepad2 className="h-6 w-6 text-emerald-500" />
               </div>
-              <span className="text-lg font-bold tracking-tight text-white font-mono">DOMINION</span>
+              <span className="text-lg font-bold tracking-tight text-white font-mono">RETROVERSE</span>
             </Link>
             
             <div className="hidden md:flex items-center gap-1">

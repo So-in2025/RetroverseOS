@@ -60,7 +60,7 @@ export default function LoadingScreen({ status, progress, gameId, coverUrl, titl
                 gameId={gameId || ''}
                 primaryUrl={coverUrl}
                 title={title || "Game Cover"}
-                systemId={systemId}
+                systemId={systemId || ''}
                 className="w-full h-auto object-contain max-h-[50vh]"
               />
             </div>

@@ -21,18 +21,23 @@ import Login from './pages/Login';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import NotificationSystem from './components/NotificationSystem';
 
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import MobileNavbar from './components/layout/MobileNavbar';
 import MobileHeader from './components/layout/MobileHeader';
 import SearchModal from './components/layout/SearchModal';
 import AchievementsModal from './components/community/AchievementsModal';
 import DebugPanel from './components/game/DebugPanel';
+import SystemOverlay from './components/game/SystemOverlay';
+import ConsoleNotification from './components/game/ConsoleNotification';
 import { useUIStore } from './store/uiStore';
 import { useEffect, useState } from 'react';
 import { SentinelEngine } from './services/gcts';
 
+import { sentinel } from './services/sentinel';
+
 function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const isGameRoom = location.pathname.startsWith('/play/');
   const { 
     socialPanelOpen, 
@@ -43,6 +48,8 @@ function Layout() {
     debugPanelOpen,
     setDebugPanel
   } = useUIStore();
+
+  const [systemOverlayOpen, setSystemOverlayOpen] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -56,16 +63,32 @@ function Layout() {
         e.preventDefault();
         setDebugPanel(!debugPanelOpen);
       }
+
+      // Quick Access Overlay: Shift + Alt + Q
+      if (e.shiftKey && e.altKey && e.code === 'KeyQ') {
+        e.preventDefault();
+        setSystemOverlayOpen(prev => !prev);
+      }
+
+      // Sentinel Traversal Shortcut: Shift + Alt + S
+      if (e.shiftKey && e.altKey && e.code === 'KeyS') {
+        e.preventDefault();
+        sentinel.runAutoTraversal(navigate);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setSearchModal, setDebugPanel, debugPanelOpen]);
+  }, [setSearchModal, setDebugPanel, debugPanelOpen, navigate]);
 
   useEffect(() => {
-    // Start Sentinel Engine in background
-    SentinelEngine.startBackgroundWorker();
+    // Start Sentinel Engine in background (Only in Dev)
+    if (import.meta.env.DEV) {
+      SentinelEngine.startBackgroundWorker();
+    }
     return () => {
-      SentinelEngine.stopBackgroundWorker();
+      if (import.meta.env.DEV) {
+        SentinelEngine.stopBackgroundWorker();
+      }
     };
   }, []);
 
@@ -79,7 +102,9 @@ function Layout() {
       <AchievementsModal isOpen={achievementsModalOpen} onClose={() => setAchievementsModal(false)} />
       <AnimatePresence>
         {debugPanelOpen && <DebugPanel onClose={() => setDebugPanel(false)} />}
+        {systemOverlayOpen && <SystemOverlay isOpen={systemOverlayOpen} onClose={() => setSystemOverlayOpen(false)} />}
       </AnimatePresence>
+      <ConsoleNotification />
       <main className={`${!isGameRoom ? 'lg:ml-20' : ''} ${!isGameRoom && socialPanelOpen ? 'xl:mr-64' : ''} min-h-screen relative ${!isGameRoom ? 'pt-16 lg:pt-0 pb-24 lg:pb-0' : ''} transition-all duration-300`}>
         <Outlet />
       </main>
@@ -93,7 +118,7 @@ import { storage } from './services/storage';
 import OnboardingFlow from './components/onboarding/OnboardingFlow';
 import { recommendationEngine } from './services/recommendationEngine';
 import BootAnimation from './components/layout/BootAnimation';
-import { AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { economy } from './services/economy';
 import { customization } from './services/customization';
 import { achievements } from './services/achievements';
@@ -104,16 +129,35 @@ function AppContent() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
+  console.log('📦 [AppContent] Rendering:', { user: !!user, loading, showBoot, showOnboarding, initialized });
+
   useEffect(() => {
     const checkOnboarding = async () => {
-      await economy.init();
-      await customization.init();
-      await gameCatalog.init(); // Initialize game catalog once
-      const completed = await storage.getSetting('onboarding_completed');
-      if (!completed) {
-        setShowOnboarding(true);
-      } else {
-        await recommendationEngine.init(user?.id);
+      console.log('🚀 [App] Starting initialization sequence...');
+      try {
+        await economy.init();
+        console.log('✅ [App] Economy initialized');
+        
+        await customization.init();
+        console.log('✅ [App] Customization initialized');
+        
+        await gameCatalog.init(); // Initialize game catalog once
+        console.log('✅ [App] Game Catalog initialized');
+        
+        const completed = await storage.getSetting('onboarding_completed');
+        console.log('ℹ️ [App] Onboarding status:', completed);
+        
+        if (!completed) {
+          setShowOnboarding(true);
+          setInitialized(true);
+        } else {
+          await recommendationEngine.init(user?.id);
+          console.log('✅ [App] Recommendation Engine initialized');
+          setInitialized(true);
+        }
+      } catch (error) {
+        console.error('❌ [App] Initialization failed:', error);
+        // We still set initialized to true to allow the app to render even in a degraded state
         setInitialized(true);
       }
     };
@@ -130,7 +174,7 @@ function AppContent() {
 
   return (
     <>
-      <AnimatePresence>
+      <AnimatePresence mode="popLayout">
         {(showBoot || loading) && <BootAnimation onComplete={() => setShowBoot(false)} />}
         {!showBoot && !loading && showOnboarding && (
           <OnboardingFlow onComplete={handleOnboardingComplete} />
@@ -162,6 +206,7 @@ function AppContent() {
 }
 
 export default function App() {
+  console.log('📦 [App] Rendering App component - START');
   return (
     <AuthProvider>
       <Router>

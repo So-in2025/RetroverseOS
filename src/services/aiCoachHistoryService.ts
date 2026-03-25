@@ -44,20 +44,18 @@ class AICoachHistoryService {
     // Sync to cloud if enabled
     const hasCloudSync = await customization.isCloudSyncEnabled();
     if (hasCloudSync && supabase) {
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (user) {
-          supabase.from('coach_history').upsert({
-            user_id: user.id,
-            advice_id: newAdvice.id,
-            game_id: newAdvice.game_id,
-            advice: newAdvice.advice,
-            timestamp: newAdvice.timestamp,
-            screenshot: newAdvice.screenshot
-          }).then(({ error }) => {
-            if (error) console.error('[AICoachHistory] Cloud sync error:', error);
-          });
-        }
-      });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error } = await supabase.from('coach_history').upsert({
+          user_id: user.id,
+          advice_id: newAdvice.id,
+          game_id: newAdvice.game_id,
+          advice: newAdvice.advice,
+          timestamp: newAdvice.timestamp,
+          screenshot: newAdvice.screenshot
+        });
+        if (error) console.error('[AICoachHistory] Cloud sync error:', error);
+      }
     }
   }
 

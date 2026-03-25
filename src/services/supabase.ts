@@ -5,10 +5,12 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 let supabaseClient: SupabaseClient | null = null;
 
-if (supabaseUrl && supabaseAnonKey) {
+const isPlaceholder = supabaseUrl?.includes('your-project-id') || supabaseAnonKey?.includes('your-anon-key');
+
+if (supabaseUrl && supabaseAnonKey && !isPlaceholder) {
   supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 } else {
-  console.warn('[Supabase] Missing environment variables. Multiplayer features will be disabled.');
+  console.warn('⚠️ [Supabase] Missing or placeholder environment variables. Cloud saves and Multiplayer features will be disabled.');
 }
 
 export const supabase = supabaseClient;
@@ -24,7 +26,10 @@ export interface GameSession {
 
 export const multiplayerService = {
   async createSession(gameId: string, userId: string) {
-    if (!supabase) throw new Error('Supabase not initialized');
+    if (!supabase) {
+      console.warn('Supabase not initialized');
+      return null;
+    }
     const { data, error } = await supabase
       .from('game_sessions')
       .insert([
@@ -38,7 +43,10 @@ export const multiplayerService = {
   },
 
   async joinSession(sessionId: string, userId: string) {
-    if (!supabase) throw new Error('Supabase not initialized');
+    if (!supabase) {
+      console.warn('Supabase not initialized');
+      return null;
+    }
     const { data, error } = await supabase
       .from('game_sessions')
       .update({ opponent_id: userId, status: 'playing' })

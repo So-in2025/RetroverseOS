@@ -143,6 +143,7 @@ const GameSection: React.FC<GameSectionProps> = ({ title, games, variant = 'defa
                   }}
                 >
                   <GameCover 
+                    key={game.game_id}
                     gameId={game.game_id}
                     primaryUrl={game.cover_url || game.artwork_url} 
                     title={game.title}
@@ -157,7 +158,7 @@ const GameSection: React.FC<GameSectionProps> = ({ title, games, variant = 'defa
                   )}
                   
                   {/* Hover Overlay (Cinematic Expansion) */}
-                  <AnimatePresence>
+                  <AnimatePresence mode="popLayout">
                     {hoveredGame === game.game_id && (
                       <motion.div 
                         initial={{ opacity: 0, y: 20 }}

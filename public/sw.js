@@ -35,15 +35,32 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  // Helper to add COOP/COEP headers to any response
+  const addHeaders = (response) => {
+    if (!response) return response;
+    // We can only add headers to responses we construct or clone if they are not opaque
+    if (response.type === 'opaque') return response;
+    
+    const newHeaders = new Headers(response.headers);
+    newHeaders.set('Cross-Origin-Embedder-Policy', 'require-corp');
+    newHeaders.set('Cross-Origin-Opener-Policy', 'same-origin');
+    
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: newHeaders
+    });
+  };
+
   // Handle ROMs (usually .zip, .sfc, .nes, etc. from specific domains or paths)
   if (url.pathname.includes('/roms/') || url.href.includes('archive.org')) {
-    event.respondWith(handleCacheFirst(ROM_CACHE, event.request));
+    event.respondWith(handleCacheFirst(ROM_CACHE, event.request).then(addHeaders));
     return;
   }
 
   // Handle Images (Covers, Artworks)
   if (url.href.includes('unsplash.com') || url.href.includes('picsum.photos') || url.href.includes('libretro.com')) {
-    event.respondWith(handleCacheFirst(IMAGE_CACHE, event.request));
+    event.respondWith(handleCacheFirst(IMAGE_CACHE, event.request).then(addHeaders));
     return;
   }
 
@@ -56,12 +73,12 @@ self.addEventListener('fetch', (event) => {
           cache.put(event.request, responseToCache);
         });
       }
-      return networkResponse;
+      return addHeaders(networkResponse);
     }).catch(() => {
       return caches.match(event.request).then((response) => {
-        if (response) return response;
+        if (response) return addHeaders(response);
         if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
+          return caches.match('/index.html').then(addHeaders);
         }
       });
     })

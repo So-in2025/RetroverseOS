@@ -14,14 +14,17 @@ export interface NetplayRoom {
 }
 
 class NetplayService {
-  private channel: any = null;
-
   async createRoom(user: any, game: any): Promise<NetplayRoom | null> {
+    if (!supabase) {
+      console.warn('Supabase not initialized');
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('netplay_rooms')
       .insert({
         host_id: user.id,
-        host_name: user.user_metadata.full_name || 'Operador',
+        host_name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Operador',
         game_id: game.game_id,
         game_title: game.title,
         system_id: game.system_id,
@@ -41,6 +44,11 @@ class NetplayService {
   }
 
   async getActiveRooms(): Promise<NetplayRoom[]> {
+    if (!supabase) {
+      console.warn('Supabase not initialized');
+      return [];
+    }
+
     const { data, error } = await supabase
       .from('netplay_rooms')
       .select('*')
@@ -56,17 +64,45 @@ class NetplayService {
   }
 
   async joinRoom(roomId: string, userId: string) {
-    // In a real app, this would update the room state and notify the host
-    // For now, we simulate the join
+    if (!supabase) {
+      console.warn('Supabase not initialized');
+      return false;
+    }
+
     const { error } = await supabase
       .from('netplay_rooms')
       .update({ players_count: 2, status: 'playing' })
       .eq('id', roomId);
 
-    return !error;
+    if (error) {
+      console.error('Error joining room:', error);
+      return false;
+    }
+
+    return true;
+  }
+
+  async leaveRoom(roomId: string) {
+    if (!supabase) {
+      console.warn('Supabase not initialized');
+      return false;
+    }
+    
+    const { error } = await supabase
+      .from('netplay_rooms')
+      .update({ status: 'closed' })
+      .eq('id', roomId);
+      
+    if (error) {
+      console.error('Error leaving room:', error);
+      return false;
+    }
+    return true;
   }
 
   subscribeToRooms(callback: (rooms: NetplayRoom[]) => void) {
+    if (!supabase) return () => {};
+
     const channel = supabase
       .channel('netplay_changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'netplay_rooms' }, async () => {
@@ -76,7 +112,9 @@ class NetplayService {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      if (supabase && channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }
 }

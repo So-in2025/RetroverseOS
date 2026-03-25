@@ -2,10 +2,17 @@ import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { sentinel } from './services/sentinel';
+
+// Start Sentinel Auditing (Only in Dev)
+if (import.meta.env.DEV) {
+  console.log('📦 [Main] Starting Sentinel...');
+  sentinel.start();
+}
 
 // Global error handler for boot issues
 window.onerror = (message, source, lineno, colno, error) => {
-  console.error('[Boot Error]:', { message, source, lineno, colno, error });
+  console.error('🔥 [Main] Global Error Caught:', { message, source, lineno, colno, error });
   // If we're in a black screen state, try to show something
   const root = document.getElementById('root');
   if (root && root.innerHTML === '') {
@@ -21,20 +28,23 @@ window.onerror = (message, source, lineno, colno, error) => {
 
 // Register Service Worker for Offline Support
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then(registration => {
-      console.log('SW registered: ', registration);
-    }).catch(registrationError => {
-      console.log('SW registration failed: ', registrationError);
-    });
-  });
+  // We are using coi-serviceworker for SharedArrayBuffer support
+  // It registers itself automatically via the script in index.html
 }
+
+import { ErrorBoundary } from './components/ErrorBoundary.tsx';
 
 const rootElement = document.getElementById('root');
 if (rootElement) {
+  console.log('📦 [Main] Mounting React root...');
   createRoot(rootElement).render(
     <StrictMode>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </StrictMode>,
   );
+  console.log('✅ [Main] React root mounted');
+} else {
+  console.error('❌ [Main] Root element not found!');
 }
