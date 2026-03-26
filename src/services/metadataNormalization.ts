@@ -118,10 +118,21 @@ export class MetadataNormalizationEngine {
     const maxRetries = 4;
     let attempt = 0;
 
-    // Handle unique game_id format: identifier_romname
-    const parts = gameId.split('_');
-    const identifier = parts[0];
-    const targetRomName = parts.length > 1 ? parts.slice(1).join('_') : null;
+    let identifier = gameId;
+    let targetRomName: string | null = null;
+
+    if (gameId.includes('/')) {
+      const firstSlash = gameId.indexOf('/');
+      identifier = gameId.substring(0, firstSlash);
+      targetRomName = gameId.substring(firstSlash + 1);
+    } else {
+      // Legacy format or just an identifier
+      // We don't know if it's identifier_romname or just identifier.
+      // We'll assume the whole thing is the identifier first. If it fails, we'll try splitting.
+      // But for now, let's just use the whole thing as identifier.
+      identifier = gameId;
+      targetRomName = null;
+    }
 
     while (attempt < maxRetries) {
       const controller = new AbortController();
@@ -171,9 +182,9 @@ export class MetadataNormalizationEngine {
             let romFile: ArchiveFile | null = null;
 
             if (targetRomName) {
-              // Try to find the specific ROM file by its sanitized name
+              // Try to find the specific ROM file by its exact name or sanitized name
               romFile = metaData.files.find((f: ArchiveFile) => 
-                f.name.replace(/[^a-zA-Z0-9]/g, '_') === targetRomName
+                f.name === targetRomName || f.name.replace(/[^a-zA-Z0-9]/g, '_') === targetRomName
               ) || null;
             }
 
@@ -201,7 +212,8 @@ export class MetadataNormalizationEngine {
 
             if (romFile) {
               clearTimeout(timeoutId);
-              return `https://archive.org/download/${identifier}/${encodeURIComponent(romFile.name)}`;
+              const encodedName = romFile.name.split('/').map((part: string) => encodeURIComponent(part)).join('/');
+              return `https://archive.org/download/${identifier}/${encodedName}`;
             } else {
               console.warn(`[RomResolver] No valid ROM file found in metadata for ${identifier}.`);
               clearTimeout(timeoutId);
@@ -215,6 +227,14 @@ export class MetadataNormalizationEngine {
         } else if (response) {
           console.warn(`[RomResolver] Metadata fetch failed for ${identifier} with status ${response.status}`);
           if (response.status === 404) {
+            if (!gameId.includes('/') && gameId.includes('_') && identifier === gameId) {
+              // Try legacy format fallback
+              const parts = gameId.split('_');
+              identifier = parts[0];
+              targetRomName = parts.slice(1).join('_');
+              console.log(`[RomResolver] Fallback to legacy format: ${identifier}`);
+              continue; // Retry with new identifier
+            }
             clearTimeout(timeoutId);
             return null;
           }
@@ -251,8 +271,8 @@ export class MetadataNormalizationEngine {
         if (lowerS.includes('atari 2600') || lowerS.includes('vcs')) systemKey = 'atari_2600';
         else if (lowerS.includes('atari 7800')) systemKey = 'atari_7800';
         else if (lowerS.includes('atari lynx')) systemKey = 'lynx';
-        else if (lowerS.includes('nes') || lowerS.includes('nintendo entertainment system')) systemKey = 'nes';
         else if (lowerS.includes('snes') || lowerS.includes('super nintendo')) systemKey = 'snes';
+        else if (lowerS.includes('nes') || lowerS.includes('nintendo entertainment system')) systemKey = 'nes';
         else if (lowerS.includes('genesis') || lowerS.includes('mega drive')) systemKey = 'sega_genesis';
         else if (lowerS.includes('gba') || lowerS.includes('game boy advance') || lowerS.includes('gameboy advance')) systemKey = 'gba';
         else if (lowerS.includes('gbc') || lowerS.includes('game boy color') || lowerS.includes('gameboy color')) systemKey = 'gbc';
@@ -307,7 +327,8 @@ export class MetadataNormalizationEngine {
 
         if (specificArt) {
           const artName = typeof specificArt === 'string' ? specificArt : specificArt.name;
-          artworkUrl = `https://archive.org/download/${identifier}/${encodeURIComponent(artName)}`;
+          const encodedArtName = artName.split('/').map((part: string) => encodeURIComponent(part)).join('/');
+          artworkUrl = `https://archive.org/download/${identifier}/${encodedArtName}`;
         } else {
           artworkUrl = sources.find(s => s.includes('Named_Snaps')) || sources[1] || null;
         }
@@ -383,8 +404,8 @@ export class MetadataNormalizationEngine {
         if (lowerS.includes('atari 2600') || lowerS.includes('vcs')) systemKey = 'atari_2600';
         else if (lowerS.includes('atari 7800')) systemKey = 'atari_7800';
         else if (lowerS.includes('atari lynx')) systemKey = 'lynx';
-        else if (lowerS.includes('nes') || lowerS.includes('nintendo entertainment system')) systemKey = 'nes';
         else if (lowerS.includes('snes') || lowerS.includes('super nintendo')) systemKey = 'snes';
+        else if (lowerS.includes('nes') || lowerS.includes('nintendo entertainment system')) systemKey = 'nes';
         else if (lowerS.includes('genesis') || lowerS.includes('mega drive')) systemKey = 'sega_genesis';
         else if (lowerS.includes('gba') || lowerS.includes('game boy advance') || lowerS.includes('gameboy advance')) systemKey = 'gba';
         else if (lowerS.includes('gbc') || lowerS.includes('game boy color') || lowerS.includes('gameboy color')) systemKey = 'gbc';
@@ -448,7 +469,8 @@ export class MetadataNormalizationEngine {
       const cleanTitle = this.cleanTitle(romFile.name);
       const gameId = `${rawData.identifier}_${romFile.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
       
-      const romUrl = `https://archive.org/download/${rawData.identifier}/${encodeURIComponent(romFile.name)}`;
+      const encodedRomName = romFile.name.split('/').map((part: string) => encodeURIComponent(part)).join('/');
+      const romUrl = `https://archive.org/download/${rawData.identifier}/${encodedRomName}`;
       
       // Use a more specific title for cover resolution (keep tags like (USA), (Disc 1), etc.)
       const specificTitle = romFile.name.replace(/_/g, ' ').replace(/\.[^/.]+$/, "");
@@ -466,7 +488,8 @@ export class MetadataNormalizationEngine {
       });
 
       if (specificArt) {
-        artworkUrl = `https://archive.org/download/${rawData.identifier}/${encodeURIComponent(specificArt.name)}`;
+        const encodedArtName = specificArt.name.split('/').map((part: string) => encodeURIComponent(part)).join('/');
+        artworkUrl = `https://archive.org/download/${rawData.identifier}/${encodedArtName}`;
       } else {
         const priorityArtwork = rawData.files?.find(f => 
           f.name.toLowerCase().includes('art') || 
@@ -477,14 +500,16 @@ export class MetadataNormalizationEngine {
         );
 
         if (priorityArtwork) {
-          artworkUrl = `https://archive.org/download/${rawData.identifier}/${encodeURIComponent(priorityArtwork.name)}`;
+          const encodedPriorityArtName = priorityArtwork.name.split('/').map((part: string) => encodeURIComponent(part)).join('/');
+          artworkUrl = `https://archive.org/download/${rawData.identifier}/${encodedPriorityArtName}`;
         } else {
           artworkUrl = sources.find(s => s.includes('Named_Snaps')) || sources[1] || null;
         }
       }
 
       const videoFile = rawData.files?.find(f => f.name.endsWith('.mp4') || f.name.endsWith('.gif'));
-      const videoPreviewUrl = videoFile ? `https://archive.org/download/${rawData.identifier}/${encodeURIComponent(videoFile.name)}` : null;
+      const encodedVideoName = videoFile ? videoFile.name.split('/').map((part: string) => encodeURIComponent(part)).join('/') : null;
+      const videoPreviewUrl = videoFile ? `https://archive.org/download/${rawData.identifier}/${encodedVideoName}` : null;
 
       let description = rawData.description || null;
       if (description) {

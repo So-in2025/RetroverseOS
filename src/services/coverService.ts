@@ -87,7 +87,7 @@ export class CoverService {
     // 3. Remove non-game keywords and special characters
     // We keep '-' because Libretro uses it for subtitles
     return baseTitle
-      .replace(/\b(v\d+\.\d+[a-z]?|rev\s*[a-z0-9]|beta|demo|sample|promo|review|preview|debug|build|hack|translation|translated|patched|fixed|trainer|cheat|intro|repack|unlicensed|aftermarket|homebrew|prototype|sample|kiosk|store|not for resale|nfr|bundle|pack|collection|anthology|bonus|disc|cd|dvd|rom|iso|rip|dump|bad|overdump|headered|unheadered|no-intro|redump|t-en|t-es|t-fr|t-pt|t-it|t-de|t-ru|t-jp|t-cn|t-kr|level editor|editor|official|snes|nes|gba|gbc|gb|n64|psx|ps1|ps2|genesis|megadrive|master system|game gear|pc engine|turbografx|wonderswan|neogeo|ngp|mame|arcade|emu|emus|emulator|pack|roms|collection|set|fullset|complete|v1\.\d+|v2\.\d+|gog edition|steam edition|rare arabic ver|pc world cover|coverdisc|cover disc|demo disc|battle coliseum)\b/gi, '')
+      .replace(/\b(v\d+\.\d+[a-z]?|rev\s*[a-z0-9]|beta|demo|sample|promo|review|preview|debug|build|hack|translation|translated|patched|fixed|trainer|cheat|intro|repack|unlicensed|aftermarket|homebrew|prototype|sample|kiosk|store|not for resale|nfr|bundle|pack|collection|anthology|bonus|disc|cd|dvd|rom|iso|rip|dump|bad|overdump|headered|unheadered|no-intro|redump|t-en|t-es|t-fr|t-pt|t-it|t-de|t-ru|t-jp|t-cn|t-kr|level editor|editor|official|snes|nes|gba|gbc|gb|n64|psx|ps1|ps2|genesis|megadrive|master system|game gear|pc engine|turbografx|wonderswan|neogeo|ngp|mame|arcade|emu|emus|emulator|pack|roms|collection|set|fullset|complete|v1\.\d+|v2\.\d+|gog edition|steam edition|rare arabic ver|pc world cover|coverdisc|cover disc|demo disc|battle coliseum|screenshot|boxart|cover|art)\b/gi, '')
       .replace(/\s*-\s*$/g, '') // Remove trailing hyphens
       .replace(/\s+/g, ' ')
       .trim();
@@ -195,7 +195,11 @@ export class CoverService {
     sources.push(`https://cdn.libretro.com/thumbnails/${libretroSystem}/Named_Boxarts/${this.safeEncode(titleWithoutExt)}.png`);
     sources.push(`${libretroSnapsBase}/${this.safeEncode(cleanTitle)}.png`);
 
-    // 4. OpenGameArt / IGDB Proxy
+    // 4. Bing Image Search Fallback (Highly reliable for missing covers)
+    const bingQuery = `${titleWithoutExt} ${system} game cover`;
+    sources.push(`https://tse2.mm.bing.net/th?q=${encodeURIComponent(bingQuery)}`);
+
+    // 5. OpenGameArt / IGDB Proxy
     // Use wsrv.nl to proxy and resize everything for better performance and CORS bypass
     const finalSources: string[] = [];
     
@@ -203,7 +207,7 @@ export class CoverService {
     sources.forEach(src => {
       if (src && src.startsWith('http')) {
         // Avoid double-proxying or proxying already proxied URLs
-        if (src.includes('wsrv.nl') || src.includes('images.weserv.nl')) {
+        if (src.includes('wsrv.nl') || src.includes('images.weserv.nl') || src.includes('tse2.mm.bing.net')) {
           finalSources.push(src);
           return;
         }
@@ -217,8 +221,8 @@ export class CoverService {
       }
     });
 
-    // Limit to top 30 most likely sources to avoid massive cascades
-    return [...new Set(finalSources.filter(Boolean))].slice(0, 30);
+    // Return all unique sources to ensure fallbacks like Bing are included
+    return [...new Set(finalSources.filter(Boolean))];
   }
 
   /**

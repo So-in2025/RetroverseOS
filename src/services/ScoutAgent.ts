@@ -168,33 +168,47 @@ export class ArchiveScoutAgent implements ScoutAgent {
                 });
 
                 if (romFiles.length > 0) {
-                  // Priority: No-Intro > Redump > Others
+                  // Extract potential title from gameId for matching
+                  const titleMatch = cleanGameId.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+                  // Priority: Title Match > No-Intro > Redump > Others
                   romFiles.sort((a: any, b: any) => {
                     const aName = a.name.toLowerCase();
                     const bName = b.name.toLowerCase();
+                    const aCleanName = aName.replace(/[^a-z0-9]/g, '');
+                    const bCleanName = bName.replace(/[^a-z0-9]/g, '');
                     
-                    const aScore = aName.includes('no-intro') ? 2 : (aName.includes('redump') ? 1 : 0);
-                    const bScore = bName.includes('no-intro') ? 2 : (bName.includes('redump') ? 1 : 0);
+                    let aScore = aName.includes('no-intro') ? 2 : (aName.includes('redump') ? 1 : 0);
+                    let bScore = bName.includes('no-intro') ? 2 : (bName.includes('redump') ? 1 : 0);
                     
+                    // Boost score if filename contains the target title
+                    if (titleMatch.length >= 3 && aCleanName.includes(titleMatch)) aScore += 10;
+                    if (titleMatch.length >= 3 && bCleanName.includes(titleMatch)) bScore += 10;
+                    
+                    // If one has a much better score, use it
                     if (aScore !== bScore) return bScore - aScore;
+                    
+                    // Otherwise, pick the largest file (often the most complete/best dump)
                     return parseInt(b.size || '0') - parseInt(a.size || '0');
                   });
                   
                   const bestFile = romFiles[0];
-                  // Sanitizar el nombre del archivo para evitar rutas locales (ej: F:/nds/roms/...)
-                  const cleanFileName = bestFile.name.split(/[/\\]/).pop() || bestFile.name;
+                  // Use the full file name including path, but encode it properly
+                  const encodedFileName = bestFile.name.split('/').map((part: string) => encodeURIComponent(part)).join('/');
                   
                   candidates.push({
-                    url: `https://archive.org/download/${doc.identifier}/${cleanFileName}`,
+                    url: `https://archive.org/download/${doc.identifier}/${encodedFileName}`,
                     source: this.name,
                     reliabilityScore: 0.9,
                     latency: 0,
-                    metadata: { identifier: doc.identifier, filename: cleanFileName, size: bestFile.size }
+                    metadata: { identifier: doc.identifier, filename: bestFile.name, size: bestFile.size }
                   });
 
                   // Add Myrient candidate if possible (much faster)
                   const myrientBase = this.getMyrientBaseUrl(system);
-                  if (myrientBase && cleanFileName.endsWith('.zip')) {
+                  if (myrientBase && bestFile.name.endsWith('.zip')) {
+                    // For Myrient, we DO want just the filename, as Myrient doesn't use subdirectories
+                    const cleanFileName = bestFile.name.split(/[/\\]/).pop() || bestFile.name;
                     candidates.push({
                       url: `${myrientBase}${encodeURIComponent(cleanFileName)}`,
                       source: 'Myrient',
