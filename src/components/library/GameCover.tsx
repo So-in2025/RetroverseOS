@@ -13,6 +13,7 @@ const coverStore = localforage.createInstance({
 
 interface GameCoverProps {
   gameId: string;
+  archiveId?: string;
   title: string;
   systemId: string;
   primaryUrl?: string | null;
@@ -26,6 +27,7 @@ interface GameCoverProps {
  */
 export const GameCover: React.FC<GameCoverProps> = ({
   gameId,
+  archiveId,
   title,
   systemId,
   primaryUrl,
@@ -40,12 +42,18 @@ export const GameCover: React.FC<GameCoverProps> = ({
 
   // Generar lista de fuentes (memoizado para evitar re-cálculos innecesarios)
   const sources = useMemo(() => {
-    return CoverService.getCoverSources(title, systemId, gameId, primaryUrl);
-  }, [title, systemId, gameId, primaryUrl]);
+    return CoverService.getCoverSources(title, systemId, archiveId || gameId, primaryUrl);
+  }, [title, systemId, archiveId, gameId, primaryUrl]);
 
   // Cargar desde cache al montar
   useEffect(() => {
     let isMounted = true;
+    
+    // Reset state immediately when gameId changes to avoid showing old data
+    setSourceIndex(0);
+    setCurrentSrc(null);
+    setStatus('loading');
+    setIsCached(false);
     
     const checkCache = async () => {
       try {
@@ -64,18 +72,23 @@ export const GameCover: React.FC<GameCoverProps> = ({
 
     checkCache().then(found => {
       if (!found && isMounted) {
-        setSourceIndex(0);
-        setCurrentSrc(null);
         setStatus('loading');
+        console.debug(`[Cover] No cache found for ${title}, starting cascade...`);
       }
     });
 
     return () => { isMounted = false; };
-  }, [gameId, sources]);
+  }, [gameId, title]); // Added title to reset if title changes for same ID
 
   useEffect(() => {
     // Si ya cargamos de cache, no hacemos nada
     if (isCached || status === 'success') return;
+
+    if (!sources || sources.length === 0) {
+      console.warn(`[Cover] No sources generated for ${title}`);
+      setStatus('error');
+      return;
+    }
 
     if (sourceIndex >= sources.length) {
       setStatus('error');
@@ -84,12 +97,12 @@ export const GameCover: React.FC<GameCoverProps> = ({
 
     const url = sources[sourceIndex];
     if (sourceIndex === 0) {
-      console.debug(`[Cover] Buscando arte para: ${title}`);
+      console.debug(`[Cover] Attempting source 1/${sources.length} for ${title}: ${url}`);
     }
 
     // Intentar cargar a través del cache de imágenes (blob URL)
     const loadWithCache = async () => {
-      if (url && !url.startsWith('/')) {
+      if (url && !url.startsWith('/') && !url.startsWith('blob:')) {
         try {
           const cachedUrl = await ImageCache.getImage(url);
           if (cachedUrl && cachedUrl.startsWith('blob:')) {
@@ -97,7 +110,7 @@ export const GameCover: React.FC<GameCoverProps> = ({
             return;
           }
         } catch (e) {
-          console.warn(`[Cover] Cache fetch failed for ${url}, falling back to direct`);
+          // Silent fail for cache, fallback to direct
         }
       }
       setCurrentSrc(url);
@@ -108,17 +121,21 @@ export const GameCover: React.FC<GameCoverProps> = ({
     // Timeout de seguridad: si una imagen tarda más de 8s en cargar o fallar, forzamos el siguiente intento
     const timeout = setTimeout(() => {
       if (status === 'loading') {
-        console.warn(`[Cover] Timeout loading ${url} for ${title}, skipping...`);
+        console.warn(`[Cover] Timeout (8s) for ${title} at source ${sourceIndex + 1}: ${url}`);
         handleError();
       }
     }, 8000);
 
     return () => clearTimeout(timeout);
-  }, [sourceIndex, sources, isCached]);
+  }, [sourceIndex, sources, isCached, status, title]);
 
   const handleError = () => {
+    const failedUrl = sources[sourceIndex];
+    console.warn(`[Cover] Failed to load source ${sourceIndex + 1}/${sources.length} for ${title}: ${failedUrl}`);
+
     // Si falló una URL que estaba en cache, la borramos y reiniciamos cascada
     if (isCached) {
+      console.debug(`[Cover] Cached URL failed, clearing cache for ${gameId}`);
       coverStore.removeItem(gameId);
       setIsCached(false);
       setSourceIndex(0);
@@ -126,14 +143,10 @@ export const GameCover: React.FC<GameCoverProps> = ({
       return;
     }
 
-    if (sourceIndex === sources.length - 1) {
-      console.warn(`[Cover] No se encontró arte para: ${title}`);
-    }
-    
-    setCurrentSrc(null);
     if (sourceIndex < sources.length - 1) {
       setSourceIndex(prev => prev + 1);
     } else {
+      console.error(`[Cover] All ${sources.length} sources failed for ${title}`);
       setStatus('error');
     }
   };

@@ -46,11 +46,11 @@ class GameCatalogService {
       }
       
       // Force refresh for OMEGA SET 50K update
-      const CATALOG_VERSION = '18'; // Bumped version to force re-seed for Elite Top 15 fixes
+      const CATALOG_VERSION = '19'; // Bumped version to force re-seed for archive_id extraction
       const currentVersion = localStorage.getItem('catalog_version');
       
       if (currentVersion !== CATALOG_VERSION) {
-        console.log('[GameCatalog] Detected old catalog version. Purging for Arcade/Atari fixes...');
+        console.log('[GameCatalog] Detected old catalog version. Purging for archive_id extraction...');
         await storage.clearCatalog();
         // DO NOT clear all ROMs, let LRU eviction handle old files.
         // This preserves user downloads across catalog updates.
@@ -366,6 +366,15 @@ class GameCatalogService {
   }
 
   async addGame(game: GameObject) {
+    // Ensure archive_id is present if it's an Archive.org URL
+    if (!game.archive_id && game.rom_url.includes('archive.org/download/')) {
+      try {
+        const parts = game.rom_url.split('archive.org/download/')[1].split('/');
+        if (parts.length > 0) {
+          game.archive_id = parts[0];
+        }
+      } catch (e) {}
+    }
     this.games.set(game.game_id, game);
     await storage.saveCatalogGame(game);
     this.notifyListeners();
@@ -375,6 +384,15 @@ class GameCatalogService {
     if (games.length === 0) return;
     
     for (const g of games) {
+      // Ensure archive_id is present if it's an Archive.org URL
+      if (!g.archive_id && g.rom_url.includes('archive.org/download/')) {
+        try {
+          const parts = g.rom_url.split('archive.org/download/')[1].split('/');
+          if (parts.length > 0) {
+            g.archive_id = parts[0];
+          }
+        } catch (e) {}
+      }
       this.games.set(g.game_id, g);
     }
     

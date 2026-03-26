@@ -145,7 +145,8 @@ const GameSection: React.FC<GameSectionProps> = ({ title, games, variant = 'defa
                   <GameCover 
                     key={game.game_id}
                     gameId={game.game_id}
-                    primaryUrl={game.cover_url || game.artwork_url} 
+                    archiveId={game.archive_id}
+                    primaryUrl={game.artwork_url || game.cover_url} 
                     title={game.title}
                     systemId={game.system_id}
                     className="w-full h-full"

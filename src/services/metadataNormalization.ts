@@ -2,6 +2,7 @@ import { CoverService } from './coverService';
 
 export interface GameObject {
   game_id: string;
+  archive_id?: string; // Original Archive.org identifier
   title: string;
   system: string;
   system_id: string;
@@ -112,9 +113,14 @@ export const ELITE_TOP_20 = [
 
 export class MetadataNormalizationEngine {
   
-  public static async resolveRomUrl(identifier: string, system?: string): Promise<string | null> {
+  public static async resolveRomUrl(gameId: string, system?: string): Promise<string | null> {
     const maxRetries = 4;
     let attempt = 0;
+
+    // Handle unique game_id format: identifier_romname
+    const parts = gameId.split('_');
+    const identifier = parts[0];
+    const targetRomName = parts.length > 1 ? parts.slice(1).join('_') : null;
 
     while (attempt < maxRetries) {
       const controller = new AbortController();
@@ -161,24 +167,37 @@ export class MetadataNormalizationEngine {
           }
 
           if (metaData && metaData.files) {
-            let validExtensions: string[] = [];
-            if (system === 'nes') validExtensions = ['.nes', '.zip'];
-            else if (system === 'snes') validExtensions = ['.sfc', '.smc', '.zip'];
-            else if (system === 'sega_genesis') validExtensions = ['.md', '.gen', '.bin', '.zip'];
-            else if (system === 'gba') validExtensions = ['.gba', '.zip'];
-            else if (system === 'gbc') validExtensions = ['.gbc', '.zip'];
-            else if (system === 'gb') validExtensions = ['.gb', '.zip'];
-            else if (system === 'n64') validExtensions = ['.n64', '.z64', '.zip'];
-            else if (system === 'psx') validExtensions = ['.chd', '.cue', '.bin', '.iso', '.zip'];
-            else if (system === 'atari_2600') validExtensions = ['.a26', '.bin', '.zip'];
-            else if (system === 'atari_7800') validExtensions = ['.a78', '.bin', '.zip'];
-            else if (system === 'lynx') validExtensions = ['.lnx', '.zip'];
-            else if (system === 'mastersystem' || system === 'gamegear') validExtensions = ['.sms', '.gg', '.zip'];
-            else if (system === 'pcengine') validExtensions = ['.pce', '.zip'];
-            else if (system === 'wonderswan') validExtensions = ['.ws', '.wsc', '.zip'];
-            else if (system === 'ngp') validExtensions = ['.ngp', '.ngc', '.zip'];
+            let romFile: ArchiveFile | null = null;
 
-            const romFile = this.findMainRom(metaData.files, validExtensions);
+            if (targetRomName) {
+              // Try to find the specific ROM file by its sanitized name
+              romFile = metaData.files.find((f: ArchiveFile) => 
+                f.name.replace(/[^a-zA-Z0-9]/g, '_') === targetRomName
+              ) || null;
+            }
+
+            // Fallback to finding the main ROM if not found or no targetRomName
+            if (!romFile) {
+              let validExtensions: string[] = [];
+              if (system === 'nes') validExtensions = ['.nes', '.zip'];
+              else if (system === 'snes') validExtensions = ['.sfc', '.smc', '.zip'];
+              else if (system === 'sega_genesis') validExtensions = ['.md', '.gen', '.bin', '.zip'];
+              else if (system === 'gba') validExtensions = ['.gba', '.zip'];
+              else if (system === 'gbc') validExtensions = ['.gbc', '.zip'];
+              else if (system === 'gb') validExtensions = ['.gb', '.zip'];
+              else if (system === 'n64') validExtensions = ['.n64', '.z64', '.zip'];
+              else if (system === 'psx') validExtensions = ['.chd', '.cue', '.bin', '.iso', '.zip'];
+              else if (system === 'atari_2600') validExtensions = ['.a26', '.bin', '.zip'];
+              else if (system === 'atari_7800') validExtensions = ['.a78', '.bin', '.zip'];
+              else if (system === 'lynx') validExtensions = ['.lnx', '.zip'];
+              else if (system === 'mastersystem' || system === 'gamegear') validExtensions = ['.sms', '.gg', '.zip'];
+              else if (system === 'pcengine') validExtensions = ['.pce', '.zip'];
+              else if (system === 'wonderswan') validExtensions = ['.ws', '.wsc', '.zip'];
+              else if (system === 'ngp') validExtensions = ['.ngp', '.ngc', '.zip'];
+
+              romFile = this.findMainRom(metaData.files, validExtensions);
+            }
+
             if (romFile) {
               clearTimeout(timeoutId);
               return `https://archive.org/download/${identifier}/${encodeURIComponent(romFile.name)}`;
@@ -217,7 +236,7 @@ export class MetadataNormalizationEngine {
     return null;
   }
 
-  public static normalizeFast(doc: any): GameObject | null {
+  public static normalizeFast(doc: any): GameObject[] {
     const identifier = doc.identifier;
     const collection = Array.isArray(doc.collection) ? doc.collection[0] : doc.collection;
     
@@ -252,129 +271,111 @@ export class MetadataNormalizationEngine {
     if (!systemKey) systemKey = 'Unknown';
     const mapping = SYSTEM_MAPPINGS[systemKey] || SYSTEM_MAPPINGS['Unknown'];
 
+    // If we have files, normalize all of them
+    if (doc.files && Array.isArray(doc.files)) {
+      const games: GameObject[] = [];
+      const romFiles = doc.files.filter((f: any) => {
+        const name = typeof f === 'string' ? f : f.name;
+        if (!name) return false;
+        const lower = name.toLowerCase();
+        const extensions = ['.nes', '.sfc', '.smc', '.gba', '.gbc', '.gb', '.bin', '.gen', '.md', '.iso', '.chd', '.cue', '.a26', '.a78', '.lnx', '.n64', '.z64', '.zip', '.7z'];
+        return extensions.some(ext => lower.endsWith(ext)) && !lower.includes('bios') && !lower.includes('manual') && !lower.includes('soundtrack');
+      });
+
+      for (const f of romFiles) {
+        const fileName = typeof f === 'string' ? f : f.name;
+        const cleanTitle = this.cleanTitle(fileName);
+        const gameId = `${identifier}_${fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        
+        // Use a more specific title for cover resolution (keep tags like (USA), (Disc 1), etc.)
+        const specificTitle = fileName.replace(/_/g, ' ').replace(/\.[^/.]+$/, "");
+        const sources = CoverService.getCoverSources(specificTitle, systemKey, identifier);
+        
+        // Try to find specific artwork for this ROM
+        let artworkUrl = null;
+        const romBaseName = fileName.substring(0, fileName.lastIndexOf('.'));
+        const specificArt = doc.files?.find((file: any) => {
+          const fName = typeof file === 'string' ? file : file.name;
+          if (!fName) return false;
+          const isImage = fName.toLowerCase().match(/\.(png|jpg|jpeg|gif|webp)$/);
+          if (!isImage) return false;
+          const artBaseName = fName.substring(0, fName.lastIndexOf('.'));
+          return artBaseName.toLowerCase() === romBaseName.toLowerCase() || 
+                 artBaseName.toLowerCase().includes(romBaseName.toLowerCase());
+        });
+
+        if (specificArt) {
+          const artName = typeof specificArt === 'string' ? specificArt : specificArt.name;
+          artworkUrl = `https://archive.org/download/${identifier}/${encodeURIComponent(artName)}`;
+        } else {
+          artworkUrl = sources.find(s => s.includes('Named_Snaps')) || sources[1] || null;
+        }
+
+        games.push({
+          game_id: gameId,
+          archive_id: identifier,
+          title: cleanTitle,
+          system: mapping.system,
+          system_id: systemKey,
+          year: this.extractYear(doc.date),
+          publisher: this.extractPublisher(doc.creator),
+          developer: this.extractPublisher(doc.creator),
+          players: this.estimatePlayers(cleanTitle, doc.description),
+          rom_url: `archive:${identifier}/${fileName}`,
+          cover_url: sources[0],
+          artwork_url: artworkUrl,
+          description: doc.description ? doc.description.replace(/<[^>]*>?/gm, '').substring(0, 300) : null,
+          genre: Array.isArray(doc.subject) ? doc.subject[0] : doc.subject,
+          rom_size: typeof f === 'object' ? parseInt(f.size || '0', 10) : 1024 * 1024,
+          emulator_core: mapping.core,
+          compatibility_status: 'untested',
+          checksum: null,
+          playable: true
+        });
+      }
+      
+      if (games.length > 0) return games;
+    }
+
+    // Fallback if no files or no valid ROMs found in files
     const cleanTitle = this.cleanTitle(doc.title || identifier);
-    
-    // Filter out obvious non-games or unplayable items
-    const lowerTitle = cleanTitle.toLowerCase();
-    const lowerId = identifier.toLowerCase();
-    
-    // List of known Arcade BIOS/Device files that should never be in the catalog
-    const arcadeBiosFiles = [
-      'neogeo', 'pgm', 'qsound', 'cpzn1', 'cpzn2', 'cvs', 'decocass', 'konamigx', 
-      'megatech', 'megaplay', 'nss', 'playch10', 'skns', 'stvbios', 'taitofx1', 'tps',
-      'mame', 'naomi', 'hikaru', 'model3', 'awbios', 'dc_boot', 'dc_flash',
-      'atps', 'atps2', 'atps3', 'atps4', 'atps5', 'atps6', 'atps7', 'atps8', 'atps9',
-      'atps10', 'atps11', 'atps12', 'atps13', 'atps14', 'atps15', 'atps16', 'atps17',
-      'atps18', 'atps19', 'atps20', 'atps21', 'atps22', 'atps23', 'atps24', 'atps25',
-      'atps26', 'atps27', 'atps28', 'atps29', 'atps30', 'atps31', 'atps32', 'atps33',
-      'atps34', 'atps35', 'atps36', 'atps37', 'atps38', 'atps39', 'atps40', 'atps41',
-      'atps42', 'atps43', 'atps44', 'atps45', 'atps46', 'atps47', 'atps48', 'atps49',
-      'atps50', 'atps51', 'atps52', 'atps53', 'atps54', 'atps55', 'atps56', 'atps57',
-      'atps58', 'atps59', 'atps60', 'atps61', 'atps62', 'atps63', 'atps64', 'atps65',
-      'atps66', 'atps67', 'atps68', 'atps69', 'atps70', 'atps71', 'atps72', 'atps73',
-      'atps74', 'atps75', 'atps76', 'atps77', 'atps78', 'atps79', 'atps80', 'atps81',
-      'atps82', 'atps83', 'atps84', 'atps85', 'atps86', 'atps87', 'atps88', 'atps89',
-      'atps90', 'atps91', 'atps92', 'atps93', 'atps94', 'atps95', 'atps96', 'atps97',
-      'atps98', 'atps99', 'atps100', 'emus', 'emulators', 'pc-world', 'pc-gamer', 'pc-magazine'
-    ];
+    const sources = CoverService.getCoverSources(cleanTitle, systemKey, identifier);
 
-    const blacklistedKeywords = [
-      'bios', 'soundtrack', 'manual', 'not working', 'update', 'magazine', 'guide', 
-      'romset', 'rom set', 'rom pack', 'chd pack', 'full set', 'collection', 
-      'emulator', 'rollback', 'samples', 'artwork', 'flyers', 'snaps', 'titles', 
-      'marquees', 'cabinets', 'cpanel', 'pcb', 'history', 'cheat', 'crosshair',
-      'pc world', 'pc gamer', 'pc magazine', 'coverdisc', 'cover disc', 'demo disc',
-      'preview disc', 'review disc', 'gog edition', 'steam edition', 'repack',
-      'installer', 'setup', 'utility', 'driver', 'software', 'shareware', 'freeware',
-      'patch', 'crack', 'trainer', 'portable', 'rip', 'full game', 'disc 1', 'disc 2',
-      'disc 3', 'disc 4', 'disc 5', 'cd-rom', 'cdrom', 'dvd-rom', 'dvdrom'
-    ];
-
-    if (blacklistedKeywords.some(k => lowerTitle.includes(k)) || 
-        arcadeBiosFiles.includes(lowerId) ||
-        arcadeBiosFiles.some(b => lowerTitle === b) ||
-        lowerTitle.match(/mame\s*0\.\d+/) ||
-        lowerTitle.match(/^[0-9]+\s+[0-9a-z\s]+stario$/)) {
-      return null;
-    }
-
-    const year = this.extractYear(doc.date);
-    const publisher = this.extractPublisher(doc.creator);
-
-    // Libretro Art Logic
-    const libretroSystemNames: Record<string, string> = {
-      'nes': 'Nintendo - Nintendo Entertainment System',
-      'snes': 'Nintendo - Super Nintendo Entertainment System',
-      'sega_genesis': 'Sega - Mega Drive - Genesis',
-      'gba': 'Nintendo - Game Boy Advance',
-      'gbc': 'Nintendo - Game Boy Color',
-      'gb': 'Nintendo - Game Boy',
-      'psx': 'Sony - PlayStation',
-      'ps2': 'Sony - PlayStation 2',
-      'atari_2600': 'Atari - 2600',
-      'atari_7800': 'Atari - 7800',
-      'n64': 'Nintendo - Nintendo 64',
-      'mastersystem': 'Sega - Master System - Mark III',
-      'gamegear': 'Sega - Game Gear',
-      'pcengine': 'NEC - PC Engine - TurboGrafx 16',
-      'wonderswan': 'Bandai - WonderSwan',
-      'ngp': 'SNK - Neo Geo Pocket'
-    };
-
-    const libretroSystem = ((mapping as any).system_id ? libretroSystemNames[(mapping as any).system_id] : (libretroSystemNames[systemKey] || mapping.system));
-    const sources = CoverService.getCoverSources(doc.title || identifier, systemKey, identifier);
-    const coverUrl = sources[0];
-    const artworkUrl = sources.find(s => s.includes('Named_Snaps')) || sources[1] || null;
-
-    let genre = null;
-    if (doc.subject) {
-      genre = Array.isArray(doc.subject) ? doc.subject[0] : doc.subject;
-    }
-
-    let description = doc.description || null;
-    if (description) {
-      description = description.replace(/<[^>]*>?/gm, '').trim();
-      if (description.length > 300) description = description.substring(0, 300) + '...';
-    }
-
-    return {
+    return [{
       game_id: identifier,
+      archive_id: identifier,
       title: cleanTitle,
       system: mapping.system,
       system_id: systemKey,
-      year: year,
-      publisher: publisher,
-      developer: publisher,
-      players: this.estimatePlayers(cleanTitle, description),
-      rom_url: `archive:${identifier}`, // Placeholder to be resolved later
-      cover_url: coverUrl,
-      artwork_url: artworkUrl,
-      description: description,
-      genre: genre,
-      rom_size: 1024 * 1024, // Dummy size to pass filters
+      year: this.extractYear(doc.date),
+      publisher: this.extractPublisher(doc.creator),
+      developer: this.extractPublisher(doc.creator),
+      players: this.estimatePlayers(cleanTitle, doc.description),
+      rom_url: `archive:${identifier}`,
+      cover_url: sources[0],
+      artwork_url: sources.find(s => s.includes('Named_Snaps')) || sources[1] || null,
+      description: doc.description ? doc.description.replace(/<[^>]*>?/gm, '').substring(0, 300) : null,
+      genre: Array.isArray(doc.subject) ? doc.subject[0] : doc.subject,
+      rom_size: 1024 * 1024,
       emulator_core: mapping.core,
       compatibility_status: 'untested',
       checksum: null,
       playable: true
-    };
+    }];
   }
 
   /**
-   * Normaliza los metadatos crudos de Archive.org en un GameObject uniforme.
+   * Normaliza los metadatos crudos de Archive.org en una lista de GameObjects uniformes.
+   * Soporta múltiples juegos dentro de un mismo ítem (colecciones).
    */
-  public static normalize(rawData: ArchiveRawData, collection?: string): GameObject | null {
-    // 1. Verificar ROM principal
-    const romFile = this.findMainRom(rawData.files || [], []); // Pass empty to find any supported
-    if (!romFile) return null; 
-
-    // Attempt to determine system from collection name or subject
-    let systemKey = '';
+  public static normalize(rawData: ArchiveRawData, collection?: string): GameObject[] {
+    const games: GameObject[] = [];
     
-    // Try to find a matching system in our mappings based on collection or subject
+    // 1. Determinar sistema
+    let systemKey = '';
     if (collection && COLLECTION_TO_SYSTEM[collection]) {
       systemKey = COLLECTION_TO_SYSTEM[collection];
     } else {
-      // Fallback: Check subjects/keywords
       const subjects = Array.isArray(rawData.subject) ? rawData.subject : [rawData.subject || ''];
       for (const s of subjects) {
         const lowerS = s?.toLowerCase() || '';
@@ -402,145 +403,119 @@ export class MetadataNormalizationEngine {
       }
     }
 
-    // MANDATORY: If system still undefined, extract from extension
-    if (!systemKey) {
-      const ext = romFile.name.split('.').pop()?.toLowerCase();
-      if (ext === 'nes') systemKey = 'nes';
-      else if (ext === 'sfc' || ext === 'smc') systemKey = 'snes';
-      else if (ext === 'gba') systemKey = 'gba';
-      else if (ext === 'gbc') systemKey = 'gbc';
-      else if (ext === 'gb') systemKey = 'gb';
-      else if (ext === 'bin' || ext === 'gen' || ext === 'md') systemKey = 'sega_genesis';
-      else if (ext === 'iso' || ext === 'chd' || ext === 'cue') systemKey = 'psx';
-      else if (ext === 'a26') systemKey = 'atari_2600';
-      else if (ext === 'a78') systemKey = 'atari_7800';
-      else if (ext === 'lnx') systemKey = 'lynx';
-      else if (ext === 'n64' || ext === 'z64') systemKey = 'n64';
-      else systemKey = 'Unknown';
-    }
+    // MANDATORY: If system still undefined, extract from files later
+    const mapping = systemKey ? (SYSTEM_MAPPINGS[systemKey] || SYSTEM_MAPPINGS['Unknown']) : SYSTEM_MAPPINGS['Unknown'];
 
-    const mapping = SYSTEM_MAPPINGS[systemKey] || SYSTEM_MAPPINGS['Unknown'];
+    // 2. Encontrar todos los archivos ROM válidos
+    const files = rawData.files || [];
+    const romFiles = files.filter(f => {
+      if (f.source !== 'original') return false;
+      const lower = f.name.toLowerCase();
+      const extensions = ['.nes', '.sfc', '.smc', '.gba', '.gbc', '.gb', '.bin', '.gen', '.md', '.iso', '.chd', '.cue', '.a26', '.a78', '.lnx', '.n64', '.z64', '.zip', '.7z'];
+      
+      // Basic exclusions
+      const exclusions = ['bios', 'manual', 'soundtrack', 'video', 'snap', 'readme', 'info', 'metadata', 'license', 'install', 'setup', '__ia_thumb'];
+      if (exclusions.some(exc => lower.includes(exc))) return false;
+      
+      return extensions.some(ext => lower.endsWith(ext));
+    });
 
-    // 2. Corregir títulos
-    const cleanTitle = this.cleanTitle(rawData.title || rawData.identifier);
+    if (romFiles.length === 0) return [];
 
-    // Filter out obvious non-games or unplayable items
-    const lowerTitle = cleanTitle.toLowerCase();
-    const lowerId = rawData.identifier.toLowerCase();
-    
-    const arcadeBiosFiles = [
-      'neogeo', 'pgm', 'qsound', 'cpzn1', 'cpzn2', 'cvs', 'decocass', 'konamigx', 
-      'megatech', 'megaplay', 'nss', 'playch10', 'skns', 'stvbios', 'taitofx1', 'tps',
-      'mame', 'naomi', 'hikaru', 'model3', 'awbios', 'dc_boot', 'dc_flash',
-      'atps', 'atps2', 'atps3', 'atps4', 'atps5', 'atps6', 'atps7', 'atps8', 'atps9',
-      'atps10', 'atps11', 'atps12', 'atps13', 'atps14', 'atps15', 'atps16', 'atps17',
-      'atps18', 'atps19', 'atps20', 'atps21', 'atps22', 'atps23', 'atps24', 'atps25',
-      'atps26', 'atps27', 'atps28', 'atps29', 'atps30', 'atps31', 'atps32', 'atps33',
-      'atps34', 'atps35', 'atps36', 'atps37', 'atps38', 'atps39', 'atps40', 'atps41',
-      'atps42', 'atps43', 'atps44', 'atps45', 'atps46', 'atps47', 'atps48', 'atps49',
-      'atps50', 'atps51', 'atps52', 'atps53', 'atps54', 'atps55', 'atps56', 'atps57',
-      'atps58', 'atps59', 'atps60', 'atps61', 'atps62', 'atps63', 'atps64', 'atps65',
-      'atps66', 'atps67', 'atps68', 'atps69', 'atps70', 'atps71', 'atps72', 'atps73',
-      'atps74', 'atps75', 'atps76', 'atps77', 'atps78', 'atps79', 'atps80', 'atps81',
-      'atps82', 'atps83', 'atps84', 'atps85', 'atps86', 'atps87', 'atps88', 'atps89',
-      'atps90', 'atps91', 'atps92', 'atps93', 'atps94', 'atps95', 'atps96', 'atps97',
-      'atps98', 'atps99', 'atps100', 'emus', 'emulators', 'pc-world', 'pc-gamer', 'pc-magazine'
-    ];
+    // 3. Procesar cada ROM como un juego independiente
+    for (const romFile of romFiles) {
+      let currentSystemKey = systemKey;
+      
+      // If system was unknown, try to infer from extension
+      if (!currentSystemKey) {
+        const ext = romFile.name.split('.').pop()?.toLowerCase();
+        if (ext === 'nes') currentSystemKey = 'nes';
+        else if (ext === 'sfc' || ext === 'smc') currentSystemKey = 'snes';
+        else if (ext === 'gba') currentSystemKey = 'gba';
+        else if (ext === 'gbc') currentSystemKey = 'gbc';
+        else if (ext === 'gb') currentSystemKey = 'gb';
+        else if (ext === 'bin' || ext === 'gen' || ext === 'md') currentSystemKey = 'sega_genesis';
+        else if (ext === 'iso' || ext === 'chd' || ext === 'cue') currentSystemKey = 'psx';
+        else if (ext === 'a26') currentSystemKey = 'atari_2600';
+        else if (ext === 'a78') currentSystemKey = 'atari_7800';
+        else if (ext === 'lnx') currentSystemKey = 'lynx';
+        else if (ext === 'n64' || ext === 'z64') currentSystemKey = 'n64';
+        else currentSystemKey = 'Unknown';
+      }
 
-    const blacklistedKeywords = [
-      'bios', 'soundtrack', 'manual', 'not working', 'update', 'magazine', 'guide', 
-      'romset', 'rom set', 'rom pack', 'chd pack', 'full set', 'collection', 
-      'emulator', 'rollback', 'samples', 'artwork', 'flyers', 'snaps', 'titles', 
-      'marquees', 'cabinets', 'cpanel', 'pcb', 'history', 'cheat', 'crosshair',
-      'pc world', 'pc gamer', 'pc magazine', 'coverdisc', 'cover disc', 'demo disc',
-      'preview disc', 'review disc', 'gog edition', 'steam edition', 'repack',
-      'installer', 'setup', 'utility', 'driver', 'software', 'shareware', 'freeware',
-      'patch', 'crack', 'trainer', 'portable', 'rip', 'full game', 'disc 1', 'disc 2',
-      'disc 3', 'disc 4', 'disc 5', 'cd-rom', 'cdrom', 'dvd-rom', 'dvdrom'
-    ];
+      const currentMapping = SYSTEM_MAPPINGS[currentSystemKey] || SYSTEM_MAPPINGS['Unknown'];
+      const cleanTitle = this.cleanTitle(romFile.name);
+      const gameId = `${rawData.identifier}_${romFile.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      
+      const romUrl = `https://archive.org/download/${rawData.identifier}/${encodeURIComponent(romFile.name)}`;
+      
+      // Use a more specific title for cover resolution (keep tags like (USA), (Disc 1), etc.)
+      const specificTitle = romFile.name.replace(/_/g, ' ').replace(/\.[^/.]+$/, "");
+      const sources = CoverService.getCoverSources(specificTitle, currentSystemKey, rawData.identifier);
+      
+      // Try to find specific artwork for this ROM
+      let artworkUrl = null;
+      const romBaseName = romFile.name.substring(0, romFile.name.lastIndexOf('.'));
+      const specificArt = rawData.files?.find(f => {
+        const isImage = f.name.toLowerCase().match(/\.(png|jpg|jpeg|gif|webp)$/);
+        if (!isImage) return false;
+        const artBaseName = f.name.substring(0, f.name.lastIndexOf('.'));
+        return artBaseName.toLowerCase() === romBaseName.toLowerCase() || 
+               artBaseName.toLowerCase().includes(romBaseName.toLowerCase());
+      });
 
-    if (blacklistedKeywords.some(k => lowerTitle.includes(k)) || 
-        arcadeBiosFiles.includes(lowerId) ||
-        arcadeBiosFiles.some(b => lowerTitle === b) ||
-        lowerTitle.match(/mame\s*0\.\d+/) ||
-        lowerTitle.match(/^[0-9]+\s+[0-9a-z\s]+stario$/)) {
-      return null;
-    }
-
-    // 3. Extraer año
-    const year = this.extractYear(rawData.date);
-
-    // 4. Extraer publisher y developer
-    const publisher = this.extractPublisher(rawData.publisher || rawData.creator);
-    const developer = this.extractPublisher(rawData.developer || rawData.creator);
-
-    // 5. Construir URLs
-    const romUrl = `https://archive.org/download/${rawData.identifier}/${encodeURIComponent(romFile.name)}`;
-    
-    // --- TRIPLE ART CASCADE ENGINE ---
-    const sources = CoverService.getCoverSources(rawData.title || rawData.identifier, systemKey, rawData.identifier);
-    const coverUrl = sources[0];
-    
-    let artworkUrl = null;
-    const priorityArtwork = rawData.files?.find(f => 
-      f.name.toLowerCase().includes('art') || 
-      f.name.toLowerCase().includes('background') ||
-      f.name.toLowerCase().includes('promo')
-    );
-
-    if (priorityArtwork) {
-      artworkUrl = `https://archive.org/download/${rawData.identifier}/${encodeURIComponent(priorityArtwork.name)}`;
-    } else {
-      // Use Libretro Named_Snaps for artwork/background if available in sources
-      artworkUrl = sources.find(s => s.includes('Named_Snaps')) || sources[1] || null;
-    }
-    
-    // 6. Buscar video preview o gif
-    // Priority: Archive.org mp4 > screenscraper (not implemented yet)
-    const videoFile = rawData.files?.find(f => f.name.endsWith('.mp4') || f.name.endsWith('.gif'));
-    const videoPreviewUrl = videoFile ? `https://archive.org/download/${rawData.identifier}/${encodeURIComponent(videoFile.name)}` : null;
-
-    // 7. Extraer género
-    let genre = null;
-    if (rawData.subject) {
-      if (Array.isArray(rawData.subject)) {
-        genre = rawData.subject[0];
+      if (specificArt) {
+        artworkUrl = `https://archive.org/download/${rawData.identifier}/${encodeURIComponent(specificArt.name)}`;
       } else {
-        genre = rawData.subject;
+        const priorityArtwork = rawData.files?.find(f => 
+          f.name.toLowerCase().includes('art') || 
+          f.name.toLowerCase().includes('background') ||
+          f.name.toLowerCase().includes('promo') ||
+          f.name.toLowerCase().includes('box') ||
+          f.name.toLowerCase().includes('cover')
+        );
+
+        if (priorityArtwork) {
+          artworkUrl = `https://archive.org/download/${rawData.identifier}/${encodeURIComponent(priorityArtwork.name)}`;
+        } else {
+          artworkUrl = sources.find(s => s.includes('Named_Snaps')) || sources[1] || null;
+        }
       }
+
+      const videoFile = rawData.files?.find(f => f.name.endsWith('.mp4') || f.name.endsWith('.gif'));
+      const videoPreviewUrl = videoFile ? `https://archive.org/download/${rawData.identifier}/${encodeURIComponent(videoFile.name)}` : null;
+
+      let description = rawData.description || null;
+      if (description) {
+        description = description.replace(/<[^>]*>?/gm, '').trim();
+        if (description.length > 300) description = description.substring(0, 300) + '...';
+      }
+
+      games.push({
+        game_id: gameId,
+        archive_id: rawData.identifier,
+        title: cleanTitle,
+        system: currentMapping.system,
+        system_id: currentSystemKey,
+        year: this.extractYear(rawData.date),
+        publisher: this.extractPublisher(rawData.publisher || rawData.creator),
+        developer: this.extractPublisher(rawData.developer || rawData.creator),
+        players: this.estimatePlayers(cleanTitle, rawData.description),
+        rom_url: romUrl,
+        cover_url: sources[0],
+        artwork_url: artworkUrl,
+        video_preview_url: videoPreviewUrl,
+        description: description,
+        genre: Array.isArray(rawData.subject) ? rawData.subject[0] : rawData.subject,
+        rom_size: parseInt(romFile.size || '0', 10),
+        emulator_core: currentMapping.core,
+        compatibility_status: 'untested',
+        checksum: romFile.crc32 || romFile.md5 || null,
+        playable: true
+      });
     }
 
-    // 8. Limpiar descripción (quitar HTML si lo hay, o limitar tamaño)
-    let description = rawData.description || null;
-    if (description) {
-      // Remover tags HTML básicos
-      description = description.replace(/<[^>]*>?/gm, '').trim();
-      if (description.length > 300) {
-        description = description.substring(0, 300) + '...';
-      }
-    }
-
-    return {
-      game_id: rawData.identifier.replace(/\s+/g, '_'),
-      title: cleanTitle,
-      system: mapping.system,
-      system_id: systemKey,
-      year: year,
-      publisher: publisher,
-      developer: developer,
-      players: this.estimatePlayers(cleanTitle, rawData.description),
-      rom_url: romUrl,
-      cover_url: coverUrl,
-      artwork_url: artworkUrl,
-      video_preview_url: videoPreviewUrl,
-      description: description,
-      genre: genre,
-      rom_size: parseInt(romFile.size || '0', 10),
-      emulator_core: mapping.core,
-      compatibility_status: 'untested',
-      checksum: romFile.crc32 || romFile.md5 || null,
-      playable: true
-    };
+    return games;
   }
 
   /**
@@ -771,7 +746,7 @@ export class MetadataNormalizationEngine {
     }
 
     // If system is provided, filter by specific subject or collection subset
-    if (system && system !== 'All') {
+    if (system && system !== 'All' && system.trim() !== '') {
       const subjects = systemSubjects[system] || [system];
       const collections = systemCollections[system] || [];
       
@@ -788,17 +763,17 @@ export class MetadataNormalizationEngine {
 
     const sort = 'downloads+desc';
     const scrapeCount = Math.max(100, rows);
-    const flParams = ['identifier', 'title', 'description', 'creator', 'date', 'subject', 'collection']
+    const flParams = ['identifier', 'title', 'description', 'creator', 'date', 'subject', 'collection', 'files']
       .map(f => `fl[]=${f}`).join('&');
 
     // Primary and Fallback Queries
-    const queries = [q];
+    const queries = [q.replace(/\s+/g, ' ').trim()];
     
     if (query && system && system !== 'All') {
       // Fallback 1: Just title and system (less restrictive subject)
-      queries.push(`mediatype:(software) AND title:(${query.replace(/[():]/g, '\\$&')}) AND subject:(${system})`);
+      queries.push(`mediatype:(software) AND title:(${query.replace(/[():]/g, '\\$&')}) AND subject:(${system})`.replace(/\s+/g, ' ').trim());
       // Fallback 2: Just title and software mediatype
-      queries.push(`mediatype:(software) AND title:(${query.replace(/[():]/g, '\\$&')})`);
+      queries.push(`mediatype:(software) AND title:(${query.replace(/[():]/g, '\\$&')})`.replace(/\s+/g, ' ').trim());
     }
 
     let searchData: any = null;
@@ -813,7 +788,7 @@ export class MetadataNormalizationEngine {
       const endpoints = [];
       
       if (page === 1) {
-        endpoints.push(`https://archive.org/services/search/v1/scrape?q=${encodeURIComponent(currentQ)}&fields=identifier,title,description,creator,date,subject,collection&count=${scrapeCount}`);
+        endpoints.push(`https://archive.org/services/search/v1/scrape?q=${encodeURIComponent(currentQ)}&fields=identifier,title,description,creator,date,subject,collection,files&count=${scrapeCount}`);
       }
       
       endpoints.push(`https://archive.org/advancedsearch.php?q=${encodeURIComponent(currentQ)}&${flParams}&sort[]=${sort}&rows=${rows}&page=${page}&output=json`);
@@ -935,9 +910,13 @@ export class MetadataNormalizationEngine {
     // Fast normalization without fetching metadata for each file
     for (const doc of docs) {
       try {
-        const game = this.normalizeFast(doc);
-        if (game && game.system !== 'Unknown') {
-          normalizedGames.push(game);
+        const games = this.normalizeFast(doc);
+        if (games && games.length > 0) {
+          games.forEach(game => {
+            if (game.system !== 'Unknown') {
+              normalizedGames.push(game);
+            }
+          });
         }
       } catch (err) {
         console.error(`Error normalizing ${doc.identifier}:`, err);

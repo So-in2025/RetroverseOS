@@ -31,7 +31,8 @@ export default function FeaturedGame({ game }: FeaturedGameProps) {
       <div className="absolute inset-0 bg-zinc-900">
         <GameCover 
           gameId={game.game_id}
-          primaryUrl={game.cover_url || game.artwork_url}
+          archiveId={game.archive_id}
+          primaryUrl={game.artwork_url || game.cover_url}
           title={game.title}
           systemId={game.system_id}
           className="w-full h-full object-cover scale-110 blur-2xl opacity-40 group-hover:scale-105 transition-transform duration-1000"

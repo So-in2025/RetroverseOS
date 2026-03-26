@@ -72,7 +72,8 @@ export const RecommendedSection: React.FC = () => {
                 >
                   <GameCover
                     gameId={game.game_id}
-                    primaryUrl={game.cover_url || game.artwork_url}
+                    archiveId={game.archive_id}
+                    primaryUrl={game.artwork_url || game.cover_url}
                     title={game.title}
                     systemId={game.system_id}
                     className="w-full h-full transition-transform duration-700 group-hover:scale-110 group-hover:rotate-1"

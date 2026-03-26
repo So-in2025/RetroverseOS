@@ -11,7 +11,7 @@ import crypto from "crypto";
 // Prevent server crashes from unhandled socket errors (like EPIPE)
 process.on('uncaughtException', (err: any) => {
   if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
-    console.warn('[Server] Ignored uncaught socket error:', err.message);
+    // Silence common client-side disconnects
     return;
   }
   console.error('[Server] Uncaught Exception:', err);

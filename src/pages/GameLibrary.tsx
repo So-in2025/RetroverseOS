@@ -118,6 +118,22 @@ export default function GameLibrary() {
     return result;
   }, [deferredGames, searchQuery, selectedSystem, mobileTab, cachedGameIds, specialFilter, yearFilter, playersFilter]);
 
+  // Pre-calculate games by system for the "Systems" view to avoid heavy filtering in render
+  const gamesBySystem = useMemo(() => {
+    if (viewMode !== 'systems') return {};
+    
+    const groups: Record<string, GameObject[]> = {};
+    SYSTEM_FILTERS.filter(f => f.id !== 'All').forEach(filter => {
+      const sysGames = filteredGames.filter(game => 
+        filter.systems.length === 0 ? true : filter.systems.includes(game.system_id)
+      );
+      if (sysGames.length > 0) {
+        groups[filter.id] = sysGames;
+      }
+    });
+    return groups;
+  }, [filteredGames, viewMode]);
+
   // Pre-cachear juegos visibles al cambiar
   useEffect(() => {
     if (filteredGames.length > 0) {
@@ -182,20 +198,6 @@ export default function GameLibrary() {
   // Carousel State
   const [selectedIndex, setSelectedIndex] = useState(0);
   const carouselRef = useRef<HTMLDivElement>(null);
-
-  // Optimized games by system grouping
-  const gamesBySystem = useMemo(() => {
-    if (!filteredGames.length) return {};
-    
-    const grouped: Record<string, GameObject[]> = {};
-    for (let i = 0; i < filteredGames.length; i++) {
-      const game = filteredGames[i];
-      const sysName = game.system || 'OTRAS';
-      if (!grouped[sysName]) grouped[sysName] = [];
-      grouped[sysName].push(game);
-    }
-    return grouped;
-  }, [filteredGames]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -681,7 +683,8 @@ export default function GameLibrary() {
                              <GameCover 
                                 key={game.game_id}
                                 gameId={game.game_id}
-                                primaryUrl={game.cover_url || game.artwork_url} 
+                                archiveId={game.archive_id}
+                                primaryUrl={game.artwork_url || game.cover_url} 
                                 title={game.title}
                                 systemId={game.system_id}
                                 className="w-full h-full transition-transform duration-500 group-hover:scale-110"
@@ -851,7 +854,8 @@ export default function GameLibrary() {
                               <GameCover 
                                 key={game.game_id}
                                 gameId={game.game_id}
-                                primaryUrl={game.cover_url || game.artwork_url} 
+                                archiveId={game.archive_id}
+                                primaryUrl={game.artwork_url || game.cover_url} 
                                 title={game.title}
                                 systemId={game.system_id}
                                 className="w-full h-full object-cover"
@@ -975,56 +979,52 @@ export default function GameLibrary() {
 
                     {/* Grid Content */}
                     <div ref={containerRef} className="flex-1 overflow-y-auto pb-32 pt-6 px-4 lg:px-0 hide-scrollbar min-h-0">
-                      {viewMode === 'systems' && (
-                        <div className="space-y-12">
-                          {SYSTEM_FILTERS.filter(f => f.id !== 'All').map(filter => {
-                            const sysGames = filteredGames.filter(game => 
-                              filter.systems.length === 0 ? true : filter.systems.includes(game.system_id)
-                            );
-                            
-                            if (sysGames.length === 0) return null;
+                      <div className="space-y-12">
+                        {SYSTEM_FILTERS.filter(f => f.id !== 'All').map(filter => {
+                          const sysGames = gamesBySystem[filter.id];
+                          
+                          if (!sysGames || sysGames.length === 0) return null;
 
-                            const sysName = filter.name;
-                            const collapsed = collapsedSystems.has(filter.id);
+                          const sysName = filter.name;
+                          const collapsed = collapsedSystems.has(filter.id);
 
-                            return (
-                              <div key={filter.id} className="space-y-6 animate-in fade-in duration-500">
-                                <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-2 cursor-pointer" onClick={() => toggleSystem(filter.id)}>
-                                  <div className="flex items-center gap-4">
-                                    <h3 className="text-2xl font-black italic uppercase tracking-tighter text-cyan-electric">
-                                      {sysName} BASE DE DATOS
-                                    </h3>
-                                    <span className="text-xs font-mono text-zinc-500 bg-white/5 px-2 py-1 rounded">
-                                      {sysGames.length} TÍTULOS ASEGURADOS
-                                    </span>
-                                  </div>
-                                  <button className="text-xs font-black uppercase tracking-widest text-zinc-500 hover:text-cyan-electric transition-colors">
-                                    {collapsed ? 'EXPANDIR' : 'CONTRAER'}
-                                  </button>
+                          return (
+                            <div key={filter.id} className="space-y-6 animate-in fade-in duration-500">
+                              <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-2 cursor-pointer" onClick={() => toggleSystem(filter.id)}>
+                                <div className="flex items-center gap-4">
+                                  <h3 className="text-2xl font-black italic uppercase tracking-tighter text-cyan-electric">
+                                    {sysName} BASE DE DATOS
+                                  </h3>
+                                  <span className="text-xs font-mono text-zinc-500 bg-white/5 px-2 py-1 rounded">
+                                    {sysGames.length} TÍTULOS ASEGURADOS
+                                  </span>
                                 </div>
-                                
-                                {!collapsed && (
-                                  <div className="h-[600px] w-full">
-                                    <VirtualizedGameGrid 
-                                      games={sysGames}
-                                      width={width || 1200}
-                                      height={600}
-                                      onCacheChange={(id, cached) => {
-                                        setCachedGameIds(prev => {
-                                          const next = new Set(prev);
-                                          if (cached) next.add(id);
-                                          else next.delete(id);
-                                          return next;
-                                        });
-                                      }}
-                                    />
-                                  </div>
-                                )}
+                                <button className="text-xs font-black uppercase tracking-widest text-zinc-500 hover:text-cyan-electric transition-colors">
+                                  {collapsed ? 'EXPANDIR' : 'CONTRAER'}
+                                </button>
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                              
+                              {!collapsed && (
+                                <div className="h-[600px] w-full">
+                                  <VirtualizedGameGrid 
+                                    games={sysGames}
+                                    width={width || (libraryRef.current?.clientWidth ? libraryRef.current.clientWidth - 64 : 1200)}
+                                    height={600}
+                                    onCacheChange={(id, cached) => {
+                                      setCachedGameIds(prev => {
+                                        const next = new Set(prev);
+                                        if (cached) next.add(id);
+                                        else next.delete(id);
+                                        return next;
+                                      });
+                                    }}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 )}

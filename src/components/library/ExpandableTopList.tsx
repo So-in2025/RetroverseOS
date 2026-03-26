@@ -39,7 +39,8 @@ export const ExpandableTopList: React.FC<ExpandableTopListProps> = ({ title, gam
               <div className="relative aspect-[2/3] rounded-2xl overflow-hidden mb-3 bg-zinc-900 border border-yellow-500/30 transition-all duration-300 group-hover:scale-105 group-hover:border-yellow-500">
                 <GameCover 
                   gameId={game.game_id}
-                  primaryUrl={game.cover_url || game.artwork_url} 
+                  archiveId={game.archive_id}
+                  primaryUrl={game.artwork_url || game.cover_url} 
                   title={game.title}
                   systemId={game.system_id}
                   className="w-full h-full transition-transform duration-500 group-hover:scale-110"

@@ -65,7 +65,8 @@ export default function GameQuickViewModal({ game, isOpen, onClose }: GameQuickV
               <div className="aspect-[3/4] md:aspect-auto md:h-full relative">
                 <GameCover
                   gameId={game.game_id}
-                  primaryUrl={game.cover_url || game.artwork_url}
+                  archiveId={game.archive_id}
+                  primaryUrl={game.artwork_url || game.cover_url}
                   title={game.title}
                   systemId={game.system_id}
                   className="w-full h-full opacity-80"

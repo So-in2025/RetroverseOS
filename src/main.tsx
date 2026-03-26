@@ -10,6 +10,31 @@ if (import.meta.env.DEV) {
   sentinel.start();
 }
 
+// Mock WakeLock to prevent "Access to Screen Wake Lock features is disallowed by permissions policy"
+if (typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
+  try {
+    const originalRequest = navigator.wakeLock.request.bind(navigator.wakeLock);
+    navigator.wakeLock.request = async (type: 'screen') => {
+      try {
+        return await originalRequest(type);
+      } catch (err) {
+        console.warn('⚠️ [Main] WakeLock request failed (Permission Policy):', err);
+        // Return a mock sentinel to prevent crashes in libraries that expect it
+        return {
+          released: false,
+          type: 'screen',
+          release: async () => {},
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          onrelease: null,
+        } as any;
+      }
+    };
+  } catch (e) {
+    console.error('❌ [Main] Failed to mock WakeLock:', e);
+  }
+}
+
 // Global error handler for boot issues
 window.onerror = (message, source, lineno, colno, error) => {
   console.error('🔥 [Main] Global Error Caught:', { message, source, lineno, colno, error });

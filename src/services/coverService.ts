@@ -51,6 +51,23 @@ const LIBRETRO_SYSTEM_MAP: Record<string, string> = {
   'arcade': 'MAME'
 };
 
+const ARCHIVE_SYSTEM_MAP: Record<string, string> = {
+  'nes': 'nointro.nes',
+  'snes': 'nointro.snes',
+  'gba': 'nointro.gba',
+  'gbc': 'nointro.gbc',
+  'gb': 'nointro.gb',
+  'sega_genesis': 'nointro.md',
+  'n64': 'nointro.n64',
+  'psx': 'sony_playstation_usa_library',
+  'atari_2600': 'nointro.atari2600',
+  'atari_7800': 'nointro.atari7800',
+  'lynx': 'nointro.lynx',
+  'mastersystem': 'nointro.ms',
+  'gamegear': 'nointro.gg',
+  'pcengine': 'nointro.pce',
+};
+
 export class CoverService {
   /**
    * Normalizes the title to match common file naming conventions.
@@ -153,19 +170,27 @@ export class CoverService {
     }
 
     // 2. Archive.org
-    if (archiveIdentifier) {
+    const archiveId = archiveIdentifier || ARCHIVE_SYSTEM_MAP[system];
+    if (archiveId) {
       // Archive.org auto-generated thumb (usually the best fallback)
-      sources.push(`https://archive.org/services/img/${archiveIdentifier}`);
+      // If it's a collection identifier (like nointro.nes), this might be generic, 
+      // but if it's a specific item identifier, it's perfect.
+      if (archiveIdentifier) {
+        sources.push(`https://archive.org/services/img/${archiveIdentifier}`);
+      }
       
       // Try specific common filenames in the item
       const archiveTitle = normalizedTitle.replace(/\s+/g, '_');
-      sources.push(`https://archive.org/download/${archiveIdentifier}/${archiveTitle}.png`);
-      sources.push(`https://archive.org/download/${archiveIdentifier}/cover.jpg`);
-      sources.push(`https://archive.org/download/${archiveIdentifier}/boxart.jpg`);
-      sources.push(`https://archive.org/download/${archiveIdentifier}/front.jpg`);
+      sources.push(`https://archive.org/download/${archiveId}/${archiveTitle}.png`);
+      sources.push(`https://archive.org/download/${archiveId}/${this.safeEncode(titleWithoutExt)}.png`);
+      sources.push(`https://archive.org/download/${archiveId}/cover.jpg`);
+      sources.push(`https://archive.org/download/${archiveId}/boxart.jpg`);
+      sources.push(`https://archive.org/download/${archiveId}/front.jpg`);
       
       // Try the __ia_thumb.jpg which is almost always present
-      sources.push(`https://archive.org/download/${archiveIdentifier}/__ia_thumb.jpg`);
+      if (archiveIdentifier) {
+        sources.push(`https://archive.org/download/${archiveIdentifier}/__ia_thumb.jpg`);
+      }
     }
 
     // 3. Alternative CDN (Libretro official)

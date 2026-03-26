@@ -135,7 +135,8 @@ export const LobbyList: React.FC = () => {
                       <div className="w-12 h-16 rounded-lg overflow-hidden bg-zinc-800 border border-white/5 flex-shrink-0">
                         <GameCover 
                           gameId={session.game_id}
-                          primaryUrl={game?.cover_url || game?.artwork_url}
+                          archiveId={game?.archive_id}
+                          primaryUrl={game?.artwork_url || game?.cover_url}
                           title={game?.title || session.game_id}
                           systemId={game?.system_id || 'unknown'}
                           className="w-full h-full"

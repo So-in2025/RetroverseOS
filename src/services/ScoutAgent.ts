@@ -28,31 +28,65 @@ export class ArchiveScoutAgent implements ScoutAgent {
     }
     
     // Use a broader query that searches for the title in various fields
-    const systemKeyword = SYSTEM_KEYWORDS[system] || `"${system}"`;
+    const upperSystem = system.toUpperCase();
+    const systemKeyword = SYSTEM_KEYWORDS[upperSystem] || (system ? `"${system}"` : "");
     
     // Try multiple query variations for better discovery
     const queryVariations = [
       // 1. Strict title match within system
-      `(title:"${cleanGameId}" OR identifier:"${gameId}") AND ${systemKeyword}`,
+      systemKeyword 
+        ? `(title:"${cleanGameId}" OR identifier:${gameId}) AND ${systemKeyword}`
+        : `(title:"${cleanGameId}" OR identifier:${gameId})`,
       // 2. Title and system combined
-      `"${cleanGameId}" ${system}`,
+      system ? `"${cleanGameId}" ${system}` : `"${cleanGameId}"`,
       // 3. First two words of title + system (for long titles)
-      `${cleanGameId.split(" ").slice(0, 2).join(" ")} ${system}`,
+      system ? `${cleanGameId.split(" ").slice(0, 2).join(" ")} ${system}` : cleanGameId.split(" ").slice(0, 2).join(" "),
       // 4. Loose title match
-      `title:(${cleanGameId}) AND ${systemKeyword}`
+      systemKeyword
+        ? `title:(${cleanGameId}) AND ${systemKeyword}`
+        : `title:(${cleanGameId})`
     ];
 
     const baseFilter = " AND (collection:nointro OR collection:software OR collection:classicpcgames OR collection:cdromimages OR mediatype:software)";
     
+    const fetchWithRetry = async (url: string, retries = 2, delay = 1000): Promise<Response> => {
+      for (let i = 0; i <= retries; i++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+        
+        try {
+          const response = await fetch(url, { signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (response.ok) return response;
+          if (response.status === 429 || response.status >= 500) {
+            if (i < retries) {
+              await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+              continue;
+            }
+          }
+          return response;
+        } catch (err: any) {
+          clearTimeout(timeoutId);
+          if (i === retries) throw err;
+          const isTimeout = err.name === 'AbortError';
+          console.warn(`[Scout] Fetch attempt ${i + 1} failed (${isTimeout ? 'Timeout' : err.message}). Retrying...`);
+          await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
+        }
+      }
+      throw new Error('Fetch failed after retries');
+    };
+
     for (const queryBase of queryVariations) {
-      const query = queryBase + (queryBase.includes('collection:') ? '' : baseFilter);
+      // Clean up query: remove double spaces and trim
+      const cleanQueryBase = queryBase.replace(/\s+/g, ' ').trim();
+      const query = (cleanQueryBase + (cleanQueryBase.includes('collection:') ? '' : baseFilter)).replace(/\s+/g, ' ').trim();
       const searchUrl = `https://archive.org/services/search/v1/scrape?q=${encodeURIComponent(query)}&fields=identifier,title,mediatype,collection&count=10`;
       const proxySearchUrl = `/api/tunnel?url=${encodeURIComponent(searchUrl)}`;
 
       try {
-        const response = await fetch(proxySearchUrl);
+        const response = await fetchWithRetry(proxySearchUrl);
         if (!response.ok) {
-          console.warn(`[Scout] Proxy returned ${response.status} for search query`);
+          console.warn(`[Scout] Proxy returned ${response.status} for search query: ${query}`);
           continue;
         }
         
@@ -76,12 +110,15 @@ export class ArchiveScoutAgent implements ScoutAgent {
           console.log(`[Scout] Resultados encontrados con query: ${queryBase}`);
           const candidates: ROMCandidate[] = [];
           
+          // Limit to first 5 documents to avoid overwhelming the server/network
+          const limitedDocs = docs.slice(0, 5);
+          
           // For each item found, fetch its file list to find the best ROM
-          for (const doc of docs) {
+          for (const doc of limitedDocs) {
             try {
               const metadataUrl = `https://archive.org/metadata/${doc.identifier}`;
               const proxyMetaUrl = `/api/tunnel?url=${encodeURIComponent(metadataUrl)}`;
-              const metaResponse = await fetch(proxyMetaUrl);
+              const metaResponse = await fetchWithRetry(proxyMetaUrl);
               if (!metaResponse.ok) {
                 console.warn(`[Scout] Proxy returned ${metaResponse.status} for metadata ${doc.identifier}`);
                 continue;

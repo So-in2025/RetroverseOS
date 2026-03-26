@@ -101,7 +101,8 @@ export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
                       <div className="w-12 h-12 rounded-lg overflow-hidden bg-zinc-800 border border-white/10 flex-shrink-0">
                         <GameCover 
                           gameId={game.game_id}
-                          primaryUrl={game.cover_url || game.artwork_url}
+                          archiveId={game.archive_id}
+                          primaryUrl={game.artwork_url || game.cover_url}
                           title={game.title}
                           systemId={game.system_id}
                           className="w-full h-full"

@@ -44,7 +44,7 @@ export default function GameDetail() {
     return CoverService.getCoverCandidates(
       game.title,
       game.system,
-      game.game_id
+      game.archive_id || game.game_id
     );
   }, [game]);
 
@@ -79,7 +79,8 @@ export default function GameDetail() {
         <GameCover 
           key={game.game_id}
           gameId={game.game_id}
-          primaryUrl={game.cover_url || game.artwork_url} 
+          archiveId={game.archive_id}
+          primaryUrl={game.artwork_url || game.cover_url} 
           title={game.title}
           systemId={game.system_id}
           className="w-full h-full opacity-30 blur-sm" 
@@ -103,7 +104,8 @@ export default function GameDetail() {
             <GameCover 
               key={game.game_id}
               gameId={game.game_id}
-              primaryUrl={game.cover_url || game.artwork_url} 
+              archiveId={game.archive_id}
+              primaryUrl={game.artwork_url || game.cover_url} 
               title={game.title}
               systemId={game.system_id}
               className="w-full h-full" 
