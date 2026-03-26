@@ -12,31 +12,40 @@ interface SearchModalProps {
 
 export default function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 100);
       setQuery('');
+      setDebouncedQuery('');
       setResults([]);
     }
   }, [isOpen]);
 
   useEffect(() => {
-    if (!query.trim()) {
+    if (!debouncedQuery.trim()) {
       setResults([]);
       return;
     }
 
     const games = gameCatalog.getAllGames().filter(g => 
-      g.title.toLowerCase().includes(query.toLowerCase()) ||
-      g.system.toLowerCase().includes(query.toLowerCase())
+      g.title.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
+      g.system.toLowerCase().includes(debouncedQuery.toLowerCase())
     ).slice(0, 5);
 
     setResults(games);
-  }, [query]);
+  }, [debouncedQuery]);
 
   const handleSelect = (path: string) => {
     navigate(path);

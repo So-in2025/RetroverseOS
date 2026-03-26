@@ -73,7 +73,6 @@ export const GameCover: React.FC<GameCoverProps> = ({
     checkCache().then(found => {
       if (!found && isMounted) {
         setStatus('loading');
-        console.debug(`[Cover] No cache found for ${title}, starting cascade...`);
       }
     });
 
@@ -96,9 +95,7 @@ export const GameCover: React.FC<GameCoverProps> = ({
     }
 
     const url = sources[sourceIndex];
-    if (sourceIndex === 0) {
-      console.debug(`[Cover] Attempting source 1/${sources.length} for ${title}: ${url}`);
-    }
+    // Silenced debug log for source attempts
 
     // Intentar cargar a través del cache de imágenes (blob URL)
     const loadWithCache = async () => {
@@ -153,7 +150,6 @@ export const GameCover: React.FC<GameCoverProps> = ({
 
   const handleLoad = () => {
     if (status !== 'success') {
-      console.debug(`[Cover] OK! Fuente ${sourceIndex + 1} cargada: ${title}`);
       setStatus('success');
       
       // Guardar URL exitosa en cache persistente (la URL original, no el blob)

@@ -14,46 +14,36 @@ export const LiveRoomsList: React.FC<LiveRoomsListProps> = ({ title, games }) =>
   const [searchQuery, setSearchQuery] = useState('');
   const [rotationIndex, setRotationIndex] = useState(0);
 
-  // Simulate a pool of live games (e.g. 30 games)
-  const simulatedLiveGames = useMemo(() => {
-    if (games.length === 0) return [];
-    // Efficiently pick 30 games without filtering the entire array
-    const result = [];
-    const step = Math.max(1, Math.floor(games.length / 30));
-    for (let i = 0; i < 30 && i * step < games.length; i++) {
-      result.push(games[i * step]);
-    }
-    return result;
-  }, [games]);
-
-  // Rotate games every 8 seconds
+  // Rotate games every 8 seconds if there are many
   useEffect(() => {
-    if (searchQuery) return; // Don't rotate while searching
+    if (searchQuery || games.length <= 5) return;
     
     const interval = setInterval(() => {
-      setRotationIndex(prev => (prev + 5) % Math.max(1, simulatedLiveGames.length));
+      setRotationIndex(prev => (prev + 5) % Math.max(1, games.length));
     }, 8000);
     
     return () => clearInterval(interval);
-  }, [simulatedLiveGames.length, searchQuery]);
+  }, [games.length, searchQuery]);
 
   const displayedGames = useMemo(() => {
     if (searchQuery) {
-      return simulatedLiveGames.filter(g => 
+      return games.filter(g => 
         g.title.toLowerCase().includes(searchQuery.toLowerCase())
       ).slice(0, 10);
     }
     
+    if (games.length <= 5) return games;
+
     // Get 5 games starting from rotationIndex
     const result = [];
     for (let i = 0; i < 5; i++) {
-      const idx = (rotationIndex + i) % Math.max(1, simulatedLiveGames.length);
-      if (simulatedLiveGames[idx]) {
-        result.push(simulatedLiveGames[idx]);
+      const idx = (rotationIndex + i) % Math.max(1, games.length);
+      if (games[idx]) {
+        result.push(games[idx]);
       }
     }
     return result;
-  }, [simulatedLiveGames, rotationIndex, searchQuery]);
+  }, [games, rotationIndex, searchQuery]);
 
   if (games.length === 0) return null;
 
@@ -92,7 +82,7 @@ export const LiveRoomsList: React.FC<LiveRoomsListProps> = ({ title, games }) =>
             <AnimatePresence mode="popLayout">
               {displayedGames.map((game, index) => (
                 <motion.div 
-                  key={`${game.game_id}-${searchQuery ? 'search' : rotationIndex}`}
+                  key={game.game_id}
                   initial={{ opacity: 0, scale: 0.9, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9, y: -20 }}
@@ -100,7 +90,7 @@ export const LiveRoomsList: React.FC<LiveRoomsListProps> = ({ title, games }) =>
                   className="w-full group relative"
                 >
                   <div className="absolute top-2 right-2 bg-black/80 backdrop-blur-md border border-emerald-500/50 text-emerald-500 text-[9px] font-black px-2 py-1 rounded-md z-10 flex items-center gap-1 shadow-[0_0_10px_rgba(16,185,129,0.3)]">
-                    <Users className="w-3 h-3" /> {Math.floor(Math.random() * 3) + 1}/2
+                    <Users className="w-3 h-3" /> {game.players > 1 ? 'MULTIJUGADOR' : 'SOLO'}
                   </div>
                   <Link to={`/play/${game.game_id}?url=${encodeURIComponent(game.rom_url)}&system=${game.system_id}`}>
                     <div className="relative aspect-[2/3] rounded-2xl overflow-hidden mb-3 bg-zinc-900 border border-emerald-500/30 transition-all duration-300 group-hover:scale-105 group-hover:border-emerald-500">

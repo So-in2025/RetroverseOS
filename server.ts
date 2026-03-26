@@ -161,7 +161,8 @@ async function startServer() {
     const range = req.headers.range;
     console.log(`[Tunnel] Fetching: ${targetUrl} (Range: ${range || 'none'})`);
 
-    const maxRetries = 3; 
+    const isArchive = targetUrl.includes('archive.org');
+    const maxRetries = isArchive ? 5 : 3; 
     let attempt = 0;
     let lastError: any = null;
 
@@ -171,13 +172,21 @@ async function startServer() {
       
       try {
         const fetchHeaders: Record<string, string> = {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
           'Accept': '*/*',
           'Accept-Language': 'en-US,en;q=0.9',
-          'Connection': 'keep-alive'
+          'Connection': 'keep-alive',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Upgrade-Insecure-Requests': '1'
         };
         
-        if (targetUrl.includes('archive.org')) {
+        if (isArchive) {
           fetchHeaders['Referer'] = 'https://archive.org/';
           fetchHeaders['Origin'] = 'https://archive.org';
         }
@@ -188,19 +197,25 @@ async function startServer() {
 
         const response = await fetch(targetUrl, {
           signal: controller.signal,
-          headers: fetchHeaders
+          headers: fetchHeaders,
+          // @ts-ignore - Node.js fetch specific
+          duplex: 'half'
         });
         clearTimeout(timeoutId);
         
         if (!response.ok) {
-          console.warn(`[Tunnel] Target returned status ${response.status} for ${targetUrl}`);
-          if (response.status === 404) return res.status(404).send('Target not found');
-          if ([503, 429, 408, 500].includes(response.status)) {
-            const waitTime = 1000 * (attempt + 1) + Math.random() * 500;
+          const status = response.status;
+          console.warn(`[Tunnel] Target returned status ${status} for ${targetUrl}`);
+          
+          if (status === 404) return res.status(404).send('Target not found');
+          
+          // Retryable statuses
+          if ([503, 429, 408, 500, 502, 504].includes(status)) {
+            const waitTime = 1500 * (attempt + 1) + Math.random() * 1000;
             await new Promise(resolve => setTimeout(resolve, waitTime));
-            throw new Error(`Target returned ${response.status}`);
+            throw new Error(`Target returned ${status}`);
           }
-          throw new Error(`Target returned ${response.status}`);
+          throw new Error(`Target returned ${status}`);
         }
 
         const contentType = response.headers.get('content-type');
@@ -255,7 +270,6 @@ async function startServer() {
         // Handle response errors
         res.on('error', (err: any) => {
           if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
-            // Silence common client-side disconnects
             return;
           }
           console.error(`[Tunnel] Response error for ${targetUrl}:`, err.message);
@@ -289,14 +303,14 @@ async function startServer() {
         attempt++;
         
         const isTimeout = error.name === 'AbortError';
-        const isConnReset = error.message?.includes('ECONNRESET') || error.code === 'ECONNRESET' || error.message?.includes('fetch failed');
-        const isRetryableStatus = error.message?.includes('503') || error.message?.includes('408') || error.message?.includes('429') || error.message?.includes('500');
+        const isConnReset = error.message?.includes('ECONNRESET') || error.code === 'ECONNRESET' || error.message?.toLowerCase().includes('fetch failed');
+        const isRetryableStatus = error.message?.includes('503') || error.message?.includes('408') || error.message?.includes('429') || error.message?.includes('500') || error.message?.includes('502') || error.message?.includes('504');
         const isFatalStatus = error.message?.includes('401') || error.message?.includes('403') || error.message?.includes('404');
         
-        console.error(`[Tunnel] Attempt ${attempt} failed for ${targetUrl}: ${error.message}`);
+        console.error(`[Tunnel] Attempt ${attempt} failed for ${targetUrl}: ${error.message}${isConnReset ? ' (Connection Reset/Fetch Failed)' : ''}`);
 
         if (attempt < maxRetries && !isFatalStatus && (isTimeout || isConnReset || isRetryableStatus || !res.headersSent)) {
-          const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+          const delay = Math.pow(2, attempt) * 1500 + Math.random() * 1000;
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         } else {

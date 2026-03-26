@@ -808,7 +808,9 @@ export default function GameLibrary() {
                     {/* Online Now / Spectate Section */}
                     <LiveRoomsList 
                       title="EN LÍNEA AHORA" 
-                      games={deferredGames} 
+                      games={Array.from(new Set(liveGames.map(lg => lg.gameId)))
+                        .map(gameId => games.find(g => g.game_id === gameId))
+                        .filter(Boolean) as GameObject[]} 
                     />
                   </div>
                 )}

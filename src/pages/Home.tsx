@@ -56,9 +56,9 @@ export default function Home() {
         const trending = await recommendationService.getTrendingGames(15);
         setPopularGames(trending);
         
-        // New Additions: Sort by some criteria, or just another slice
-        const shuffled = [...allGames].sort(() => 0.5 - Math.random());
-        setNewAdditions(shuffled.slice(15, 30));
+        // New Additions: Use real recently added games
+        const recentlyAdded = gameCatalog.getRecentlyAdded(15);
+        setNewAdditions(recentlyAdded);
       }
       setIsLoading(false);
     };

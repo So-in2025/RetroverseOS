@@ -67,7 +67,10 @@ class GameCatalogService {
       await this.addGames(FULL_CATALOG);
 
       if (storedGames && storedGames.length > 0 && hasNewData) {
-        storedGames.forEach(g => this.games.set(g.game_id, g));
+        storedGames.forEach(g => {
+          g.title = MetadataNormalizationEngine.cleanTitle(g.title);
+          this.games.set(g.game_id, g);
+        });
       } else {
         if (storedGames && storedGames.length > 0) {
           await storage.clearCatalog();
@@ -173,10 +176,10 @@ class GameCatalogService {
     // Run immediately
     this.runIngestionCycle();
 
-    // Then run every 5 seconds for MASS INGESTION
+    // Then run every 10 seconds for MASS INGESTION
     this.ingestionInterval = setInterval(() => {
       this.runIngestionCycle();
-    }, 5000);
+    }, 10000);
   }
 
   public stopAutonomousIngestion() {
@@ -189,7 +192,7 @@ class GameCatalogService {
 
   private async runIngestionCycle() {
     if (!this.ingestionSystems || this.ingestionSystems.length === 0) {
-      console.log('[Autonomous Engine] ALL SECTORS SECURED. INGESTION COMPLETE.');
+      // Silenced repetitive log
       this.stopAutonomousIngestion();
       return;
     }
@@ -212,7 +215,7 @@ class GameCatalogService {
         return;
       }
 
-      const results = await this.search('', system, 500, page);
+      const results = await this.search('', system, 200, page);
       
       // 3. Add to Catalog
       const newGames = results.filter(game => !this.games.has(game.game_id));
@@ -232,7 +235,6 @@ class GameCatalogService {
         console.log(`[Autonomous Engine] Sector ${system.toUpperCase()} fully ingested or unreachable.`);
         this.ingestionSystems.splice(this.currentSystemIndex, 1);
         if (this.ingestionSystems.length === 0) {
-          console.log('[Autonomous Engine] ALL SECTORS SECURED. INGESTION COMPLETE.');
           this.stopAutonomousIngestion();
           return;
         }
@@ -375,6 +377,15 @@ class GameCatalogService {
         }
       } catch (e) {}
     }
+    
+    // Clean title if it looks like a raw filename or has system prefixes
+    game.title = MetadataNormalizationEngine.cleanTitle(game.title);
+    
+    // Set added_at if not present
+    if (!game.added_at) {
+      game.added_at = Date.now();
+    }
+    
     this.games.set(game.game_id, game);
     await storage.saveCatalogGame(game);
     this.notifyListeners();
@@ -383,6 +394,7 @@ class GameCatalogService {
   async addGames(games: GameObject[]) {
     if (games.length === 0) return;
     
+    const now = Date.now();
     for (const g of games) {
       // Ensure archive_id is present if it's an Archive.org URL
       if (!g.archive_id && g.rom_url.includes('archive.org/download/')) {
@@ -393,6 +405,15 @@ class GameCatalogService {
           }
         } catch (e) {}
       }
+      
+      // Clean title if it looks like a raw filename or has system prefixes
+      g.title = MetadataNormalizationEngine.cleanTitle(g.title);
+      
+      // Set added_at if not present
+      if (!g.added_at) {
+        g.added_at = now;
+      }
+      
       this.games.set(g.game_id, g);
     }
     
@@ -402,6 +423,13 @@ class GameCatalogService {
 
   getGame(gameId: string): GameObject | undefined {
     return this.games.get(gameId);
+  }
+
+  getRecentlyAdded(limit: number = 20): GameObject[] {
+    return this.getAllGames()
+      .filter(g => g.added_at)
+      .sort((a, b) => (b.added_at || 0) - (a.added_at || 0))
+      .slice(0, limit);
   }
 
   getAllGames(): GameObject[] {
@@ -414,8 +442,6 @@ class GameCatalogService {
     
     // Use FULL_CATALOG as source to ensure we have the legends even before ingestion
     const source = FULL_CATALOG;
-    console.log(`[EliteTop20] Source catalog size: ${source.length}`);
-    console.log(`[EliteTop20] Looking for: ${normalizedElite.join(', ')}`);
 
     const elite = source.filter(g => {
       const titleNorm = normalize(g.title);
@@ -424,7 +450,6 @@ class GameCatalogService {
         titleNorm.includes(eliteTitle) ||
         eliteTitle.includes(titleNorm)
       );
-      if (isMatch) console.log(`[EliteTop20] Found match: ${g.title} (${titleNorm})`);
       return isMatch;
     });
 
@@ -490,7 +515,7 @@ class GameCatalogService {
       return ext && validExtensions.includes(ext) && isBigEnough;
     }).map(game => {
       // Clean title from extensions if present
-      game.title = game.title.replace(/\.(nes|sfc|smc|bin|iso|gba|zip|7z|chd|cue|n64|z64|a26|a78|lnx)$/i, '').trim();
+      game.title = MetadataNormalizationEngine.cleanTitle(game.title);
       
       // Strict mapping check
       if (game.system === 'Genesis') game.emulator_core = 'genesis_plus_gx';

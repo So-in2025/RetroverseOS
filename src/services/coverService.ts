@@ -82,14 +82,13 @@ export class CoverService {
     baseTitle = baseTitle.replace(/\.(nes|sfc|smc|bin|iso|gba|gbc|gb|gen|md|a26|a78|lnx|n64|z64|zip|7z|chd|cue)$/i, '');
 
     // 2. Remove common tags in parentheses or brackets
-    // But keep things like (USA) if we want to try specific matches later
     baseTitle = baseTitle.replace(/\s*[(\[].*?[)\]]/g, ' ').trim();
 
     // 3. Remove non-game keywords and special characters
-    // NOTE: We keep '-' because Libretro uses it for subtitles (e.g. "Game - Subtitle")
+    // We keep '-' because Libretro uses it for subtitles
     return baseTitle
-      .replace(/Screenshot|Official|Beta|Demo|Sample|Promo|Review|Preview|Debug|Build|v\d+\.\d+|V\d+/gi, '')
-      .replace(/[^a-zA-Z0-9\s-]/g, '') 
+      .replace(/\b(v\d+\.\d+[a-z]?|rev\s*[a-z0-9]|beta|demo|sample|promo|review|preview|debug|build|hack|translation|translated|patched|fixed|trainer|cheat|intro|repack|unlicensed|aftermarket|homebrew|prototype|sample|kiosk|store|not for resale|nfr|bundle|pack|collection|anthology|bonus|disc|cd|dvd|rom|iso|rip|dump|bad|overdump|headered|unheadered|no-intro|redump|t-en|t-es|t-fr|t-pt|t-it|t-de|t-ru|t-jp|t-cn|t-kr|level editor|editor|official|snes|nes|gba|gbc|gb|n64|psx|ps1|ps2|genesis|megadrive|master system|game gear|pc engine|turbografx|wonderswan|neogeo|ngp|mame|arcade|emu|emus|emulator|pack|roms|collection|set|fullset|complete|v1\.\d+|v2\.\d+|gog edition|steam edition|rare arabic ver|pc world cover|coverdisc|cover disc|demo disc|battle coliseum)\b/gi, '')
+      .replace(/\s*-\s*$/g, '') // Remove trailing hyphens
       .replace(/\s+/g, ' ')
       .trim();
   }
@@ -173,8 +172,6 @@ export class CoverService {
     const archiveId = archiveIdentifier || ARCHIVE_SYSTEM_MAP[system];
     if (archiveId) {
       // Archive.org auto-generated thumb (usually the best fallback)
-      // If it's a collection identifier (like nointro.nes), this might be generic, 
-      // but if it's a specific item identifier, it's perfect.
       if (archiveIdentifier) {
         sources.push(`https://archive.org/services/img/${archiveIdentifier}`);
       }
@@ -205,16 +202,23 @@ export class CoverService {
     // Add original sources but wrapped in wsrv.nl for CORS and speed
     sources.forEach(src => {
       if (src && src.startsWith('http')) {
-        // We prioritize the proxied version because it's more reliable for CORS
-        finalSources.push(`https://wsrv.nl/?url=${encodeURIComponent(src)}&w=400&output=webp&n=-1`);
-        finalSources.push(src);
+        // Avoid double-proxying or proxying already proxied URLs
+        if (src.includes('wsrv.nl') || src.includes('images.weserv.nl')) {
+          finalSources.push(src);
+          return;
+        }
+
+        if (src.includes('githubusercontent.com') || src.includes('archive.org') || src.includes('libretro.com') || src.includes('cdn.libretro.com')) {
+          finalSources.push(`https://wsrv.nl/?url=${encodeURIComponent(src)}&w=400&output=webp&n=-1`);
+          finalSources.push(src); // Fallback to raw URL
+        } else {
+          finalSources.push(src);
+        }
       }
     });
 
-    // 5. Placeholder local
-    finalSources.push('/placeholder-cover.png');
-
-    return [...new Set(finalSources.filter(Boolean))];
+    // Limit to top 30 most likely sources to avoid massive cascades
+    return [...new Set(finalSources.filter(Boolean))].slice(0, 30);
   }
 
   /**

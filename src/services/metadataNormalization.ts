@@ -21,6 +21,7 @@ export interface GameObject {
   compatibility_status: 'compatible' | 'unstable' | 'broken' | 'untested' | 'verified' | 'unknown';
   checksum: string | null;
   playable?: boolean;
+  added_at?: number; // Timestamp when added to local catalog
 }
 
 export interface ArchiveRawData {
@@ -623,7 +624,7 @@ export class MetadataNormalizationEngine {
    * Limpia el título eliminando tags molestos como (USA), (Rev A), [!], etc.
    * También elimina guiones bajos y extensiones.
    */
-  private static cleanTitle(rawTitle: string): string {
+  public static cleanTitle(rawTitle: string): string {
     if (!rawTitle) return 'Unknown Game';
     
     let title = rawTitle
@@ -633,10 +634,20 @@ export class MetadataNormalizationEngine {
       .replace(/\s+/g, ' ') // Normalize spaces
       .trim();
 
-    // Remove common Archive.org prefixes like "001 - "
-    title = title.replace(/^\d+\s*-\s*/, '');
+    // Remove common Archive.org prefixes like "001 - " or "Snes - "
+    title = title
+      .replace(/^\d+\s*-\s*/, '') // Remove numeric prefixes (001 - Game)
+      .replace(/^(nes|snes|gba|gbc|gb|n64|psx|ps2|genesis|md|atari|lynx|ngp|mame|neogeo|mastersystem|gamegear|pcengine)\s*-\s*/i, '') // Remove system prefixes (Snes - Game)
+      .trim();
+
+    // Remove common junk words that appear in some collections
+    title = title
+      .replace(/\b(v\d+\.\d+[a-z]?|rev\s*[a-z0-9]|beta|demo|sample|promo|review|preview|debug|build|hack|translation|translated|patched|fixed|trainer|cheat|intro|repack|unlicensed|aftermarket|homebrew|prototype|sample|kiosk|store|not for resale|nfr|bundle|pack|collection|anthology|bonus|disc|cd|dvd|rom|iso|rip|dump|bad|overdump|headered|unheadered|no-intro|redump|t-en|t-es|t-fr|t-pt|t-it|t-de|t-ru|t-jp|t-cn|t-kr|level editor|editor|official|snes|nes|gba|gbc|gb|n64|psx|ps1|ps2|genesis|megadrive|master system|game gear|pc engine|turbografx|wonderswan|neogeo|ngp|mame|arcade|emu|emus|emulator|pack|roms|collection|set|fullset|complete|v1\.\d+|v2\.\d+|gog edition|steam edition|rare arabic ver|pc world cover|coverdisc|cover disc|demo disc|battle coliseum)\b/gi, '')
+      .replace(/\s*-\s*$/g, '') // Remove trailing hyphens
+      .replace(/\s+/g, ' ')
+      .trim();
     
-    return title;
+    return title || rawTitle;
   }
 
   /**
@@ -741,7 +752,7 @@ export class MetadataNormalizationEngine {
     
     if (query) {
       // Escape special characters for Archive.org
-      const escapedQuery = query.replace(/[():]/g, '\\$&');
+      const escapedQuery = query.replace(/[():"]/g, '\\$&');
       q += ` AND title:(${escapedQuery})`;
     }
 
@@ -762,18 +773,22 @@ export class MetadataNormalizationEngine {
     }
 
     const sort = 'downloads+desc';
-    const scrapeCount = Math.max(100, rows);
     const flParams = ['identifier', 'title', 'description', 'creator', 'date', 'subject', 'collection', 'files']
       .map(f => `fl[]=${f}`).join('&');
 
     // Primary and Fallback Queries
+    const cleanQ = this.cleanTitle(query);
     const queries = [q.replace(/\s+/g, ' ').trim()];
     
     if (query && system && system !== 'All') {
       // Fallback 1: Just title and system (less restrictive subject)
-      queries.push(`mediatype:(software) AND title:(${query.replace(/[():]/g, '\\$&')}) AND subject:(${system})`.replace(/\s+/g, ' ').trim());
+      queries.push(`mediatype:(software) AND title:(${cleanQ.replace(/[():"]/g, '\\$&')}) AND subject:(${system})`.replace(/\s+/g, ' ').trim());
       // Fallback 2: Just title and software mediatype
-      queries.push(`mediatype:(software) AND title:(${query.replace(/[():]/g, '\\$&')})`.replace(/\s+/g, ' ').trim());
+      queries.push(`mediatype:(software) AND title:(${cleanQ.replace(/[():"]/g, '\\$&')})`.replace(/\s+/g, ' ').trim());
+      // Fallback 3: Broad keyword search
+      queries.push(`"${cleanQ.replace(/"/g, '\\"')}" AND mediatype:software`.replace(/\s+/g, ' ').trim());
+      // Fallback 4: Super simple title search
+      queries.push(`${cleanQ.replace(/"/g, '\\"')}`.replace(/\s+/g, ' ').trim());
     }
 
     let searchData: any = null;
@@ -785,21 +800,14 @@ export class MetadataNormalizationEngine {
     for (const currentQ of queries) {
       if (searchData || (Date.now() - startTime > globalTimeout)) break;
 
-      const endpoints = [];
-      
-      if (page === 1) {
-        endpoints.push(`https://archive.org/services/search/v1/scrape?q=${encodeURIComponent(currentQ)}&fields=identifier,title,description,creator,date,subject,collection,files&count=${scrapeCount}`);
-      }
-      
-      endpoints.push(`https://archive.org/advancedsearch.php?q=${encodeURIComponent(currentQ)}&${flParams}&sort[]=${sort}&rows=${rows}&page=${page}&output=json`);
-
-      for (const endpoint of endpoints) {
+      for (const proxy of (proxies as any[])) {
         if (searchData || (Date.now() - startTime > globalTimeout)) break;
-        
-        let endpointSuccess = false;
 
-        for (const proxy of (proxies as any[])) {
-          if (Date.now() - startTime > globalTimeout) break;
+        const endpoints = [];
+        endpoints.push(`https://archive.org/advancedsearch.php?q=${encodeURIComponent(currentQ)}&${flParams}&sort[]=${sort}&rows=${rows}&page=${page}&output=json`);
+
+        for (const endpoint of endpoints) {
+          if (searchData || (Date.now() - startTime > globalTimeout)) break;
           
           try {
             let fetchUrl = endpoint;
@@ -808,20 +816,26 @@ export class MetadataNormalizationEngine {
             } else if (proxy.url) {
               fetchUrl = `${proxy.url}${encodeURIComponent(endpoint)}`;
             }
-            console.log(`[Archive.org Search] Attempting via ${proxy.name} (${currentQ.substring(0, 20)}...): ${proxy.name === 'LocalTunnel' ? 'tunneling' : fetchUrl}`);
             
             const controller = new AbortController();
             const timeout = proxy.timeout || 25000;
             const timeoutId = setTimeout(() => controller.abort(), timeout); 
             
             // Add small jitter to avoid slamming the server
-            await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 500));
+            await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 300));
             
             const response = await fetch(fetchUrl, { 
               signal: controller.signal,
               headers: {
                 'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache'
+                'Pragma': 'no-cache',
+                'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Upgrade-Insecure-Requests': '1'
               }
             });
             clearTimeout(timeoutId);
@@ -834,9 +848,9 @@ export class MetadataNormalizationEngine {
                 errText = "Proxy Internal Error (Target might be unreachable)";
               }
 
-              // If it's a 503, 429 or 408, move to next proxy
+              // If it's a 503, 429 or 408, move to next proxy/endpoint
               if (response.status === 503 || response.status === 429 || response.status === 408) {
-                console.warn(`[Archive.org Search] ${proxy.name} returned ${response.status}. Moving to next proxy...`);
+                console.warn(`[Archive.org Search] ${proxy.name} returned ${response.status} for ${endpoint.includes('scrape') ? 'scrape' : 'advancedsearch'}. Moving to next...`);
                 continue;
               }
 
@@ -861,14 +875,12 @@ export class MetadataNormalizationEngine {
 
               if (data.response && Array.isArray(data.response.docs)) {
                 searchData = data;
-                endpointSuccess = true;
-                console.log(`[Archive.org Search] Success via ${proxy.name} with ${searchData.response.docs.length} results.`);
-                break; // Break proxy loop
+                console.log(`[Archive.org Search] Success via ${proxy.name} (${endpoint.includes('scrape') ? 'scrape' : 'advancedsearch'}) with ${searchData.response.docs.length} results.`);
+                break; // Break endpoint loop
               } else if (data.items && Array.isArray(data.items)) {
                 searchData = { response: { docs: data.items } };
-                endpointSuccess = true;
-                console.log(`[Archive.org Search] Success via ${proxy.name} with ${searchData.response.docs.length} results.`);
-                break; // Break proxy loop
+                console.log(`[Archive.org Search] Success via ${proxy.name} (${endpoint.includes('scrape') ? 'scrape' : 'advancedsearch'}) with ${searchData.response.docs.length} results.`);
+                break; // Break endpoint loop
               } else {
                  throw new Error('Invalid data format: missing docs or items array');
               }
@@ -888,14 +900,16 @@ export class MetadataNormalizationEngine {
               lastError = err;
             }
             
-            console.warn(`[Archive.org Search] Proxy ${proxy.name} failed: ${lastError}`);
+            // Only log if it's not a common fetch failed or timeout
+            if (!err.toLowerCase().includes('fetch failed') && !err.includes('aborted')) {
+              console.warn(`[Archive.org Search] Proxy ${proxy.name} failed for ${endpoint.includes('scrape') ? 'scrape' : 'advancedsearch'}: ${lastError}`);
+            }
             
             // If it's a logical API error (like deep paging), don't try other proxies
             if (lastError.includes('DEEP_PAGING')) break;
           }
         }
-        
-        if (endpointSuccess) break;
+        if (searchData) break; // Break proxy loop
       }
     }
 

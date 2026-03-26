@@ -8,9 +8,15 @@ class RomPreloaderService {
   private PRELOAD_SIZE = 1024 * 1024; // 1MB
 
   public async addToQueue(games: GameObject[]) {
-    // Solo pre-cachear si no están ya en cache (completa o parcial)
+    // Limit to 20 games per call to avoid massive background downloads
+    const targetGames = games.slice(0, 20);
+    
+    // Filter out games already in queue or storage
     const filtered = [];
-    for (const game of games) {
+    for (const game of targetGames) {
+      // Avoid duplicates in queue
+      if (this.queue.some(q => q.game_id === game.game_id)) continue;
+      
       const isFull = await storage.isRomCached(game.game_id);
       const isPartial = await storage.isPartialRomCached(game.game_id);
       if (!isFull && !isPartial) {
@@ -18,7 +24,10 @@ class RomPreloaderService {
       }
     }
 
-    this.queue.push(...filtered);
+    // Keep only the most recent 40 games in queue to avoid memory/network bloat
+    this.queue = [...this.queue, ...filtered].slice(-40);
+    
+    // Start with a small delay to ensure the user has stopped scrolling
     this.startProcessing();
   }
 
@@ -26,12 +35,16 @@ class RomPreloaderService {
     if (this.isProcessing || this.queue.length === 0) return;
     this.isProcessing = true;
 
+    // Wait 3 seconds before starting to ensure the user is actually looking at these games
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
     while (this.queue.length > 0) {
-      const batch = this.queue.splice(0, this.MAX_CONCURRENT);
-      await Promise.all(batch.map(game => this.preload(game)));
-      
-      // Pequeña pausa entre batches para no saturar
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const game = this.queue.shift();
+      if (game) {
+        await this.preload(game);
+        // Pause between preloads to be polite to the network and Archive.org
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
     }
 
     this.isProcessing = false;

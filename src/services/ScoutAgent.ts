@@ -30,21 +30,22 @@ export class ArchiveScoutAgent implements ScoutAgent {
     // Use a broader query that searches for the title in various fields
     const upperSystem = system.toUpperCase();
     const systemKeyword = SYSTEM_KEYWORDS[upperSystem] || (system ? `"${system}"` : "");
+    const escapedGameId = cleanGameId.replace(/"/g, '\\"');
     
     // Try multiple query variations for better discovery
     const queryVariations = [
       // 1. Strict title match within system
       systemKeyword 
-        ? `(title:"${cleanGameId}" OR identifier:${gameId}) AND ${systemKeyword}`
-        : `(title:"${cleanGameId}" OR identifier:${gameId})`,
+        ? `(title:"${escapedGameId}" OR identifier:${gameId}) AND ${systemKeyword}`
+        : `(title:"${escapedGameId}" OR identifier:${gameId})`,
       // 2. Title and system combined
-      system ? `"${cleanGameId}" ${system}` : `"${cleanGameId}"`,
+      system ? `"${escapedGameId}" ${system}` : `"${escapedGameId}"`,
       // 3. First two words of title + system (for long titles)
-      system ? `${cleanGameId.split(" ").slice(0, 2).join(" ")} ${system}` : cleanGameId.split(" ").slice(0, 2).join(" "),
+      system ? `${escapedGameId.split(" ").slice(0, 2).join(" ")} ${system}` : escapedGameId.split(" ").slice(0, 2).join(" "),
       // 4. Loose title match
       systemKeyword
-        ? `title:(${cleanGameId}) AND ${systemKeyword}`
-        : `title:(${cleanGameId})`
+        ? `title:(${escapedGameId}) AND ${systemKeyword}`
+        : `title:(${escapedGameId})`
     ];
 
     const baseFilter = " AND (collection:nointro OR collection:software OR collection:classicpcgames OR collection:cdromimages OR mediatype:software)";
@@ -80,7 +81,7 @@ export class ArchiveScoutAgent implements ScoutAgent {
       // Clean up query: remove double spaces and trim
       const cleanQueryBase = queryBase.replace(/\s+/g, ' ').trim();
       const query = (cleanQueryBase + (cleanQueryBase.includes('collection:') ? '' : baseFilter)).replace(/\s+/g, ' ').trim();
-      const searchUrl = `https://archive.org/services/search/v1/scrape?q=${encodeURIComponent(query)}&fields=identifier,title,mediatype,collection&count=10`;
+      const searchUrl = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(query)}&fl[]=identifier,title,mediatype,collection&rows=10&page=1&output=json`;
       const proxySearchUrl = `/api/tunnel?url=${encodeURIComponent(searchUrl)}`;
 
       try {
