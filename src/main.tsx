@@ -53,8 +53,15 @@ window.onerror = (message, source, lineno, colno, error) => {
 
 // Register Service Worker for Offline Support
 if ('serviceWorker' in navigator) {
-  // We are using coi-serviceworker for SharedArrayBuffer support
-  // It registers itself automatically via the script in index.html
+  window.addEventListener('load', () => {
+    // SharedArrayBuffer is now handled via Vercel headers (COOP/COEP)
+    // We register our custom sw.js for offline shell and asset caching
+    navigator.serviceWorker.register('/sw.js').then(registration => {
+      console.log('✅ [Main] ServiceWorker registered:', registration.scope);
+    }).catch(err => {
+      console.error('❌ [Main] ServiceWorker registration failed:', err);
+    });
+  });
 }
 
 import { ErrorBoundary } from './components/ErrorBoundary.tsx';
