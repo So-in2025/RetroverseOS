@@ -54,13 +54,13 @@ const getCoreMap = (): Record<string, string> => ({
   'atari_7800': 'prosystem',
   'lynx': 'handy',
   'nes': 'fceumm',
-  'snes': isMobileDevice() ? 'snes9x2010' : 'snes9x',
+  'snes': 'snes9x2010', // More stable across devices than latest snes9x
   'sega_genesis': 'genesis_plus_gx',
-  'gba': (isMobileDevice() || !hasSAB()) ? 'vba_next' : 'mgba',
+  'gba': 'mgba', // mgba is generally the best, Nostalgist handles it well
   'gbc': 'gambatte',
   'gb': 'gambatte',
   'psx': 'pcsx_rearmed',
-  'n64': 'mupen64plus_next',
+  'n64': 'parallel_n64',
   'ps2': 'play',
   'mastersystem': 'genesis_plus_gx',
   'gamegear': 'genesis_plus_gx',
@@ -170,17 +170,30 @@ export class EmulatorService {
       const isChd = magicView[0] === 0x4D && magicView[1] === 0x43 && magicView[2] === 0x6F && magicView[3] === 0x6D; // MCom
 
       let extension = 'bin';
-      if (isZip) extension = 'zip';
-      else if (isChd) extension = 'chd';
-      else if (config.system === 'nes') extension = 'nes';
+      if (isZip) {
+         // If it's STILL a zip here, it means extractMainFileFromZip failed or was skipped.
+         // We MUST pass it as .zip to Nostalgist, otherwise it will try to read a zip as a raw ROM.
+         extension = 'zip';
+      } else if (isChd) {
+         extension = 'chd';
+      } else if (config.system === 'nes') extension = 'nes';
       else if (config.system === 'snes') extension = 'sfc';
       else if (config.system === 'sega_genesis') extension = 'md';
       else if (config.system === 'gba') extension = 'gba';
       else if (config.system === 'gbc') extension = 'gbc';
       else if (config.system === 'gb') extension = 'gb';
       else if (config.system === 'psx') extension = 'chd';
-      else if (config.system === 'n64') extension = 'n64';
-      else if (config.romUrl.includes('.n64') || config.romUrl.includes('.z64')) extension = 'n64';
+      else if (config.system === 'n64') {
+        // N64 requires the correct extension for byte order detection
+        if (magicView[0] === 0x80 && magicView[1] === 0x37 && magicView[2] === 0x12 && magicView[3] === 0x40) {
+          extension = 'z64'; // Big Endian
+        } else if (magicView[0] === 0x37 && magicView[1] === 0x80 && magicView[2] === 0x40 && magicView[3] === 0x12) {
+          extension = 'v64'; // Byte Swapped
+        } else {
+          extension = 'n64'; // Little Endian or fallback
+        }
+      }
+      else if (config.romUrl.includes('.n64') || config.romUrl.includes('.z64') || config.romUrl.includes('.v64')) extension = 'n64';
       else if (config.romUrl.includes('.iso')) extension = 'iso';
       else if (config.romUrl.includes('.chd')) extension = 'chd';
 
@@ -209,27 +222,73 @@ export class EmulatorService {
       const isUltraRes = effectiveResolution === '4K';
       const useEnhancements = videoSettings.textureEnhancement ?? false;
 
+      let finalCore: any = core;
+      
+      // Map cores to available versions in webretro if they are missing from the default CDN
+      let webretroCore = '';
+      let coreSource = 'BinBashBanana/webretro@master/cores';
+      let coreSuffix = '_libretro';
+      
+      if (core === 'parallel_n64' || core === 'mupen64plus_next') {
+        webretroCore = core;
+        coreSource = 'BinBashBanana/webretro@master/cores';
+      } else if (core === 'prosystem') {
+        webretroCore = core;
+      } else if (core === 'stella') {
+        webretroCore = 'stella2014';
+      } else if (core === 'mednafen_psx') {
+        webretroCore = 'mednafen_psx_hw';
+      } else if (core === 'melonds' || core === 'yabause') {
+        webretroCore = core;
+      }
+
+      if (webretroCore) {
+        const jsUrl = `https://cdn.jsdelivr.net/gh/${coreSource}/${webretroCore}${coreSuffix}.js`;
+        const wasmUrl = `https://cdn.jsdelivr.net/gh/${coreSource}/${webretroCore}${coreSuffix}.wasm`;
+        
+        console.log(`[Emulator] Fetching core files: \nJS: ${jsUrl}\nWASM: ${wasmUrl}`);
+
+        try {
+          // Manual fetch with progress for cores
+          const jsBlob = await ROMFetchService.fetchCoreFile(jsUrl, 'JS', onProgress);
+          const wasmBlob = await ROMFetchService.fetchCoreFile(wasmUrl, 'WASM', onProgress);
+
+          if (jsBlob.size < 1000 || wasmBlob.size < 1000) {
+            throw new Error('Core file too small, probably an error page or redirect');
+          }
+
+          finalCore = {
+            name: webretroCore,
+            js: { fileName: `${webretroCore}${coreSuffix}.js`, fileContent: jsBlob },
+            wasm: { fileName: `${webretroCore}${coreSuffix}.wasm`, fileContent: wasmBlob }
+          };
+          console.log(`[Emulator] Core files fetched successfully. JS: ${jsBlob.size} bytes, WASM: ${wasmBlob.size} bytes`);
+        } catch (e) {
+          console.error('[Emulator] Manual core fetch failed:', e);
+          onProgress?.('Error en descarga rápida, usando servidor alternativo...');
+          finalCore = webretroCore; // Fallback to string name (Nostalgist will fetch it)
+        }
+      }
+
       const nostalgistOptions: any = {
         element: config.canvas,
-        core: core,
+        core: finalCore,
         rom: { fileName, fileContent: romBlob },
         bios: biosFiles.length > 0 ? biosFiles : undefined,
         retroarchConfig: {
-          video_driver: 'gl',
-          audio_driver: 'webaudio',
           video_aspect_ratio_auto: videoSettings.aspectRatio === 'Original',
           video_smooth: videoSettings.bilinearFiltering,
           video_shader_enable: videoSettings.crtFilter && !isMobile,
           video_threaded: !hasLowLatency, // Threaded video adds 1 frame of lag but improves performance
-          audio_latency: hasLowLatency ? 32 : (isMobile ? 128 : 64),
+          audio_latency: hasLowLatency ? 64 : (isMobile ? 128 : 96), // Increased slightly for stability
           directory_system: '/home/web_user/retroarch/system',
           directory_savefile: '/home/web_user/retroarch/saves',
           directory_savestate: '/home/web_user/retroarch/states',
-          video_vsync: videoSettings.vsync ?? false,
+          video_vsync: videoSettings.vsync ?? true, // Default to true for smoother scrolling
           video_hard_sync: hasLowLatency,
           threaded_data_runloop_enable: true,
-          rewind_enable: true,
-          rewind_buffer_size: 20 * 1024 * 1024, // 20MB buffer for rewind
+          rewind_enable: false, // Disabled by default for stability and performance
+          rewind_buffer_size: 10 * 1024 * 1024, // Reduced buffer size
           rewind_granularity: 1,
           fastforward_ratio: 3.0
         },
@@ -239,19 +298,24 @@ export class EmulatorService {
           'pcsx_rearmed_neon_enhancement_no_main': isHighRes ? 'enabled' : 'disabled',
           'pcsx_rearmed_dithering': useEnhancements ? 'disabled' : 'enabled', // Removes dot pattern for smoother gradients
           
-          // N64 (Mupen64Plus)
-          'mupen64plus-next-ResolutionBackground': isUltraRes ? '3840x2160' : (isHighRes ? '1920x1080' : '640x480'),
-          'mupen64plus-next-MultiSampling': useEnhancements ? (isUltraRes ? '16' : '4') : '0',
-          'mupen64plus-next-EnableTrilinearFiltering': useEnhancements ? 'True' : 'False',
-          'mupen64plus-next-TextureFilter': useEnhancements ? 'Trilinear' : 'None',
-          'mupen64plus-next-TextureEnhancement': (useEnhancements && isUltraRes) ? 'HQ2X' : 'None',
-          
           // GBA (mGBA)
           'mgba_video_scale': isUltraRes ? '4' : (isHighRes ? '3' : '1'),
+
+          // N64 (ParaLLEl N64)
+          'parallel-n64-gfxplugin': 'glide64',
+          'parallel-n64-rspplugin': 'hle',
+          'parallel-n64-screensize': '640x480',
+          'parallel-n64-polyoffset-factor': '-3.0',
+          'parallel-n64-polyoffset-units': '-3.0',
         }
       };
 
       console.log(`[Emulator] Launching with core: ${core}, ROM: ${fileName}`);
+      if (nostalgistOptions.core && typeof nostalgistOptions.core !== 'string') {
+        const coreObj = nostalgistOptions.core as any;
+        console.log(`[Emulator] Core Blobs - JS: ${coreObj.js?.size} bytes, WASM: ${coreObj.wasm?.size} bytes`);
+      }
+      onProgress?.('Iniciando motor de emulación...');
       this.nostalgist = await Nostalgist.launch(nostalgistOptions);
       
       this.isRunning = true;

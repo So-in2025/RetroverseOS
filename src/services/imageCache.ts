@@ -12,13 +12,16 @@ export const ImageCache = {
       }
 
       // Try to fetch and cache the image locally
-      // We use 'cors' by default. If it fails, we fallback to native loading.
-      const response = await fetch(url, { 
+      // We use our backend proxy to bypass CORS
+      const proxyUrl = `/api/tunnel?url=${encodeURIComponent(url)}`;
+      const response = await fetch(proxyUrl, { 
         mode: 'cors',
         credentials: 'omit'
       });
 
       if (response.ok) {
+        // Cache the original URL, but return a blob URL for the image
+        const cache = await caches.open('retroos-covers-v2');
         await cache.put(url, response.clone());
         const blob = await response.blob();
         return URL.createObjectURL(blob);

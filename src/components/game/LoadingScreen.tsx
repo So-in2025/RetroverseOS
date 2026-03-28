@@ -71,27 +71,41 @@ export default function LoadingScreen({ status, progress, gameId, coverUrl, titl
           )}
         </motion.div>
 
-        {/* Minimalist Progress Bar */}
-        <div className="w-full max-w-md flex flex-col gap-4">
-          <div className="h-[2px] w-full bg-zinc-900 overflow-hidden relative">
+        {/* Progress Bar Container */}
+        <div className="w-full max-w-xl flex flex-col gap-6">
+          <div className="relative h-4 w-full bg-zinc-900/50 rounded-full overflow-hidden border border-white/5 backdrop-blur-sm">
+            {/* Animated Background Track */}
+            <div className="absolute inset-0 opacity-20 bg-[linear-gradient(90deg,transparent_0%,rgba(0,242,255,0.2)_50%,transparent_100%)] animate-[shimmer_2s_infinite]" />
+            
             <motion.div 
-              className="absolute top-0 bottom-0 left-0 bg-cyan-electric shadow-[0_0_10px_rgba(0,242,255,0.8)]"
+              className="absolute top-0 bottom-0 left-0 bg-gradient-to-r from-cyan-500 to-cyan-electric shadow-[0_0_25px_rgba(0,242,255,0.6)] rounded-full"
               initial={{ width: "0%" }}
               animate={{ width: `${progress}%` }}
-              transition={{ type: "spring", stiffness: 50, damping: 20 }}
-            />
+              transition={{ type: "spring", stiffness: 40, damping: 15 }}
+            >
+              {/* Glossy highlight */}
+              <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.2)_0%,transparent_50%,rgba(0,0,0,0.1)_100%)]" />
+            </motion.div>
           </div>
           
-          <div className="flex justify-between items-center">
-            <motion.span 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              key={status} // Animate on change
-              className="text-white/80 font-sans text-sm uppercase tracking-wider"
-            >
-              {status || `Cargando ${title || 'juego'}...`}
-            </motion.span>
-            <span className="text-zinc-600 font-sans text-sm">{progress}%</span>
+          <div className="flex flex-col gap-2">
+            <div className="flex justify-between items-end">
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                key={status}
+                className="flex flex-col"
+              >
+                <span className="text-cyan-electric font-black text-xs uppercase tracking-[0.2em] mb-1">Status Report</span>
+                <span className="text-white font-bold text-lg uppercase tracking-tight">
+                  {status || `Iniciando ${title || 'juego'}...`}
+                </span>
+              </motion.div>
+              <div className="flex flex-col items-end">
+                <span className="text-zinc-500 font-black text-xs uppercase tracking-widest mb-1">Progress</span>
+                <span className="text-cyan-electric font-black text-3xl tracking-tighter italic">{progress}%</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

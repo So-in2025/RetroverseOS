@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GameObject } from '../../services/metadataNormalization';
 import { Link, useNavigate } from 'react-router-dom';
-import { Play, Info, Users, Star, ChevronRight, ChevronLeft, Lock } from 'lucide-react';
+import { Play, Info, Users, Star, ChevronRight, ChevronLeft, Lock, Zap } from 'lucide-react';
 import { GameCover } from './GameCover';
 import { motion, AnimatePresence } from 'motion/react';
 import { AudioEngine } from '../../services/audioEngine';
@@ -22,6 +22,8 @@ const GameSection: React.FC<GameSectionProps> = ({ title, games, variant = 'defa
   const { ownedItems, isRetroPassActive } = useCustomization();
   const [hoveredGame, setHoveredGame] = useState<string | null>(null);
   const [selectedGame, setSelectedGame] = useState<GameObject | null>(null);
+
+  const [visibleCount, setVisibleCount] = useState(50);
 
   // Predictive Loading: Prefetch ROM when hovering
   useEffect(() => {
@@ -104,7 +106,7 @@ const GameSection: React.FC<GameSectionProps> = ({ title, games, variant = 'defa
         className="flex gap-4 px-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory pb-8 pt-4 -mt-4"
         style={{ scrollBehavior: 'smooth' }}
       >
-        {games.map((game) => {
+        {games.slice(0, visibleCount).map((game) => {
           const isLocked = gameCatalog.isGameLocked(game);
           
           return (
@@ -219,6 +221,17 @@ const GameSection: React.FC<GameSectionProps> = ({ title, games, variant = 'defa
             </div>
           );
         })}
+        {games.length > visibleCount && (
+          <div className="snap-start shrink-0 flex items-center justify-center" style={{ width: 'calc(20% - 12.8px)', minWidth: '160px', maxWidth: '240px' }}>
+            <button 
+              onClick={() => setVisibleCount(prev => prev + 50)}
+              className="w-full aspect-[2/3] rounded-2xl bg-zinc-900/50 border border-white/10 flex flex-col items-center justify-center gap-4 text-cyan-electric hover:bg-zinc-900 transition-all"
+            >
+              <Zap className="w-8 h-8" />
+              <span className="font-black text-xs uppercase tracking-widest">CARGAR MÁS</span>
+            </button>
+          </div>
+        )}
       </div>
 
       <GameQuickViewModal 

@@ -153,8 +153,11 @@ export class ROMFetchService {
     }
 
     // 0. Auto-correct old URLs that used raw extensions instead of .zip for nointro sets
+    let originalUrl = finalUrl;
+    let autoCorrected = false;
     if (finalUrl.includes('archive.org/download/nointro.') && !finalUrl.endsWith('.zip')) {
-      finalUrl = finalUrl.replace(/\.(nes|sfc|smc|md|gen|gba|gbc|gb|n64|z64)$/i, '.zip');
+      finalUrl = finalUrl.replace(/\.(nes|sfc|smc|md|gen|gba|gbc|gb|n64|z64|v64)$/i, '.zip');
+      autoCorrected = true;
       console.log(`[ROM Fetch] Auto-corrected URL to: ${finalUrl}`);
     }
 
@@ -164,10 +167,21 @@ export class ROMFetchService {
       // Validate that the cached ROM is not an HTML error page
       const header = await cachedRom.blob.slice(0, 100).text();
       if (!header.trim().toLowerCase().startsWith('<') && !header.toLowerCase().includes('<!doctype html>')) {
-        console.log(`[ROM Fetch] Cache hit for ${gameId} (${(cachedRom.blob.size / 1024).toFixed(2)} KB)`);
-        onProgress?.('Cargando desde caché...');
-        await storage.updateRomAccessTime(gameId);
-        return cachedRom.blob;
+        
+        // Check if the cached ROM is a ZIP and we are not mame/neogeo
+        const magicBuffer = await cachedRom.blob.slice(0, 4).arrayBuffer();
+        const magicBytes = new Uint8Array(magicBuffer);
+        const isCachedZip = magicBytes[0] === 0x50 && magicBytes[1] === 0x4B;
+        
+        if (isCachedZip && system !== 'mame' && system !== 'neogeo') {
+          console.warn(`[ROM Fetch] Found unextracted ZIP in cache for non-arcade system. Clearing cache and re-fetching...`);
+          await storage.deleteCachedRom(gameId);
+        } else {
+          console.log(`[ROM Fetch] Cache hit for ${gameId} (${(cachedRom.blob.size / 1024).toFixed(2)} KB)`);
+          onProgress?.('Cargando desde caché...');
+          await storage.updateRomAccessTime(gameId);
+          return cachedRom.blob;
+        }
       } else {
         console.warn(`[ROM Fetch] Cache hit for ${gameId} but file appears to be HTML. Re-downloading...`);
       }
@@ -189,17 +203,6 @@ export class ROMFetchService {
         const header = await blob.slice(0, 100).text();
         if (header.trim().toLowerCase().startsWith('<') || header.toLowerCase().includes('<!doctype html>')) {
           throw new Error('Downloaded ROM is an HTML error page. Sector de Datos Dañado.');
-        }
-        if (targetUrl.toLowerCase().endsWith('.zip') || header.startsWith('PK')) {
-          try {
-             // Attempt to unzip header to verify integrity
-             // Only unzip if not arcade
-             if (system !== 'mame' && system !== 'neogeo') {
-               await this.extractMainFileFromZip(blob, system);
-             }
-          } catch (e) {
-             throw new Error('Corrupt ZIP data. Sector de Datos Dañado.');
-          }
         }
       };
 
@@ -243,15 +246,21 @@ export class ROMFetchService {
           }
       }
 
-      // 4. Handle Compressed Files (.zip, .7z)
-      // Sometimes URLs don't end in .zip but the content is actually a zip file.
-      // We check the magic number (PK\x03\x04) to be sure.
-      const magic = await blob.slice(0, 4).text();
-      const isZip = targetUrl.toLowerCase().endsWith('.zip') || magic.startsWith('PK');
+      // 4. Handle Compressed Files (.zip)
+      // We check the magic number (PK) to be sure it's actually a zip file,
+      // regardless of the URL extension.
+      const magicBuffer = await blob.slice(0, 4).arrayBuffer();
+      const magicBytes = new Uint8Array(magicBuffer);
+      const isZip = magicBytes[0] === 0x50 && magicBytes[1] === 0x4B; // P, K
 
       if (isZip && system !== 'mame' && system !== 'neogeo') {
         onProgress?.('Extrayendo archivo principal...');
-        blob = await this.extractMainFileFromZip(blob, system);
+        try {
+          blob = await this.extractMainFileFromZip(blob, system);
+        } catch (extractErr) {
+          console.error('[ROM Fetch] Error extracting ZIP:', extractErr);
+          throw new Error('El archivo ZIP está corrupto o incompleto.');
+        }
       }
 
       // 5. Save to Cache
@@ -268,6 +277,16 @@ export class ROMFetchService {
     try {
       return await doFetch(finalUrl);
     } catch (e) {
+      if (autoCorrected) {
+        console.warn(`[ROM Fetch] Auto-corrected URL failed: ${e}. Trying original URL: ${originalUrl}`);
+        try {
+          return await doFetch(originalUrl);
+        } catch (originalErr) {
+          // Fall through to discovery fallback if original also fails
+          e = originalErr;
+        }
+      }
+
       if (usedDiscovery && system) {
         console.warn(`[ROM Fetch] Discovered URL failed: ${e}. Clearing cache and trying original URL...`);
         const { DiscoveryCache } = await import('./DiscoveryCache');
@@ -306,7 +325,7 @@ export class ROMFetchService {
     }
   }
 
-  private static async fetchWithProgress(url: string, onProgress?: (status: string) => void): Promise<Response> {
+  public static async fetchWithProgress(url: string, onProgress?: (status: string) => void): Promise<Response> {
     let response: Response;
     
     // Use our own backend proxy
@@ -328,7 +347,73 @@ export class ROMFetchService {
     } catch (e: any) {
       console.error(`[ROM Fetch] Backend proxy collapsed:`, e);
       sentinel.logRomFetch('unknown', url, 'error', { error: e.message });
-      throw new Error('Download failed: Backend proxy collapsed.');
+      throw new Error(`Backend proxy collapsed: ${e.message}`);
+    }
+  }
+
+  /**
+   * Fetches a core file (JS or WASM) with progress feedback
+   */
+  public static async fetchCoreFile(url: string, type: 'JS' | 'WASM', onProgress?: (status: string) => void): Promise<Blob> {
+    onProgress?.(`Conectando con el servidor de núcleos (${type})...`);
+    
+    try {
+      // fetchWithProgress already handles tunneling via /api/tunnel
+      const response = await this.fetchWithProgress(url);
+
+      if (!response.ok) {
+        throw new Error(`Error del servidor (${response.status}) al descargar el núcleo.`);
+      }
+
+      const contentLength = response.headers.get('content-length');
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
+      let loaded = 0;
+
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Response body is not readable');
+
+      const chunks: Uint8Array[] = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          chunks.push(value);
+          loaded += value.length;
+          if (total && onProgress) {
+            const percent = Math.round((loaded / total) * 100);
+            onProgress?.(`Descargando Núcleo (${type})... ${percent}%`);
+          } else if (onProgress) {
+            // If total is unknown, we still want to show progress
+            const mb = (loaded / 1024 / 1024).toFixed(2);
+            onProgress?.(`Descargando Núcleo (${type})... ${mb} MB`);
+          }
+        }
+      }
+
+      if (chunks.length === 0 || loaded === 0) {
+        throw new Error(`El archivo del núcleo (${type}) está vacío.`);
+      }
+
+      const blob = new Blob(chunks);
+
+      // VALIDATION: Ensure we didn't download an HTML error page
+      if (blob.size < 500) {
+        const text = await blob.text();
+        if (text.includes('<!DOCTYPE html>') || text.includes('<html') || text.includes('{"error"')) {
+          throw new Error(`El servidor devolvió un error en lugar del núcleo (${type}).`);
+        }
+      } else if (type === 'JS') {
+        // Check first few bytes of JS
+        const head = await blob.slice(0, 100).text();
+        if (head.includes('<!DOCTYPE html>') || head.includes('<html')) {
+          throw new Error(`Respuesta inválida del servidor para el núcleo JS.`);
+        }
+      }
+
+      return blob;
+    } catch (err: any) {
+      console.error(`[ROMFetchService] Core fetch failed for ${type}:`, err);
+      throw err;
     }
   }
 
@@ -351,7 +436,7 @@ export class ROMFetchService {
           'gbc': ['.gbc'],
           'gb': ['.gb'],
           'psx': ['.chd', '.cue', '.bin', '.iso'],
-          'n64': ['.n64', '.z64'],
+          'n64': ['.n64', '.z64', '.v64'],
           'atari_2600': ['.a26', '.bin'],
           'atari_7800': ['.a78', '.bin'],
           'lynx': ['.lnx'],

@@ -162,33 +162,26 @@ async function startServer() {
     console.log(`[Tunnel] Fetching: ${targetUrl} (Range: ${range || 'none'})`);
 
     const isArchive = targetUrl.includes('archive.org');
-    const maxRetries = isArchive ? 5 : 3; 
+    const maxRetries = isArchive ? 7 : 3; 
     let attempt = 0;
     let lastError: any = null;
 
     while (attempt < maxRetries) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); 
+      const timeoutId = setTimeout(() => controller.abort(), 180000); // 180 Second Timeout for large ROMs
       
       try {
         const fetchHeaders: Record<string, string> = {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
           'Accept': '*/*',
           'Accept-Language': 'en-US,en;q=0.9',
-          'Connection': 'keep-alive',
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
-          'Accept-Encoding': 'gzip, deflate, br',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Sec-Fetch-User': '?1',
-          'Upgrade-Insecure-Requests': '1'
+          'Connection': 'keep-alive', // Use keep-alive for the target request to avoid early closure
         };
-        
+
         if (isArchive) {
           fetchHeaders['Referer'] = 'https://archive.org/';
-          fetchHeaders['Origin'] = 'https://archive.org';
         }
 
         if (range) {
@@ -198,8 +191,9 @@ async function startServer() {
         const response = await fetch(targetUrl, {
           signal: controller.signal,
           headers: fetchHeaders,
-          // @ts-ignore - Node.js fetch specific
-          duplex: 'half'
+          // Only use duplex for non-GET requests if needed, but here we only do GET
+          // @ts-ignore
+          redirect: 'follow'
         });
         clearTimeout(timeoutId);
         
@@ -230,10 +224,12 @@ async function startServer() {
         
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
         res.status(response.status);
 
         if (!response.body) throw new Error('Response body is null');
 
+        // Use a more robust streaming approach
         const reader = response.body.getReader();
         const stream = new Readable({
           async read() {
@@ -241,10 +237,8 @@ async function startServer() {
               const { done, value } = await reader.read();
               if (done) {
                 this.push(null);
-              } else if (value) {
-                this.push(Buffer.from(value));
               } else {
-                this.push(null);
+                this.push(Buffer.from(value));
               }
             } catch (err) {
               this.destroy(err instanceof Error ? err : new Error(String(err)));
@@ -255,6 +249,10 @@ async function startServer() {
             callback(err);
           }
         });
+
+        // Ensure we don't close the connection prematurely
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('Keep-Alive', 'timeout=120, max=1000');
 
         // Handle stream errors
         stream.on('error', (err) => {

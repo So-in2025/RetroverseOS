@@ -42,8 +42,8 @@ export class ROMValidator {
       case 'nes':
         // iNES Header: 'N' 'E' 'S' 0x1A
         if (!(view[0] === 0x4E && view[1] === 0x45 && view[2] === 0x53 && view[3] === 0x1A)) {
-          isValid = false;
-          errorMsg = 'Invalid NES header (iNES magic number missing)';
+          console.warn('[ROM Validator] Invalid NES header (iNES magic number missing). Proceeding anyway as it might be headerless or a different format.');
+          headerType = 'unknown-nes';
         } else {
           headerType = 'ines';
         }
@@ -69,8 +69,8 @@ export class ROMValidator {
         const isN64 = view[0] === 0x40 && view[1] === 0x12 && view[2] === 0x37 && view[3] === 0x80;
         
         if (!isZ64 && !isV64 && !isN64) {
-          isValid = false;
-          errorMsg = 'Invalid N64 header (Magic number missing)';
+          console.warn('[ROM Validator] Invalid N64 header (Magic number missing). Proceeding anyway.');
+          headerType = 'unknown-n64';
         } else {
           headerType = isZ64 ? 'z64' : isV64 ? 'v64' : 'n64';
         }
@@ -83,7 +83,8 @@ export class ROMValidator {
           const genesisView = new Uint8Array(await blob.slice(256, 260).arrayBuffer());
           const isSega = genesisView[0] === 0x53 && genesisView[1] === 0x45 && genesisView[2] === 0x47 && genesisView[3] === 0x41;
           if (!isSega) {
-            console.warn('[ROM Validator] Genesis ROM missing "SEGA" string at 0x100. Might be interleaved or homebrew.');
+            console.warn('[ROM Validator] Genesis ROM missing "SEGA" string at 0x100. Might be interleaved or homebrew. Proceeding anyway.');
+            headerType = 'unknown-genesis';
           } else {
             headerType = 'sega-standard';
           }
@@ -96,7 +97,8 @@ export class ROMValidator {
         if (blob.size > 8) {
           const isGba = view[4] === 0x24 && view[5] === 0xFF && view[6] === 0xAE && view[7] === 0x51;
           if (!isGba) {
-            console.warn('[ROM Validator] GBA ROM missing standard Nintendo logo signature. Might be modified.');
+            console.warn('[ROM Validator] GBA ROM missing standard Nintendo logo signature. Might be modified. Proceeding anyway.');
+            headerType = 'unknown-gba';
           } else {
             headerType = 'gba-standard';
           }

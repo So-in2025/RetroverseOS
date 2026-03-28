@@ -166,8 +166,8 @@ export class MetadataNormalizationEngine {
         if (response && response.ok) {
           const text = await response.text();
           
-          if (!text || text.trim().toLowerCase().startsWith('<!doctype')) {
-             throw new Error("Received HTML instead of JSON from Archive.org");
+          if (!text || text.trim() === '' || text.trim().toLowerCase().startsWith('<!doctype')) {
+             throw new Error("Received HTML or empty response instead of JSON from Archive.org");
           }
 
           let metaData;

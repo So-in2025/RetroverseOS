@@ -529,7 +529,7 @@ export default function GameLibrary() {
       {/* Main Content Area */}
       <div 
         ref={libraryRef}
-        className={`relative z-10 flex-1 flex flex-col overflow-hidden px-0 lg:px-8 max-w-7xl mx-auto w-full`}
+        className={`relative z-10 flex-1 flex flex-col overflow-hidden px-0 lg:px-8 max-w-[95%] mx-auto w-full`}
       >
         
         {/* Desktop Category Selection - Compact Dropdown */}

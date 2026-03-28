@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Gamepad2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import localforage from 'localforage';
@@ -45,8 +45,13 @@ export const GameCover: React.FC<GameCoverProps> = ({
     return CoverService.getCoverSources(title, systemId, archiveId || gameId, primaryUrl);
   }, [title, systemId, archiveId, gameId, primaryUrl]);
 
+  const prevGameId = useRef(gameId);
+
   // Cargar desde cache al montar
   useEffect(() => {
+    if (prevGameId.current === gameId) return;
+    prevGameId.current = gameId;
+
     let isMounted = true;
     
     // Reset state immediately when gameId changes to avoid showing old data
@@ -77,7 +82,7 @@ export const GameCover: React.FC<GameCoverProps> = ({
     });
 
     return () => { isMounted = false; };
-  }, [gameId, title]); // Added title to reset if title changes for same ID
+  }, [gameId]); // Removed title, only gameId should trigger reset
 
   useEffect(() => {
     // Si ya cargamos de cache, no hacemos nada
@@ -95,7 +100,7 @@ export const GameCover: React.FC<GameCoverProps> = ({
     }
 
     const url = sources[sourceIndex];
-    // Silenced debug log for source attempts
+    console.log(`[Cover] Attempting load for ${title} (ID: ${gameId}) - Source ${sourceIndex + 1}/${sources.length}: ${url}`);
 
     // Intentar cargar a través del cache de imágenes (blob URL)
     const loadWithCache = async () => {
@@ -103,25 +108,30 @@ export const GameCover: React.FC<GameCoverProps> = ({
         try {
           const cachedUrl = await ImageCache.getImage(url);
           if (cachedUrl && cachedUrl.startsWith('blob:')) {
+            console.log(`[Cover] Cache hit for ${url}`);
             setCurrentSrc(cachedUrl);
             return;
           }
         } catch (e) {
-          // Silent fail for cache, fallback to direct
+          console.warn(`[Cover] Cache error for ${url}:`, e);
         }
       }
-      setCurrentSrc(url);
+      
+      // Use proxy for direct loading to avoid CORS
+      const proxiedUrl = url.startsWith('blob:') ? url : `/api/tunnel?url=${encodeURIComponent(url)}`;
+      console.log(`[Cover] Setting src via proxy: ${proxiedUrl}`);
+      setCurrentSrc(proxiedUrl);
     };
 
     loadWithCache();
 
-    // Timeout de seguridad: si una imagen tarda más de 8s en cargar o fallar, forzamos el siguiente intento
+    // Timeout de seguridad: si una imagen tarda más de 15s en cargar o fallar, forzamos el siguiente intento
     const timeout = setTimeout(() => {
       if (status === 'loading') {
-        console.warn(`[Cover] Timeout (8s) for ${title} at source ${sourceIndex + 1}: ${url}`);
+        console.warn(`[Cover] Timeout (15s) for ${title} at source ${sourceIndex + 1}: ${url}`);
         handleError();
       }
-    }, 8000);
+    }, 15000);
 
     return () => clearTimeout(timeout);
   }, [sourceIndex, sources, isCached, status, title]);
@@ -141,6 +151,7 @@ export const GameCover: React.FC<GameCoverProps> = ({
     }
 
     if (sourceIndex < sources.length - 1) {
+      console.log(`[Cover] Trying next source for ${title}`);
       setSourceIndex(prev => prev + 1);
     } else {
       console.error(`[Cover] All ${sources.length} sources failed for ${title}`);
@@ -149,6 +160,7 @@ export const GameCover: React.FC<GameCoverProps> = ({
   };
 
   const handleLoad = () => {
+    console.log(`[Cover] Successfully loaded source for ${title}: ${sources[sourceIndex]}`);
     if (status !== 'success') {
       setStatus('success');
       

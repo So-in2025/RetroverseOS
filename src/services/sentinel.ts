@@ -84,21 +84,26 @@ class SentinelService {
     const originalConsoleError = console.error;
     console.error = (...args: any[]) => {
       try {
-        this.report.errors.push({
-          type: 'console.error',
-          message: args.map(arg => {
-            if (typeof arg === 'object' && arg !== null) {
-              try {
-                return JSON.stringify(arg);
-              } catch (e) {
-                return '[Circular or Unserializable Object]';
-              }
+        const messageStr = args.map(arg => {
+          if (typeof arg === 'object' && arg !== null) {
+            try {
+              return JSON.stringify(arg);
+            } catch (e) {
+              return '[Circular or Unserializable Object]';
             }
-            return String(arg);
-          }).join(' '),
-          timestamp: new Date().toISOString(),
-          stack: new Error().stack
-        });
+          }
+          return String(arg);
+        }).join(' ');
+
+        // Ignore benign Vite websocket errors in AI Studio
+        if (!messageStr.includes('[vite] failed to connect to websocket') && !messageStr.includes('WebSocket closed without opened')) {
+          this.report.errors.push({
+            type: 'console.error',
+            message: messageStr,
+            timestamp: new Date().toISOString(),
+            stack: new Error().stack
+          });
+        }
       } catch (e) {
         // Fallback if even the logging fails
       }
@@ -107,15 +112,18 @@ class SentinelService {
 
     const originalOnerror = window.onerror;
     window.onerror = (message, source, lineno, colno, error) => {
-      this.report.errors.push({
-        type: 'window.onerror',
-        message: String(message),
-        source,
-        lineno,
-        colno,
-        stack: error?.stack,
-        timestamp: new Date().toISOString()
-      });
+      const msgStr = String(message);
+      if (!msgStr.includes('[vite] failed to connect to websocket') && !msgStr.includes('WebSocket closed without opened')) {
+        this.report.errors.push({
+          type: 'window.onerror',
+          message: msgStr,
+          source,
+          lineno,
+          colno,
+          stack: error?.stack,
+          timestamp: new Date().toISOString()
+        });
+      }
       
       if (typeof originalOnerror === 'function') {
         return originalOnerror(message, source, lineno, colno, error);
@@ -125,11 +133,14 @@ class SentinelService {
 
     const originalOnunhandledrejection = window.onunhandledrejection;
     window.onunhandledrejection = (event) => {
-      this.report.errors.push({
-        type: 'unhandledrejection',
-        reason: String(event.reason),
-        timestamp: new Date().toISOString()
-      });
+      const reasonStr = String(event.reason);
+      if (!reasonStr.includes('WebSocket closed without opened') && !reasonStr.includes('[vite] failed to connect to websocket')) {
+        this.report.errors.push({
+          type: 'unhandledrejection',
+          reason: reasonStr,
+          timestamp: new Date().toISOString()
+        });
+      }
       
       if (typeof originalOnunhandledrejection === 'function') {
         originalOnunhandledrejection.call(window, event);

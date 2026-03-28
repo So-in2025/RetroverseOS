@@ -345,6 +345,16 @@ export default function GameRoom() {
 
       while (retries <= MAX_RETRIES) {
         if (!mountedRef.current) return;
+
+        // Check for SharedArrayBuffer (required for N64/PSX)
+        if ((gameData.system_id === 'n64' || gameData.system_id === 'psx') && typeof SharedArrayBuffer === 'undefined') {
+          console.error('[GameRoom] SharedArrayBuffer is not available. This is required for N64/PSX emulation.');
+          if (!mountedRef.current) return;
+          setGameState('error');
+          setErrorMessage('Tu navegador no soporta SharedArrayBuffer, necesario para N64/PSX. Por favor, usa Chrome o Edge.');
+          return;
+        }
+
         try {
           setLoadingStatus('Preparando motor de emulación...');
           await emulator.initialize({
@@ -356,20 +366,48 @@ export default function GameRoom() {
           }, (status) => {
             if (!mountedRef.current) return;
             setLoadingStatus(status);
+            
             // Try to extract progress from status string if it contains percentage
-            const match = status.match(/(\d+)%/);
-            if (match) {
-              setLoadingProgress(parseInt(match[1], 10));
-            } else if (status.includes('Launching')) {
-              setLoadingProgress(90);
+            const percentMatch = status.match(/(\d+)%/);
+            const mbMatch = status.match(/(\d+\.\d+) MB/);
+
+            if (percentMatch) {
+              const percent = parseInt(percentMatch[1], 10);
+              // Scale progress based on stage
+              if (status.includes('Núcleo')) {
+                setLoadingProgress(Math.round(percent * 0.3)); // Core is first 30%
+              } else if (status.includes('BIOS')) {
+                setLoadingProgress(30 + Math.round(percent * 0.1)); // BIOS is next 10%
+              } else if (status.includes('Descargando')) {
+                setLoadingProgress(40 + Math.round(percent * 0.5)); // ROM is next 50%
+              } else {
+                setLoadingProgress(percent);
+              }
+            } else if (mbMatch) {
+              // If we only have MBs, we can't know the percentage, but we can simulate progress
+              // by incrementing it slowly for each MB, capped at a reasonable value for the stage
+              const mb = parseFloat(mbMatch[1]);
+              if (status.includes('Núcleo')) {
+                // Core is usually 2-10MB, let's say 3% per MB, capped at 25%
+                setLoadingProgress(prev => Math.min(25, Math.max(prev, Math.round(mb * 3))));
+              } else if (status.includes('Descargando')) {
+                // ROM can be anything, let's say 1% per MB, starting from 40%, capped at 85%
+                setLoadingProgress(prev => Math.min(85, Math.max(prev, 40 + Math.round(mb))));
+              }
+            } else if (status.includes('Launching') || status.includes('Iniciando motor')) {
+              setLoadingProgress(95);
             } else if (status.includes('BIOS')) {
-              setLoadingStatus('Cargando BIOS...');
-              setLoadingProgress(40);
+              setLoadingProgress(35);
+            } else if (status.includes('Extrayendo')) {
+              setLoadingProgress(92);
+            } else if (status.includes('Conectando')) {
+              // Just started connecting, set a base progress
+              setLoadingProgress(prev => Math.max(prev, 5));
             }
           });
           
           if (!mountedRef.current) return;
-          setLoadingStatus('Iniciando sistema...');
+          setLoadingStatus('SISTEMA LISTO');
           setLoadingProgress(100);
           
           notify({
@@ -380,6 +418,7 @@ export default function GameRoom() {
           
           telemetry.trackGameStart(gameId, gameData.system_id, currentCore);
           
+          // Small delay to let the user see the 100% progress
           setTimeout(async () => {
             if (mountedRef.current) {
               setGameState('waiting');
@@ -454,15 +493,24 @@ export default function GameRoom() {
         'PS1': ['pcsx_rearmed', 'pcsx_rearmed_interpreter', 'duckstation', 'mednafen_psx_hw'],
         'Atari 2600': ['stella', 'stella2014'],
         'Atari 7800': ['prosystem', 'stella'],
-        'N64': ['mupen64plus_next', 'parallel_n64']
+        'N64': ['parallel_n64', 'mupen64plus_next']
       };
-      const cores = alternatives[system] || alternatives[gameData.system_id] || [];
+      
+      const sysKey = system?.toUpperCase() || gameData.system_id?.toUpperCase() || '';
+      const cores = alternatives[sysKey] || alternatives[system] || alternatives[gameData.system_id] || [];
+      
       if (!cores.length) return null;
+      
       const currentIndex = cores.indexOf(currentCore);
-      if (currentIndex !== -1 && currentIndex < cores.length - 1) {
-        return cores[currentIndex + 1];
-      }
-      return null;
+      if (currentIndex === -1) return cores[0];
+      
+      // Try the next core in the list (circular)
+      const nextIndex = (currentIndex + 1) % cores.length;
+      
+      // If we've come back to the same core, we've tried them all
+      if (nextIndex === currentIndex) return null;
+      
+      return cores[nextIndex];
     };
 
     initEmulator();
@@ -811,33 +859,41 @@ export default function GameRoom() {
       </AnimatePresence>
 
       {/* Error State */}
+      {/* Error Screen */}
       {gameState === 'error' && (
-        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-xl p-6">
+        <div className="absolute inset-0 z-[100] flex items-center justify-center bg-black/95 backdrop-blur-2xl p-6">
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="max-w-md w-full bg-zinc-900 border border-rose-500/30 rounded-3xl p-8 text-center shadow-2xl"
+            className="max-w-md w-full bg-zinc-900 border border-rose-500/40 rounded-[2.5rem] p-10 text-center shadow-2xl relative overflow-hidden"
           >
-            <div className="w-20 h-20 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-              <AlertTriangle className="w-10 h-10 text-rose-500" />
+            {/* Background Glow */}
+            <div className="absolute -top-24 -left-24 w-48 h-48 bg-rose-500/10 blur-[100px] rounded-full" />
+            <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-cyan-500/10 blur-[100px] rounded-full" />
+
+            <div className="w-24 h-24 bg-rose-500/10 rounded-full flex items-center justify-center mx-auto mb-8 relative">
+              <div className="absolute inset-0 bg-rose-500/20 rounded-full animate-ping" />
+              <AlertTriangle className="w-12 h-12 text-rose-500 relative z-10" />
             </div>
-            <h2 className="text-2xl font-black text-white uppercase tracking-tighter mb-2">Fallo de Sistema</h2>
-            <p className="text-zinc-400 mb-8 leading-relaxed">
+
+            <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-4 italic">Fallo de Sistema</h2>
+            <p className="text-zinc-400 mb-10 leading-relaxed font-medium">
               {errorMessage || 'Se ha detectado una anomalía crítica en el sector de datos.'}
             </p>
-            <div className="flex flex-col gap-3">
+
+            <div className="flex flex-col gap-4">
               <button
                 onClick={handleRetry}
-                className="w-full py-4 bg-rose-500 hover:bg-rose-600 text-white font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2"
+                className="w-full py-5 bg-rose-500 hover:bg-rose-600 text-white font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(244,63,94,0.3)] group"
               >
-                <Zap className="w-5 h-5" />
-                Reintentar (Limpiar Caché)
+                <Zap className="w-6 h-6 group-hover:animate-pulse" />
+                Reparar Enlace (Limpieza Forzada)
               </button>
               <button
                 onClick={() => navigate('/')}
-                className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95"
+                className="w-full py-5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 border border-white/5"
               >
-                Volver a la Biblioteca
+                Volver a la Base
               </button>
             </div>
           </motion.div>
@@ -1253,36 +1309,6 @@ export default function GameRoom() {
           onExit={handleExit}
           onOpenSavePanel={() => setIsSavePanelOpen(true)}
         />
-      )}
-
-      {gameState === 'error' && (
-        <div className="absolute inset-0 bg-carbon/95 z-[110] flex items-center justify-center crt-filter">
-          <div className="bg-zinc-900 border border-rose-500/30 p-12 rounded-3xl max-w-md text-center glass">
-            <AlertTriangle className="w-16 h-16 text-rose-500 mx-auto mb-6" />
-            <h2 className="text-2xl font-black text-white mb-4 uppercase italic tracking-tighter">Fallo del Sistema</h2>
-            <p className="text-zinc-500 mb-8 font-medium">{errorMessage}</p>
-            <div className="flex flex-col gap-3">
-              <button 
-                onClick={() => {
-                  if (gameId) {
-                    storage.deleteCachedRom(gameId).then(() => {
-                      window.location.reload();
-                    });
-                  }
-                }}
-                className="w-full bg-cyan-electric/10 hover:bg-cyan-electric/20 text-cyan-electric border border-cyan-electric/30 py-4 rounded-xl font-black uppercase tracking-widest transition-all"
-              >
-                Reparar Enlace (Limpieza Forzada)
-              </button>
-              <button 
-                onClick={handleExit}
-                className="w-full bg-rose-600 hover:bg-rose-500 text-white py-4 rounded-xl font-black uppercase tracking-widest transition-all"
-              >
-                Volver a la Base
-              </button>
-            </div>
-          </div>
-        </div>
       )}
 
       {isUiVisible && (
