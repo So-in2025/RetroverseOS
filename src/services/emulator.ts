@@ -224,52 +224,17 @@ export class EmulatorService {
 
       let finalCore: any = core;
       
-      // Map cores to available versions in webretro if they are missing from the default CDN
-      let webretroCore = '';
-      let coreSource = 'BinBashBanana/webretro@master/cores';
-      let coreSuffix = '_libretro';
-      
-      if (core === 'parallel_n64' || core === 'mupen64plus_next') {
-        webretroCore = core;
-        coreSource = 'BinBashBanana/webretro@master/cores';
-      } else if (core === 'prosystem') {
-        webretroCore = core;
-      } else if (core === 'stella') {
-        webretroCore = 'stella2014';
+      // Map cores to available versions in Nostalgist's default CDN
+      if (core === 'stella') {
+        finalCore = 'stella2014';
       } else if (core === 'mednafen_psx') {
-        webretroCore = 'mednafen_psx_hw';
-      } else if (core === 'melonds' || core === 'yabause') {
-        webretroCore = core;
+        finalCore = 'pcsx_rearmed';
+      } else if (core === 'prosystem') {
+        finalCore = 'prosystem';
+      } else if (core === 'parallel_n64') {
+        finalCore = 'mupen64plus_next';
       }
-
-      if (webretroCore) {
-        const jsUrl = `https://cdn.jsdelivr.net/gh/${coreSource}/${webretroCore}${coreSuffix}.js`;
-        const wasmUrl = `https://cdn.jsdelivr.net/gh/${coreSource}/${webretroCore}${coreSuffix}.wasm`;
-        
-        console.log(`[Emulator] Fetching core files: \nJS: ${jsUrl}\nWASM: ${wasmUrl}`);
-
-        try {
-          // Manual fetch with progress for cores
-          const jsBlob = await ROMFetchService.fetchCoreFile(jsUrl, 'JS', onProgress);
-          const wasmBlob = await ROMFetchService.fetchCoreFile(wasmUrl, 'WASM', onProgress);
-
-          if (jsBlob.size < 1000 || wasmBlob.size < 1000) {
-            throw new Error('Core file too small, probably an error page or redirect');
-          }
-
-          finalCore = {
-            name: webretroCore,
-            js: { fileName: `${webretroCore}${coreSuffix}.js`, fileContent: jsBlob },
-            wasm: { fileName: `${webretroCore}${coreSuffix}.wasm`, fileContent: wasmBlob }
-          };
-          console.log(`[Emulator] Core files fetched successfully. JS: ${jsBlob.size} bytes, WASM: ${wasmBlob.size} bytes`);
-        } catch (e) {
-          console.error('[Emulator] Manual core fetch failed:', e);
-          onProgress?.('Error en descarga rápida, usando servidor alternativo...');
-          finalCore = webretroCore; // Fallback to string name (Nostalgist will fetch it)
-        }
-      }
-
+      
       const nostalgistOptions: any = {
         element: config.canvas,
         core: finalCore,

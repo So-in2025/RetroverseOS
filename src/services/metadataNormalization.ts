@@ -300,7 +300,28 @@ export class MetadataNormalizationEngine {
         if (!name) return false;
         const lower = name.toLowerCase();
         const extensions = ['.nes', '.sfc', '.smc', '.gba', '.gbc', '.gb', '.bin', '.gen', '.md', '.iso', '.chd', '.cue', '.a26', '.a78', '.lnx', '.n64', '.z64', '.zip', '.7z'];
-        return extensions.some(ext => lower.endsWith(ext)) && !lower.includes('bios') && !lower.includes('manual') && !lower.includes('soundtrack');
+        
+        // Extended exclusions for non-game files
+        const exclusions = [
+          'bios', 'manual', 'soundtrack', 'video', 'snap', 'readme', 'info', 'metadata', 
+          'license', 'install', 'setup', '__ia_thumb', 'emulator', 'ares', 'retroarch',
+          'core', 'firmware', 'update', 'patch', 'utility', 'driver', 'software',
+          'scan', 'boxart', 'cover', 'flyer', 'manual', 'map', 'hint', 'guide'
+        ];
+        
+        const isExcluded = exclusions.some(exc => lower.includes(exc));
+        const hasValidExt = extensions.some(ext => lower.endsWith(ext));
+        
+        if (isExcluded || !hasValidExt) return false;
+
+        // Filter out very short filenames or those that look like system names
+        const baseName = name.replace(/\.[^/.]+$/, "").trim();
+        if (baseName.length < 2) return false;
+        
+        const systemNames = ['nes', 'snes', 'gba', 'gbc', 'gb', 'n64', 'psx', 'ps1', 'ps2', 'genesis', 'md', 'atari', '3do', 'mame', 'neogeo'];
+        if (systemNames.includes(baseName.toLowerCase())) return false;
+
+        return true;
       });
 
       for (const f of romFiles) {
@@ -435,11 +456,27 @@ export class MetadataNormalizationEngine {
       const lower = f.name.toLowerCase();
       const extensions = ['.nes', '.sfc', '.smc', '.gba', '.gbc', '.gb', '.bin', '.gen', '.md', '.iso', '.chd', '.cue', '.a26', '.a78', '.lnx', '.n64', '.z64', '.zip', '.7z'];
       
-      // Basic exclusions
-      const exclusions = ['bios', 'manual', 'soundtrack', 'video', 'snap', 'readme', 'info', 'metadata', 'license', 'install', 'setup', '__ia_thumb'];
-      if (exclusions.some(exc => lower.includes(exc))) return false;
+      // Extended exclusions for non-game files
+      const exclusions = [
+        'bios', 'manual', 'soundtrack', 'video', 'snap', 'readme', 'info', 'metadata', 
+        'license', 'install', 'setup', '__ia_thumb', 'emulator', 'ares', 'retroarch',
+        'core', 'firmware', 'update', 'patch', 'utility', 'driver', 'software',
+        'scan', 'boxart', 'cover', 'flyer', 'manual', 'map', 'hint', 'guide'
+      ];
       
-      return extensions.some(ext => lower.endsWith(ext));
+      const isExcluded = exclusions.some(exc => lower.includes(exc));
+      const hasValidExt = extensions.some(ext => lower.endsWith(ext));
+      
+      if (isExcluded || !hasValidExt) return false;
+
+      // Filter out very short filenames or those that look like system names
+      const baseName = f.name.replace(/\.[^/.]+$/, "").trim();
+      if (baseName.length < 2) return false;
+      
+      const systemNames = ['nes', 'snes', 'gba', 'gbc', 'gb', 'n64', 'psx', 'ps1', 'ps2', 'genesis', 'md', 'atari', '3do', 'mame', 'neogeo'];
+      if (systemNames.includes(baseName.toLowerCase())) return false;
+
+      return true;
     });
 
     if (romFiles.length === 0) return [];
@@ -667,7 +704,7 @@ export class MetadataNormalizationEngine {
 
     // Remove common junk words that appear in some collections
     title = title
-      .replace(/\b(v\d+\.\d+[a-z]?|rev\s*[a-z0-9]|beta|demo|sample|promo|review|preview|debug|build|hack|translation|translated|patched|fixed|trainer|cheat|intro|repack|unlicensed|aftermarket|homebrew|prototype|sample|kiosk|store|not for resale|nfr|bundle|pack|collection|anthology|bonus|disc|cd|dvd|rom|iso|rip|dump|bad|overdump|headered|unheadered|no-intro|redump|t-en|t-es|t-fr|t-pt|t-it|t-de|t-ru|t-jp|t-cn|t-kr|level editor|editor|official|snes|nes|gba|gbc|gb|n64|psx|ps1|ps2|genesis|megadrive|master system|game gear|pc engine|turbografx|wonderswan|neogeo|ngp|mame|arcade|emu|emus|emulator|pack|roms|collection|set|fullset|complete|v1\.\d+|v2\.\d+|gog edition|steam edition|rare arabic ver|pc world cover|coverdisc|cover disc|demo disc|battle coliseum)\b/gi, '')
+      .replace(/\b(v\d+\.\d+[a-z]?|rev\s*[a-z0-9]|beta|demo|sample|promo|review|preview|debug|build|hack|translation|translated|patched|fixed|trainer|cheat|intro|repack|unlicensed|aftermarket|homebrew|prototype|sample|kiosk|store|not for resale|nfr|bundle|pack|collection|anthology|bonus|disc|cd|dvd|rom|iso|rip|dump|bad|overdump|headered|unheadered|no-intro|redump|t-en|t-es|t-fr|t-pt|t-it|t-de|t-ru|t-jp|t-cn|t-kr|level editor|editor|official|snes|nes|gba|gbc|gb|n64|psx|ps1|ps2|genesis|megadrive|master system|game gear|pc engine|turbografx|wonderswan|neogeo|ngp|mame|arcade|emu|emus|emulator|pack|roms|collection|set|fullset|complete|v1\.\d+|v2\.\d+|gog edition|steam edition|rare arabic ver|pc world cover|coverdisc|cover disc|demo disc|battle coliseum|ares|retroarch|libretro|core|firmware|update|patch)\b/gi, '')
       .replace(/\s*-\s*$/g, '') // Remove trailing hyphens
       .replace(/\s+/g, ' ')
       .trim();

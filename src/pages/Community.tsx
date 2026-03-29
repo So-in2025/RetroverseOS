@@ -207,7 +207,7 @@ export default function Community() {
                 {feed.map((item) => (
                   <div key={item.id} className="bg-zinc-900 border border-white/5 rounded-xl p-4 md:p-6 hover:border-white/10 transition-colors">
                     <div className="flex items-center gap-3 mb-3">
-                      <img src={item.avatar} className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover bg-zinc-800" alt={item.user} referrerPolicy="no-referrer" />
+                      <img src={item.avatar} className="w-8 h-8 md:w-10 md:h-10 rounded-full object-cover bg-zinc-800" alt={item.user} referrerPolicy="no-referrer" crossOrigin="anonymous" />
                       <div>
                         <p className="font-bold text-white text-sm md:text-base">{item.user}</p>
                         <p className="text-[10px] md:text-xs text-zinc-500">{item.timestamp}</p>
@@ -245,7 +245,7 @@ export default function Community() {
                       'https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?w=100&h=100&fit=crop',
                       'https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=100&h=100&fit=crop'
                     ].map((url, i) => (
-                      <img key={i} src={url} className="w-8 h-8 rounded-full bg-zinc-800 border-2 border-zinc-900 hover:border-emerald-500 transition-colors cursor-pointer object-cover" title={`Jugador ${i}`} />
+                      <img key={i} src={url} className="w-8 h-8 rounded-full bg-zinc-800 border-2 border-zinc-900 hover:border-emerald-500 transition-colors cursor-pointer object-cover" title={`Jugador ${i}`} crossOrigin="anonymous" />
                     ))}
                     <div className="w-8 h-8 rounded-full bg-zinc-800 border-2 border-zinc-900 flex items-center justify-center text-xs text-zinc-500 font-bold">
                       +42
@@ -292,7 +292,7 @@ export default function Community() {
                 {tournaments.map((t) => (
                 <div key={t.id} className="group relative bg-zinc-900 border border-white/5 rounded-2xl overflow-hidden hover:border-emerald-500/50 transition-all hover:shadow-2xl hover:shadow-emerald-900/10">
                     <div className="absolute inset-0 z-0">
-                      <img src={t.image} alt={t.title} className="w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity group-hover:scale-105 duration-700" referrerPolicy="no-referrer" />
+                      <img src={t.image} alt={t.title} className="w-full h-full object-cover opacity-20 group-hover:opacity-30 transition-opacity group-hover:scale-105 duration-700" referrerPolicy="no-referrer" crossOrigin="anonymous" />
                       <div className="absolute inset-0 bg-gradient-to-r from-zinc-950 via-zinc-950/90 to-transparent" />
                     </div>
                     
@@ -411,6 +411,7 @@ export default function Community() {
                           className="w-10 h-10 md:w-8 md:h-8 rounded object-cover bg-zinc-800" 
                           alt={player.name}
                           referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
                         />
                         <div>
                           <span className="font-bold text-white group-hover:text-emerald-400 transition-colors block md:inline text-sm md:text-base">{player.name}</span>

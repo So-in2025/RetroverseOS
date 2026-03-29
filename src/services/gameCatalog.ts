@@ -46,7 +46,7 @@ class GameCatalogService {
       }
       
       // Force refresh for OMEGA SET 50K update
-      const CATALOG_VERSION = '19'; // Bumped version to force re-seed for archive_id extraction
+      const CATALOG_VERSION = '20'; // Bumped version to force re-seed with improved filters
       const currentVersion = localStorage.getItem('catalog_version');
       
       if (currentVersion !== CATALOG_VERSION) {
@@ -68,8 +68,19 @@ class GameCatalogService {
 
       if (storedGames && storedGames.length > 0 && hasNewData) {
         storedGames.forEach(g => {
+          // Re-clean title with improved logic
           g.title = MetadataNormalizationEngine.cleanTitle(g.title);
-          this.games.set(g.game_id, g);
+          
+          // Filter out suspicious entries that might have slipped in
+          const lowerTitle = g.title.toLowerCase();
+          const systemNames = ['nes', 'snes', 'gba', 'gbc', 'gb', 'n64', 'psx', 'ps1', 'ps2', 'genesis', 'md', 'atari', '3do', 'mame', 'neogeo'];
+          const isSystemName = systemNames.includes(lowerTitle);
+          const isTooShort = g.title.length < 2;
+          const isEmulator = lowerTitle.includes('ares') || lowerTitle.includes('retroarch') || lowerTitle.includes('emulator');
+          
+          if (!isSystemName && !isTooShort && !isEmulator) {
+            this.games.set(g.game_id, g);
+          }
         });
       } else {
         if (storedGames && storedGames.length > 0) {

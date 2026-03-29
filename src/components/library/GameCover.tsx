@@ -3,7 +3,7 @@ import { Gamepad2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import localforage from 'localforage';
 import { CoverService } from '../../services/coverService';
-import { ImageCache } from '../../services/imageCache';
+// import { ImageCache } from '../../services/imageCache';
 
 // Configurar localforage para covers
 const coverStore = localforage.createInstance({
@@ -64,7 +64,12 @@ export const GameCover: React.FC<GameCoverProps> = ({
       try {
         const cachedUrl = await coverStore.getItem<string>(gameId);
         if (cachedUrl && isMounted) {
-          setCurrentSrc(cachedUrl);
+          // Ensure cached URL is also proxied for COEP compatibility
+          const proxiedUrl = (cachedUrl.startsWith('blob:') || cachedUrl.startsWith('/')) 
+            ? cachedUrl 
+            : `/api/tunnel?url=${encodeURIComponent(cachedUrl)}`;
+          
+          setCurrentSrc(proxiedUrl);
           setStatus('success');
           setIsCached(true);
           return true;
@@ -102,28 +107,12 @@ export const GameCover: React.FC<GameCoverProps> = ({
     const url = sources[sourceIndex];
     console.log(`[Cover] Attempting load for ${title} (ID: ${gameId}) - Source ${sourceIndex + 1}/${sources.length}: ${url}`);
 
-    // Intentar cargar a través del cache de imágenes (blob URL)
-    const loadWithCache = async () => {
-      if (url && !url.startsWith('/') && !url.startsWith('blob:')) {
-        try {
-          const cachedUrl = await ImageCache.getImage(url);
-          if (cachedUrl && cachedUrl.startsWith('blob:')) {
-            console.log(`[Cover] Cache hit for ${url}`);
-            setCurrentSrc(cachedUrl);
-            return;
-          }
-        } catch (e) {
-          console.warn(`[Cover] Cache error for ${url}:`, e);
-        }
-      }
-      
-      // Use proxy for direct loading to avoid CORS
-      const proxiedUrl = url.startsWith('blob:') ? url : `/api/tunnel?url=${encodeURIComponent(url)}`;
-      console.log(`[Cover] Setting src via proxy: ${proxiedUrl}`);
-      setCurrentSrc(proxiedUrl);
-    };
-
-    loadWithCache();
+    // Use proxy for all external loads to satisfy COEP/CORP requirements
+    const proxiedUrl = (url.startsWith('blob:') || url.startsWith('/')) 
+      ? url 
+      : `/api/tunnel?url=${encodeURIComponent(url)}`;
+    
+    setCurrentSrc(proxiedUrl);
 
     // Timeout de seguridad: si una imagen tarda más de 15s en cargar o fallar, forzamos el siguiente intento
     const timeout = setTimeout(() => {
@@ -256,6 +245,7 @@ export const GameCover: React.FC<GameCoverProps> = ({
             onError={handleError}
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
             referrerPolicy="no-referrer"
+            crossOrigin="anonymous"
           />
         )
       )}

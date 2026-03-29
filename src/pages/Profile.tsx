@@ -131,7 +131,7 @@ export default function Profile() {
             {/* Avatar */}
             <div className="relative group shrink-0">
               <div className="w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-zinc-800 border-4 border-zinc-950 overflow-hidden relative z-10 shadow-2xl shadow-emerald-900/50">
-                <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop" alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=crop" alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" crossOrigin="anonymous" />
               </div>
               <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-emerald-600 text-white text-[10px] font-bold px-3 py-1 rounded-full border-2 border-zinc-950 z-20 whitespace-nowrap tracking-wider">
                 LVL 99
@@ -612,6 +612,7 @@ export default function Profile() {
                         src={friend.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend.username}`} 
                         alt={friend.username} 
                         className="w-8 h-8 rounded-full bg-zinc-800" 
+                        crossOrigin="anonymous"
                       />
                       <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-zinc-900 ${
                         friend.status === 'online' ? 'bg-emerald-500' : 
@@ -769,7 +770,7 @@ export default function Profile() {
                   { id: 'sotn', title: 'Castlevania: SOTN', image: 'https://images.igdb.com/igdb/image/upload/t_cover_big/co1tq0.png' }
                 ].map(game => (
                   <div key={game.id} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-white/10 group cursor-pointer">
-                    <img src={game.image} alt={game.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" referrerPolicy="no-referrer" />
+                    <img src={game.image} alt={game.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" referrerPolicy="no-referrer" crossOrigin="anonymous" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
                       <span className="text-white text-[10px] font-bold leading-tight">{game.title}</span>
                     </div>
@@ -795,7 +796,7 @@ export default function Profile() {
                 ].map(clip => (
                   <div key={clip.id} className="group relative rounded-xl overflow-hidden border border-white/10 cursor-pointer">
                     <div className="aspect-video relative">
-                      <img src={clip.image} alt={clip.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
+                      <img src={clip.image} alt={clip.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" referrerPolicy="no-referrer" crossOrigin="anonymous" />
                       <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
                         <PlayCircle className="w-10 h-10 text-white opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all drop-shadow-lg" />
                       </div>

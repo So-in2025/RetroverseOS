@@ -81,6 +81,7 @@ export default function Sidebar() {
                 alt="Profile"
                 className="w-10 h-10 rounded-lg border border-white/10 group-hover:border-cyan-electric/50 transition-all"
                 referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
               />
               <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-zinc-900 border border-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
                 <span className="text-[10px] font-black uppercase tracking-widest text-white">

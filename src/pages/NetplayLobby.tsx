@@ -220,7 +220,7 @@ export default function NetplayLobby() {
                       className="flex items-center gap-4 p-4 rounded-2xl bg-black/40 border border-white/5 hover:border-cyan-electric/50 hover:bg-cyan-electric/5 transition-all group text-left"
                     >
                       <div className="w-12 h-12 rounded-lg bg-zinc-800 overflow-hidden flex-shrink-0">
-                        <img src={game.cover_url || undefined} alt={game.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        <img src={game.cover_url || undefined} alt={game.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" crossOrigin="anonymous" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] text-zinc-500 uppercase font-bold tracking-widest mb-1">{game.system}</p>

@@ -137,6 +137,7 @@ export class CoverService {
 
     const libretroSystem = LIBRETRO_SYSTEM_MAP[system] || system.replace(/\s+/g, '_');
     const libretroBase = `https://raw.githubusercontent.com/libretro-thumbnails/${libretroSystem}/master/Named_Boxarts`;
+    const libretroOldBase = `https://raw.githubusercontent.com/libretro/libretro-thumbnails/master/${libretroSystem}/Named_Boxarts`;
     const libretroTitlesBase = `https://raw.githubusercontent.com/libretro-thumbnails/${libretroSystem}/master/Named_Titles`;
     const libretroSnapsBase = `https://raw.githubusercontent.com/libretro-thumbnails/${libretroSystem}/master/Named_Snaps`;
 
@@ -145,6 +146,7 @@ export class CoverService {
     
     // Try exact title from Archive.org (often contains (USA) etc)
     sources.push(`${libretroBase}/${this.safeEncode(titleWithoutExt)}.png`);
+    sources.push(`${libretroOldBase}/${this.safeEncode(titleWithoutExt)}.png`);
     sources.push(`${libretroTitlesBase}/${this.safeEncode(titleWithoutExt)}.png`);
     
     // Try clean title (without tags)
@@ -154,6 +156,7 @@ export class CoverService {
     const regions = [' (USA)', ' (World)', ' (Europe)', ' (Japan) (En)', ' (Japan)', ''];
     regions.forEach(region => {
       sources.push(`${libretroBase}/${this.safeEncode(cleanTitle + region)}.png`);
+      sources.push(`${libretroOldBase}/${this.safeEncode(cleanTitle + region)}.png`);
       sources.push(`${libretroTitlesBase}/${this.safeEncode(cleanTitle + region)}.png`);
     });
 

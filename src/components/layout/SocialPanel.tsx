@@ -136,6 +136,7 @@ export default function SocialPanel() {
                               src={friend.avatar} 
                               className={`w-12 h-12 rounded-xl object-cover border border-white/10 ${friend.status === 'offline' ? 'grayscale opacity-40' : ''}`} 
                               alt={friend.name}
+                              crossOrigin="anonymous"
                             />
                             <div className={`absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-[3px] border-zinc-950 ${
                               friend.status === 'online' ? 'bg-emerald-500 shadow-[0_0_10px_#10b981]' : 

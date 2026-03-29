@@ -1,39 +1,69 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { Readable } from 'stream';
+export const config = {
+  runtime: 'edge',
+};
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const { url } = req.query;
+export default async function handler(req: Request) {
+  const urlObj = new URL(req.url);
+  const url = urlObj.searchParams.get('url');
   
   if (!url || typeof url !== 'string') {
-    return res.status(400).json({ error: 'Missing url parameter' });
+    return new Response(JSON.stringify({ error: 'Missing url parameter' }), { 
+      status: 400, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
   }
 
-  const allowedDomains = ['archive.org', 'raw.githubusercontent.com', 'cdn.jsdelivr.net', 'myrient.erista.me', 'github.com', 'wsrv.nl'];
+  const allowedDomains = [
+    'archive.org',
+    'githubusercontent.com',
+    'raw.githubusercontent.com',
+    'github.com',
+    'libretro.com',
+    'libretro.org',
+    'cdn.libretro.com',
+    'jsdelivr.net',
+    'cdn.jsdelivr.net',
+    'erista.me',
+    'myrient.erista.me',
+    'bing.net',
+    'bing.com',
+    'wsrv.nl',
+    'weserv.nl',
+    'googleusercontent.com'
+  ];
   try {
     const parsedTarget = new URL(url.startsWith('//') ? 'https:' + url : (url.startsWith('http') ? url : 'https://' + url));
     if (!allowedDomains.some(domain => parsedTarget.hostname.endsWith(domain))) {
       console.warn(`[Tunnel] Blocked unauthorized domain: ${parsedTarget.hostname}`);
-      return res.status(403).json({ error: 'Domain not allowed' });
+      return new Response(JSON.stringify({ error: 'Domain not allowed' }), { 
+        status: 403, 
+        headers: { 'Content-Type': 'application/json' } 
+      });
     }
   } catch (e) {
-    return res.status(400).json({ error: 'Invalid URL' });
+    return new Response(JSON.stringify({ error: 'Invalid URL' }), { 
+      status: 400, 
+      headers: { 'Content-Type': 'application/json' } 
+    });
   }
 
   let targetUrl = url;
   if (targetUrl.startsWith('//')) targetUrl = 'https:' + targetUrl;
   else if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) targetUrl = 'https://' + targetUrl;
 
-  const range = req.headers.range;
+  const range = req.headers.get('range');
   console.log(`[Tunnel] Fetching: ${targetUrl} (Range: ${range || 'none'})`);
 
   const isArchive = targetUrl.includes('archive.org');
-  const maxRetries = isArchive ? 3 : 2; // Reduced for serverless to avoid timeout
+  const maxRetries = isArchive ? 3 : 2;
   let attempt = 0;
   let lastError: any = null;
 
   while (attempt < maxRetries) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 55000); // Vercel Pro timeout is 60s, Hobby is 10s.
+    // Edge functions don't have the same strict wall-clock limits for streaming,
+    // but we still want a timeout for the initial connection.
+    const timeoutId = setTimeout(() => controller.abort(), 30000); 
     
     try {
       const fetchHeaders: Record<string, string> = {
@@ -61,61 +91,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       if (!response.ok) {
         const status = response.status;
-        if (status === 404) return res.status(404).send('Target not found');
+        if (status === 404) return new Response('Target not found', { status: 404 });
         if ([503, 429, 408, 500, 502, 504].includes(status)) {
           throw new Error(`Target returned ${status}`);
         }
         throw new Error(`Target returned ${status}`);
       }
 
-      const contentType = response.headers.get('content-type');
-      const contentLength = response.headers.get('content-length');
-      const contentRange = response.headers.get('content-range');
-      const acceptRanges = response.headers.get('accept-ranges');
+      // Create new headers for the response
+      const responseHeaders = new Headers(response.headers);
       
-      if (contentType) res.setHeader('Content-Type', contentType);
-      if (contentLength) res.setHeader('Content-Length', contentLength);
-      if (contentRange) res.setHeader('Content-Range', contentRange);
-      if (acceptRanges) res.setHeader('Accept-Ranges', acceptRanges);
+      // Ensure CORS and CORP headers are set for COEP compatibility
+      responseHeaders.set('Access-Control-Allow-Origin', '*');
+      responseHeaders.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      responseHeaders.set('Cross-Origin-Resource-Policy', 'cross-origin');
       
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-      
-      // COOP/COEP for the response itself
-      res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-      res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+      // Remove COOP/COEP from image/binary responses as they are only for documents
+      responseHeaders.delete('Cross-Origin-Embedder-Policy');
+      responseHeaders.delete('Cross-Origin-Opener-Policy');
 
-      if (!response.body) throw new Error('Response body is null');
-
-      // @ts-ignore - response.body is a ReadableStream in Node 18+ fetch
-      const reader = response.body.getReader();
-      const stream = new Readable({
-        async read() {
-          try {
-            const { done, value } = await reader.read();
-            if (done) {
-              this.push(null);
-            } else {
-              this.push(Buffer.from(value));
-            }
-          } catch (err) {
-            this.destroy(err instanceof Error ? err : new Error(String(err)));
-          }
-        },
-        destroy(err, callback) {
-          reader.cancel().catch(() => {});
-          callback(err);
-        }
-      });
-
-      // Pipe to response
-      stream.pipe(res);
-
-      return new Promise((resolve, reject) => {
-        res.on('finish', resolve);
-        res.on('error', reject);
-        stream.on('error', reject);
+      // Return the response directly. The Edge runtime handles streaming automatically.
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers: responseHeaders
       });
 
     } catch (error: any) {
@@ -124,6 +123,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       attempt++;
       
       if (attempt < maxRetries) {
+        // Simple wait before retry
         await new Promise(resolve => setTimeout(resolve, 1000));
         continue;
       } else {
@@ -132,7 +132,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  if (!res.writableEnded) {
-    res.status(502).send(`Gateway Error: ${lastError?.message}`);
-  }
+  return new Response(`Gateway Error: ${lastError?.message}`, { status: 502 });
 }

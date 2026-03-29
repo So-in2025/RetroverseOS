@@ -181,10 +181,33 @@ export class StorageService {
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(STORE_ROMS, 'readwrite');
       const store = transaction.objectStore(STORE_ROMS);
-      const request = store.put(rom);
+      
+      try {
+        const request = store.put(rom);
 
-      request.onsuccess = () => resolve();
-      request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve();
+        request.onerror = async () => {
+          if (request.error?.name === 'QuotaExceededError') {
+            console.warn('[Storage] Quota exceeded during put. Evicting aggressively...');
+            // Try to evict 500MB or half the cache
+            await this.enforceStorageLimit(500 * 1024 * 1024);
+            // Retry once
+            try {
+              const retryTx = this.db!.transaction(STORE_ROMS, 'readwrite');
+              const retryStore = retryTx.objectStore(STORE_ROMS);
+              const retryReq = retryStore.put(rom);
+              retryReq.onsuccess = () => resolve();
+              retryReq.onerror = () => reject(retryReq.error);
+            } catch (e) {
+              reject(e);
+            }
+          } else {
+            reject(request.error);
+          }
+        };
+      } catch (e) {
+        reject(e);
+      }
     });
   }
 
