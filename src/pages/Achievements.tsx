@@ -69,11 +69,11 @@ export default function Achievements() {
               <ArrowLeft className="w-6 h-6" />
             </button>
             <div>
-              <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter flex items-center gap-3">
-                <Trophy className="w-8 h-8 text-amber-400" />
+              <h1 className="text-2xl md:text-3xl font-retro uppercase tracking-tighter flex items-center gap-3">
+                <Trophy className="w-7 h-7 text-amber-400" />
                 Sala de Trofeos
               </h1>
-              <p className="text-zinc-400 font-mono text-sm mt-1">
+              <p className="text-zinc-400 font-mono text-xs mt-1">
                 {unlockedIds.length} de {allAchievements.length} Logros Desbloqueados
               </p>
             </div>
@@ -89,7 +89,7 @@ export default function Achievements() {
                 AudioEngine.playMoveSound();
                 setFilter(f);
               }}
-              className={`px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wider transition-all ${
+              className={`px-4 py-2 rounded-lg text-sm font-retro uppercase tracking-wider transition-all ${
                 filter === f 
                   ? 'bg-white text-black shadow-lg' 
                   : 'text-zinc-400 hover:text-white hover:bg-white/5'
@@ -123,10 +123,10 @@ export default function Achievements() {
                     {isUnlocked ? getIcon(ach.icon) : <Lock className="w-6 h-6" />}
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-bold text-lg mb-1">{ach.title}</h3>
-                    <p className="text-sm text-zinc-400 leading-relaxed mb-3">{ach.description}</p>
+                    <h3 className="font-retro text-base mb-1">{ach.title}</h3>
+                    <p className="text-xs text-zinc-400 leading-relaxed mb-3">{ach.description}</p>
                     <div className="flex items-center justify-between">
-                      <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${isUnlocked ? rarityStyle : 'bg-zinc-800 text-zinc-500'}`}>
+                      <span className={`text-[10px] font-retro uppercase tracking-widest px-2 py-1 rounded-md ${isUnlocked ? rarityStyle : 'bg-zinc-800 text-zinc-500'}`}>
                         {ach.rarity}
                       </span>
                       <span className="text-xs font-mono text-cyan-400 flex items-center gap-1">

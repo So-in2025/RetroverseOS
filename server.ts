@@ -143,12 +143,12 @@ async function startServer() {
       return res.status(400).json({ error: 'Missing url parameter' });
     }
 
-    const allowedDomains = ['archive.org', 'raw.githubusercontent.com', 'cdn.jsdelivr.net', 'myrient.erista.me', 'github.com', 'wsrv.nl'];
+    const allowedDomains = ['archive.org', 'raw.githubusercontent.com', 'cdn.jsdelivr.net', 'myrient.erista.me', 'github.com', 'wsrv.nl', 'weserv.nl', 'tse2.mm.bing.net', 'images.unsplash.com'];
     try {
       const parsedTarget = new URL(url.startsWith('//') ? 'https:' + url : (url.startsWith('http') ? url : 'https://' + url));
       if (!allowedDomains.some(domain => parsedTarget.hostname.endsWith(domain))) {
         console.warn(`[Tunnel] Blocked unauthorized domain: ${parsedTarget.hostname}`);
-        return res.status(403).json({ error: 'Domain not allowed' });
+        return res.status(403).json({ error: `Domain ${parsedTarget.hostname} not allowed in tunnel` });
       }
     } catch (e) {
       return res.status(400).json({ error: 'Invalid URL' });
@@ -162,26 +162,51 @@ async function startServer() {
     console.log(`[Tunnel] Fetching: ${targetUrl} (Range: ${range || 'none'})`);
 
     const isArchive = targetUrl.includes('archive.org');
-    const maxRetries = isArchive ? 7 : 3; 
+    const isMyrient = targetUrl.includes('myrient.erista.me');
+    const maxRetries = (isArchive || isMyrient) ? 10 : 7; 
     let attempt = 0;
     let lastError: any = null;
 
+    const userAgents = [
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:126.0) Gecko/20100101 Firefox/126.0',
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0',
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 OPR/111.0.0.0'
+    ];
+
+    let cookies: string[] = [];
+
     while (attempt < maxRetries) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 180000); // 180 Second Timeout for large ROMs
+      const timeoutId = setTimeout(() => controller.abort(), 240000); // Increased to 240 Seconds
       
       try {
         const fetchHeaders: Record<string, string> = {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-          'Accept': '*/*',
+          'User-Agent': userAgents[attempt % userAgents.length],
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
           'Accept-Language': 'en-US,en;q=0.9',
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
-          'Connection': 'keep-alive', // Use keep-alive for the target request to avoid early closure
+          'Connection': 'keep-alive',
+          'Upgrade-Insecure-Requests': '1',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'DNT': '1'
         };
 
+        if (cookies.length > 0) {
+          fetchHeaders['Cookie'] = cookies.join('; ');
+        }
+
+        // Archive.org is sensitive to Referer and Origin
         if (isArchive) {
           fetchHeaders['Referer'] = 'https://archive.org/';
+          fetchHeaders['Origin'] = 'https://archive.org';
         }
 
         if (range) {
@@ -191,21 +216,28 @@ async function startServer() {
         const response = await fetch(targetUrl, {
           signal: controller.signal,
           headers: fetchHeaders,
-          // Only use duplex for non-GET requests if needed, but here we only do GET
           // @ts-ignore
           redirect: 'follow'
         });
+        
+        // Capture cookies for potential retries (some Archive.org downloads need them)
+        const setCookie = response.headers.get('set-cookie');
+        if (setCookie) {
+          const newCookies = setCookie.split(',').map(c => c.split(';')[0].trim());
+          cookies = [...new Set([...cookies, ...newCookies])];
+        }
+
         clearTimeout(timeoutId);
         
         if (!response.ok) {
           const status = response.status;
-          console.warn(`[Tunnel] Target returned status ${status} for ${targetUrl}`);
+          console.warn(`[Tunnel] Target returned status ${status} for ${targetUrl} (Attempt ${attempt + 1})`);
           
           if (status === 404) return res.status(404).send('Target not found');
           
-          // Retryable statuses
-          if ([503, 429, 408, 500, 502, 504].includes(status)) {
-            const waitTime = 1500 * (attempt + 1) + Math.random() * 1000;
+          // If we get a 401/403, it might be a temporary block or anti-bot
+          if (status === 401 || status === 403 || [503, 429, 408, 500, 502, 504].includes(status)) {
+            const waitTime = 3000 * (attempt + 1) + Math.random() * 3000; // Increased wait time
             await new Promise(resolve => setTimeout(resolve, waitTime));
             throw new Error(`Target returned ${status}`);
           }
@@ -217,6 +249,18 @@ async function startServer() {
         const contentRange = response.headers.get('content-range');
         const acceptRanges = response.headers.get('accept-ranges');
         
+        // Security: Don't allow tunneling HTML if we expect a ROM/Binary or Metadata
+        // This prevents the proxy from being used for phishing or serving malicious HTML
+        const isBinaryRequest = targetUrl.match(/\.(zip|nes|sfc|smc|md|gen|gba|gbc|gb|n64|z64|v64|iso|chd|cue|bin|exe|msi|7z|rar)$/i);
+        const isMetadataRequest = targetUrl.includes('archive.org/metadata/');
+        if ((isBinaryRequest || isMetadataRequest) && contentType?.includes('text/html')) {
+           console.warn(`[Tunnel] Blocked HTML response for ${isBinaryRequest ? 'binary' : 'metadata'} request: ${targetUrl}`);
+           // If it's HTML, it's likely an error page served with 200 OK (common on some CDNs)
+           if (attempt < maxRetries - 1) {
+             throw new Error(`Received HTML instead of ${isBinaryRequest ? 'Binary' : 'JSON'}`);
+           }
+        }
+
         if (contentType) res.setHeader('Content-Type', contentType);
         if (contentLength) res.setHeader('Content-Length', contentLength);
         if (contentRange) res.setHeader('Content-Range', contentRange);
@@ -303,12 +347,17 @@ async function startServer() {
         const isTimeout = error.name === 'AbortError';
         const isConnReset = error.message?.includes('ECONNRESET') || error.code === 'ECONNRESET' || error.message?.toLowerCase().includes('fetch failed');
         const isRetryableStatus = error.message?.includes('503') || error.message?.includes('408') || error.message?.includes('429') || error.message?.includes('500') || error.message?.includes('502') || error.message?.includes('504');
-        const isFatalStatus = error.message?.includes('401') || error.message?.includes('403') || error.message?.includes('404');
+        const isHtmlError = error.message?.includes('Received HTML instead of Binary');
+        
+        // 401/403 can sometimes be temporary blocks or anti-bot glitches on Archive.org
+        const isAuthRetryable = (isArchive || isMyrient) && (error.message?.includes('401') || error.message?.includes('403'));
+        const isFatalStatus = error.message?.includes('404') || (!isAuthRetryable && (error.message?.includes('401') || error.message?.includes('403')));
         
         console.error(`[Tunnel] Attempt ${attempt} failed for ${targetUrl}: ${error.message}${isConnReset ? ' (Connection Reset/Fetch Failed)' : ''}`);
 
-        if (attempt < maxRetries && !isFatalStatus && (isTimeout || isConnReset || isRetryableStatus || !res.headersSent)) {
-          const delay = Math.pow(2, attempt) * 1500 + Math.random() * 1000;
+        if (attempt < maxRetries && !isFatalStatus && (isTimeout || isConnReset || isRetryableStatus || isAuthRetryable || isHtmlError || !res.headersSent)) {
+          const delay = Math.pow(2, attempt) * 2000 + Math.random() * 1000;
+          console.log(`[Tunnel] Retrying in ${Math.round(delay)}ms...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         } else {
@@ -319,27 +368,32 @@ async function startServer() {
 
     if (!res.headersSent) {
       const isTimeout = lastError?.name === 'AbortError' || lastError?.message?.includes('408');
-      const isOverloaded = lastError?.message?.includes('503');
+      const isOverloaded = lastError?.message?.includes('503') || lastError?.message?.includes('429');
       const isAuthError = lastError?.message?.includes('401') || lastError?.message?.includes('403');
       const isNotFound = lastError?.message?.includes('404');
+      const isServerError = lastError?.message?.includes('500') || lastError?.message?.includes('502') || lastError?.message?.includes('504');
       
       let status = 502;
-      let message = `Gateway Error: ${lastError?.message}`;
+      let message = `Tunnel Error: ${lastError?.message || 'Unknown Error'}`;
       
       if (isTimeout) {
         status = 408;
-        message = 'Request Timeout.';
+        message = 'Request Timeout. The target server took too long to respond.';
       } else if (isOverloaded) {
         status = 503;
-        message = 'Archive.org is overloaded.';
+        message = 'Target server is overloaded or rate-limiting requests.';
       } else if (isAuthError) {
-        status = 401;
-        message = 'Unauthorized or Forbidden access to target.';
+        status = 403;
+        message = 'Access Forbidden or Unauthorized by target server.';
       } else if (isNotFound) {
         status = 404;
-        message = 'Target not found.';
+        message = 'Target resource not found.';
+      } else if (isServerError) {
+        status = 502;
+        message = 'Target server returned a server error (500/502/504).';
       }
       
+      console.error(`[Tunnel] Final failure for ${targetUrl}: ${status} - ${message}`);
       res.status(status).send(message);
     }
   });

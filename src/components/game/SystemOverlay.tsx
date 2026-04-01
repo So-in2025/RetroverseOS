@@ -40,8 +40,8 @@ export default function SystemOverlay({ isOpen, onClose }: { isOpen: boolean, on
                   <Gamepad2 className="w-6 h-6 text-cyan-electric" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-black italic uppercase tracking-tighter">QUICK ACCESS</h2>
-                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">SYSTEM OVERLAY V2.5</p>
+                  <h2 className="text-xl font-retro italic uppercase tracking-tighter">QUICK ACCESS</h2>
+                  <p className="text-[10px] font-retro text-zinc-500 uppercase tracking-widest">SYSTEM OVERLAY V2.5</p>
                 </div>
               </div>
               <button 
@@ -85,7 +85,7 @@ export default function SystemOverlay({ isOpen, onClose }: { isOpen: boolean, on
                 className="w-full py-4 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 rounded-2xl flex items-center justify-center gap-3 transition-all group"
               >
                 <LogOut className="w-5 h-5 text-rose-500 group-hover:translate-x-1 transition-transform" />
-                <span className="text-xs font-black text-rose-500 uppercase tracking-widest">EXIT TO LIBRARY</span>
+                <span className="text-xs font-retro text-rose-500 uppercase tracking-widest">EXIT TO LIBRARY</span>
               </button>
             </div>
           </div>
@@ -93,7 +93,7 @@ export default function SystemOverlay({ isOpen, onClose }: { isOpen: boolean, on
           <div className="bg-black/40 px-8 py-4 flex items-center justify-between border-t border-white/5">
             <div className="flex items-center gap-2">
               <Zap className="w-3 h-3 text-cyan-electric" />
-              <span className="text-[8px] font-black text-zinc-500 uppercase tracking-widest">SENTINEL PROTOCOL: ACTIVE</span>
+              <span className="text-[8px] font-retro text-zinc-500 uppercase tracking-widest">SENTINEL PROTOCOL: ACTIVE</span>
             </div>
             <span className="text-[8px] font-mono text-zinc-600">BUILD 03.25.26</span>
           </div>
@@ -110,7 +110,7 @@ function OverlayButton({ icon: Icon, label, onClick, color }: any) {
       className="flex flex-col items-center justify-center gap-3 p-6 bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl transition-all group"
     >
       <Icon className={`w-8 h-8 ${color} group-hover:scale-110 transition-transform`} />
-      <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest group-hover:text-white transition-colors">{label}</span>
+      <span className="text-[10px] font-retro text-zinc-400 uppercase tracking-widest group-hover:text-white transition-colors">{label}</span>
     </button>
   );
 }

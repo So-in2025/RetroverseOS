@@ -171,9 +171,9 @@ export class SentinelEngine {
       // Headless ROM Fetch Test (< 5s requirement)
       const fetchPromise = ROMFetchService.fetchRom(game.game_id, game.rom_url);
       
-      // 5 second timeout for Sentinel
+      // 15 second timeout for Sentinel (Archive.org can be slow)
       const timeoutPromise = new Promise<Blob>((_, reject) => 
-        setTimeout(() => reject(new Error('Sentinel Timeout: Fetch took longer than 5s')), 5000)
+        setTimeout(() => reject(new Error('Sentinel Timeout: Fetch took longer than 15s')), 15000)
       );
 
       const blob = await Promise.race([fetchPromise, timeoutPromise]);

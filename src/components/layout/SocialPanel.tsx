@@ -52,7 +52,7 @@ export default function SocialPanel() {
             >
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-white/5 bg-black/20">
-                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-cyan-400 flex items-center gap-2">
+                <h3 className="text-xs font-retro uppercase tracking-[0.2em] text-cyan-400 flex items-center gap-2">
                   <Users className="w-4 h-4" />
                   Nexo Social
                 </h3>
@@ -70,11 +70,11 @@ export default function SocialPanel() {
                 {/* Tournaments Section */}
                 <section>
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                    <h4 className="text-[10px] font-retro uppercase tracking-widest text-zinc-500 flex items-center gap-2">
                       <Trophy className="w-3 h-3" />
                       Torneos Activos
                     </h4>
-                    <span className="px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-[9px] font-black">
+                    <span className="px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-[9px] font-retro uppercase tracking-widest">
                       {activeTournaments.length}
                     </span>
                   </div>
@@ -93,15 +93,15 @@ export default function SocialPanel() {
                         
                         <div className="relative z-10">
                           <div className="flex justify-between items-start mb-1">
-                            <h5 className="text-sm font-black text-white group-hover:text-yellow-400 transition-colors tracking-tight">{t.name}</h5>
+                            <h5 className="text-sm font-retro text-white group-hover:text-yellow-400 transition-colors tracking-tight uppercase italic">{t.name}</h5>
                           </div>
-                          <p className="text-[10px] font-bold text-zinc-400 mb-3 truncate">{t.game}</p>
+                          <p className="text-[10px] font-retro text-zinc-400 mb-3 truncate uppercase tracking-widest">{t.game}</p>
                           
-                          <div className="flex items-center justify-between text-[10px] font-mono">
+                          <div className="flex items-center justify-between text-[10px] font-retro uppercase tracking-widest">
                             <span className="flex items-center gap-1.5 text-zinc-300 bg-black/40 px-2 py-1 rounded-lg border border-white/5">
                               <Users className="w-3 h-3 text-cyan-400" /> {t.players}
                             </span>
-                            <span className="text-yellow-400 font-bold bg-yellow-500/10 px-2 py-1 rounded-lg border border-yellow-500/20">
+                            <span className="text-yellow-400 font-retro bg-yellow-500/10 px-2 py-1 rounded-lg border border-yellow-500/20">
                               {t.prize}
                             </span>
                           </div>
@@ -114,12 +114,12 @@ export default function SocialPanel() {
                 {/* Friends Section */}
                 <section>
                   <div className="flex items-center justify-between mb-4">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                    <h4 className="text-[10px] font-retro uppercase tracking-widest text-zinc-500 flex items-center gap-2">
                       <Swords className="w-3 h-3" />
-                      Neural Links
+                      Nexo Neural
                     </h4>
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-black">
-                      {friends.filter(f => f.status === 'online').length} LIVE
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-retro uppercase tracking-widest">
+                      {friends.filter(f => f.status === 'online').length} EN VIVO
                     </span>
                   </div>
                   <div className="space-y-2">
@@ -145,7 +145,7 @@ export default function SocialPanel() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between">
-                              <p className={`text-sm font-black uppercase tracking-tight truncate ${friend.status === 'offline' ? 'text-zinc-500' : 'text-zinc-100'}`}>
+                              <p className={`text-sm font-retro uppercase tracking-tight truncate ${friend.status === 'offline' ? 'text-zinc-500' : 'text-zinc-100'}`}>
                                 {friend.name}
                               </p>
                               {friend.status === 'online' && (
@@ -157,13 +157,13 @@ export default function SocialPanel() {
                             
                             {friend.game ? (
                               <div className="mt-1">
-                                <p className="text-[10px] font-bold text-cyan-400 truncate flex items-center gap-1.5">
+                                <p className="text-[10px] font-retro text-cyan-400 truncate flex items-center gap-1.5 uppercase tracking-widest">
                                   <Gamepad2 className="w-3 h-3" /> {friend.game}
                                 </p>
-                                <p className="text-[9px] font-mono text-zinc-500 mt-0.5 ml-4">{friend.system}</p>
+                                <p className="text-[9px] font-retro text-zinc-500 mt-0.5 ml-4 uppercase tracking-widest">{friend.system}</p>
                               </div>
                             ) : (
-                              <p className="text-[10px] font-mono text-zinc-600 mt-1">Desconectado</p>
+                              <p className="text-[10px] font-retro text-zinc-600 mt-1 uppercase tracking-widest">Desconectado</p>
                             )}
                           </div>
                         </div>
@@ -177,7 +177,7 @@ export default function SocialPanel() {
               <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-zinc-950 via-zinc-950/90 to-transparent pt-12">
                 <button 
                   onClick={() => haptics.medium()}
-                  className="w-full py-3.5 bg-cyan-500 text-black rounded-xl text-xs font-black uppercase tracking-[0.2em] hover:bg-cyan-400 hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all flex items-center justify-center gap-2 active:scale-95"
+                  className="w-full py-3.5 bg-cyan-500 text-black rounded-xl text-xs font-retro uppercase tracking-[0.2em] hover:bg-cyan-400 hover:shadow-[0_0_20px_rgba(6,182,212,0.4)] transition-all flex items-center justify-center gap-2 active:scale-95"
                 >
                   <MessageSquare className="w-4 h-4" />
                   Chat Global

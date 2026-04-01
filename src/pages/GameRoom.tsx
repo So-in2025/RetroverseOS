@@ -1,7 +1,7 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import React from 'react';
-import { Share2, Users, MessageSquare, Send, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video, Bot, Cloud, Zap, Target, Shield, Cpu, Settings } from 'lucide-react';
+import { Share2, Users, MessageSquare, Send, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video, Bot, Cloud, Zap, Target, Shield, Cpu, Settings, Trophy } from 'lucide-react';
 import { emulator } from '../services/emulator';
 import { multiplayer } from '../services/multiplayer';
 import { inputManager, RetroButton } from '../services/inputManager';
@@ -37,13 +37,22 @@ import { useAuth } from '../services/AuthContext';
 import { useCustomization } from '../hooks/useCustomization';
 import { useEconomy } from '../hooks/useEconomy';
 import { telemetry } from '../services/telemetry';
+import { supabase } from '../services/supabase';
+import { competitiveGuard, ViolationType } from '../competitive/competitiveGuard';
 
 export default function GameRoom() {
   const { gameId } = useParams();
+  const [searchParams] = useSearchParams();
+  const urlRoomId = searchParams.get('roomId');
+  const urlOpponentId = searchParams.get('opponentId');
   const navigate = useNavigate();
   const { user } = useAuth();
   const { ownedItems, isRetroPassActive } = useCustomization();
   const [players, setPlayers] = useState<string[]>([]);
+  const playersRef = useRef(players);
+  useEffect(() => {
+    playersRef.current = players;
+  }, [players]);
   const [messages, setMessages] = useState<{user: string, text: string}[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [gameState, setGameState] = useState<'loading' | 'waiting' | 'playing' | 'paused' | 'error'>('loading');
@@ -53,7 +62,7 @@ export default function GameRoom() {
     gameStateRef.current = gameState;
   }, [gameState]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [loadingStatus, setLoadingStatus] = useState('Initializing Systems...');
+  const [loadingStatus, setLoadingStatus] = useState('Inicializando Sistemas...');
   const [matchmakingStatus, setMatchmakingStatus] = useState<string | null>(null);
   const [netplayStatus, setNetplayStatus] = useState<'disconnected' | 'searching' | 'connecting' | 'connected' | 'reconnecting' | 'error'>('disconnected');
   const [netplayLatency, setNetplayLatency] = useState<number>(0);
@@ -89,6 +98,9 @@ export default function GameRoom() {
   const [showPerformanceHUD, setShowPerformanceHUD] = useState(false);
   const [isRewinding, setIsRewinding] = useState(false);
   const [isFastForwarding, setIsFastForwarding] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [hasReportedResult, setHasReportedResult] = useState(false);
+  const [isReporting, setIsReporting] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -134,12 +146,37 @@ export default function GameRoom() {
   const [isOpponentDisconnected, setIsOpponentDisconnected] = useState(false);
 
   useEffect(() => {
-    if (netplayStatus === 'reconnecting') {
+    let disconnectTimer: NodeJS.Timeout;
+    let connectingTimer: NodeJS.Timeout;
+
+    if (netplayStatus === 'reconnecting' && urlRoomId && gameState === 'playing' && !hasReportedResult) {
       setIsOpponentDisconnected(true);
+      notify({ title: 'Desconexión', message: 'El oponente se ha desconectado. Esperando reconexión...', type: 'system' });
+      
+      // Wait 10 seconds for reconnect, otherwise auto-win
+      disconnectTimer = setTimeout(() => {
+        if (!hasReportedResult) {
+          alert('El oponente ha abandonado la partida. ¡Victoria por abandono!');
+          handleReportResult('win', true);
+        }
+      }, 10000);
     } else if (netplayStatus === 'connected') {
       setIsOpponentDisconnected(false);
+    } else if (netplayStatus === 'reconnecting') {
+      setIsOpponentDisconnected(true);
+    } else if (netplayStatus === 'connecting' && urlRoomId && gameState === 'waiting') {
+      // Timeout if opponent doesn't join the room within 30 seconds
+      connectingTimer = setTimeout(() => {
+        alert('Tiempo de espera agotado. El oponente no se conectó a la sala.');
+        navigate('/');
+      }, 30000);
     }
-  }, [netplayStatus]);
+
+    return () => {
+      if (disconnectTimer) clearTimeout(disconnectTimer);
+      if (connectingTimer) clearTimeout(connectingTimer);
+    };
+  }, [netplayStatus, urlRoomId, gameState, hasReportedResult]);
 
   const [tacticalAdvice, setTacticalAdvice] = useState('');
   const [isTacticalLoading, setIsTacticalLoading] = useState(false);
@@ -159,6 +196,7 @@ export default function GameRoom() {
   const containerRef = useRef<HTMLDivElement>(null);
   const userId = useRef('user-' + Math.random().toString(36).substr(2, 9));
   const mountedRef = useRef(false);
+  const blurWarnings = useRef(0);
 
   const [pendingExit, setPendingExit] = useState(false);
 
@@ -283,7 +321,7 @@ export default function GameRoom() {
     let interval: NodeJS.Timeout;
     if (gameState === 'playing') {
       interval = setInterval(async () => {
-        await economy.addCoins(100, 'Playtime Reward');
+        await economy.addCoins(100, 'Recompensa por Tiempo de Juego');
         
         const currentPlaytime = (await storage.getSetting('total_playtime_minutes')) || 0;
         const newPlaytime = currentPlaytime + 5;
@@ -309,7 +347,7 @@ export default function GameRoom() {
       
       if (!gameData) {
         setGameState('error');
-        setErrorMessage('Game not found in catalog.');
+        setErrorMessage('Juego no encontrado en el catálogo.');
         return;
       }
 
@@ -412,8 +450,8 @@ export default function GameRoom() {
           
           notify({
             type: 'elite',
-            title: 'SYSTEM READY',
-            message: `CORE: ${gameData.system.toUpperCase()} INITIALIZED`
+            title: 'SISTEMA LISTO',
+            message: `NÚCLEO: ${gameData.system.toUpperCase()} INICIALIZADO`
           });
           
           telemetry.trackGameStart(gameId, gameData.system_id, currentCore);
@@ -428,7 +466,7 @@ export default function GameRoom() {
                 try {
                   const cloudSave = await saveService.downloadSave(user.id, gameId);
                   if (cloudSave) {
-                    console.log('Cloud save found, preparing for injection...');
+                    console.log('Guardado en la nube encontrado, preparando inyección...');
                     setShowCloudSaveToast(true);
                     setTimeout(() => setShowCloudSaveToast(false), 6000);
                   }
@@ -526,24 +564,70 @@ export default function GameRoom() {
       multiplayer.onStatusChange(setNetplayStatus);
       multiplayer.onLatencyUpdate(setNetplayLatency);
 
-      multiplayer.joinMatchmaking(
-        gameId, 
-        userId.current, 
-        (roomId, opponentId, isHostValue) => {
-          console.log(`Match found! Room: ${roomId}, Opponent: ${opponentId}, Host: ${isHostValue}`);
-          setPlayers([opponentId]);
-          setMatchmakingStatus('Opponent found! Connecting...');
-          setIsHost(isHostValue);
-          telemetry.trackNetplayMatch(gameId, roomId, 0); // Latency will be updated later
-        }
-      );
+      if (urlRoomId && supabase) {
+        // Connect to the specific room from the new matchmaking system
+        const connectToRoom = async () => {
+          if (!supabase) return;
+          const { data: room } = await supabase.from('netplay_rooms').select('*').eq('id', urlRoomId).single();
+          if (room) {
+            const isHostValue = room.host_id === userId.current;
+            setIsHost(isHostValue);
+            setMatchmakingStatus('Conectando a la sala competitiva...');
+            multiplayer.connect(urlRoomId, userId.current, isHostValue);
+            telemetry.trackNetplayMatch(gameId, urlRoomId, 0);
+          } else {
+            setMatchmakingStatus('Error: Sala no encontrada');
+          }
+        };
+        connectToRoom();
+      } else {
+        // Fallback to old matchmaking if no roomId provided
+        multiplayer.joinMatchmaking(
+          gameId, 
+          userId.current, 
+          (roomId, opponentId, isHostValue) => {
+            console.log(`Match found! Room: ${roomId}, Opponent: ${opponentId}, Host: ${isHostValue}`);
+            setPlayers([opponentId]);
+            setMatchmakingStatus('¡Oponente encontrado! Conectando...');
+            setIsHost(isHostValue);
+            telemetry.trackNetplayMatch(gameId, roomId, 0); // Latency will be updated later
+          }
+        );
+      }
     } else {
       setMatchmakingStatus('Modo Multijugador Desactivado (Licencia Pro Requerida)');
     }
 
     inputManager.start();
+    
+    if (urlRoomId) {
+      competitiveGuard.start(async (type: ViolationType) => {
+        if (type === 'macro_detected') {
+          alert('¡ADVERTENCIA: Se ha detectado uso de macros o turbo! Tu partida será registrada como derrota.');
+          await handleReportResult('loss', true, true); // Auto-loss, isSuspicious=true
+        } else if (type === 'window_blurred') {
+          blurWarnings.current += 1;
+          if (blurWarnings.current >= 2) {
+            alert('¡ADVERTENCIA: Has perdido el foco de la ventana repetidamente! Tu partida será registrada como derrota.');
+            await handleReportResult('loss', true, true);
+          } else {
+            notify({ title: 'Advertencia', message: 'Advertencia: Perder el foco de la ventana puede resultar en descalificación.', type: 'system' });
+          }
+        } else if (type === 'desync') {
+          notify({ title: 'Desincronización', message: 'Se ha detectado una desincronización en la partida.', type: 'system' });
+          await handleReportResult('draw', true, true);
+        } else if (type === 'rage_quit') {
+          notify({ title: 'Desconexión', message: 'El oponente se ha desconectado.', type: 'system' });
+          await handleReportResult('win', true, false);
+        }
+      });
+    }
+
     const cleanupInput = inputManager.onInput((button: RetroButton, isPressed: boolean) => {
       if (gameStateRef.current === 'playing') {
+        if (isPressed && urlRoomId) {
+          competitiveGuard.registerInput();
+        }
         const playerIndex = isHostRef.current ? 0 : 1;
         emulator.sendInput(button, isPressed, playerIndex);
         multiplayer.sendInput({ button, isPressed, playerIndex });
@@ -559,7 +643,7 @@ export default function GameRoom() {
 
     multiplayer.onChatMessage((msg) => {
       if (msg.user === userId.current) return;
-      const displayUser = `Player ${msg.user.slice(-4)}`;
+      const displayUser = `Jugador ${msg.user.slice(-4)}`;
       setMessages(prev => [...prev, { user: displayUser, text: msg.text }]);
     });
 
@@ -572,6 +656,12 @@ export default function GameRoom() {
       initializedRef.current = false;
       cleanupInput();
       inputManager.stop();
+      if (urlRoomId) {
+        competitiveGuard.stop();
+        import('../services/netplayService').then(({ netplayService }) => {
+          netplayService.leaveRoom(urlRoomId);
+        });
+      }
       emulator.stop();
       AudioEngine.stopAll();
       multiplayer.leaveMatchmaking();
@@ -695,7 +785,7 @@ export default function GameRoom() {
   const handleSendText = (text: string) => {
     if (!text.trim() || !gameId) return;
     const msg = { user: userId.current, text };
-    setMessages(prev => [...prev, { user: 'You', text }]);
+    setMessages(prev => [...prev, { user: 'Tú', text }]);
     multiplayer.sendChatMessage(gameId, msg);
     achievements.unlock('social_link');
     haptics.light();
@@ -759,8 +849,57 @@ export default function GameRoom() {
       setShowGuestModal(true);
       return;
     }
+    
+    if (urlRoomId && !hasReportedResult && user) {
+      await emulator.pause();
+      setGameState('paused');
+      setShowReportModal(true);
+      return;
+    }
+
     await emulator.stop();
     navigate('/');
+  };
+
+  const handleReportResult = async (result: 'win' | 'loss' | 'draw', isAbandonment: boolean = false, isSuspicious: boolean = false) => {
+    if (!user || !urlRoomId || !gameId || isReporting) return;
+    setIsReporting(true);
+    try {
+      // Find opponent ID from players array (assuming 1v1)
+      let opponentId = playersRef.current.length > 0 ? playersRef.current[0] : null;
+      
+      if (!opponentId && urlOpponentId) {
+        opponentId = urlOpponentId;
+      }
+      
+      if (!opponentId && supabase) {
+        // Fallback: fetch from room
+        const { data: room } = await supabase.from('netplay_rooms').select('*').eq('id', urlRoomId).single();
+        if (room) {
+           if (room.host_id !== user.id) {
+             opponentId = room.host_id;
+           }
+        }
+      }
+
+      if (opponentId) {
+        const { resultsService } = await import('../competitive/resultsService');
+        await resultsService.reportResult(urlRoomId, gameId, user.id, opponentId, result, isAbandonment, isSuspicious);
+        setHasReportedResult(true);
+        setShowReportModal(false);
+        await emulator.stop();
+        navigate('/');
+      } else {
+        console.warn("No opponent found to report against.");
+        setShowReportModal(false);
+        await emulator.stop();
+        navigate('/');
+      }
+    } catch (err) {
+      console.error("Error reporting result:", err);
+    } finally {
+      setIsReporting(false);
+    }
   };
 
   const handleRecordClip = () => {
@@ -1509,6 +1648,63 @@ export default function GameRoom() {
                   className="w-full py-3 bg-white/5 text-white font-bold rounded-xl hover:bg-white/10 transition-colors"
                 >
                   Cerrar
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      )}
+
+      {/* Report Result Modal */}
+      {isUiVisible && (
+      <AnimatePresence>
+        {showReportModal && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md"
+          >
+            <div className="bg-zinc-900 border border-purple-500/30 rounded-3xl p-8 max-w-md w-full text-center shadow-[0_0_50px_rgba(168,85,247,0.2)]">
+              <div className="w-20 h-20 bg-purple-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 rotate-3 border border-purple-500/20">
+                <Trophy className="w-10 h-10 text-purple-500" />
+              </div>
+              <h3 className="text-2xl font-black italic uppercase tracking-tighter text-white mb-4">Reportar Resultado</h3>
+              <p className="text-zinc-400 text-sm mb-8 leading-relaxed">
+                ¿Cuál fue el resultado de la partida? Tu reporte debe coincidir con el de tu oponente para actualizar el MMR.
+              </p>
+              <div className="flex flex-col gap-4">
+                <button 
+                  onClick={() => handleReportResult('win')}
+                  disabled={isReporting}
+                  className="w-full py-4 bg-green-600 text-white font-black uppercase tracking-widest rounded-xl hover:bg-green-500 transition-all shadow-lg shadow-green-600/20 disabled:opacity-50"
+                >
+                  {isReporting ? 'Enviando...' : 'Gané la partida'}
+                </button>
+                <button 
+                  onClick={() => handleReportResult('loss')}
+                  disabled={isReporting}
+                  className="w-full py-4 bg-red-600 text-white font-black uppercase tracking-widest rounded-xl hover:bg-red-500 transition-all shadow-lg shadow-red-600/20 disabled:opacity-50"
+                >
+                  {isReporting ? 'Enviando...' : 'Perdí la partida'}
+                </button>
+                <button 
+                  onClick={() => handleReportResult('draw')}
+                  disabled={isReporting}
+                  className="w-full py-4 bg-zinc-700 text-white font-black uppercase tracking-widest rounded-xl hover:bg-zinc-600 transition-all shadow-lg shadow-zinc-700/20 disabled:opacity-50"
+                >
+                  {isReporting ? 'Enviando...' : 'Empate'}
+                </button>
+                <button 
+                  onClick={async () => {
+                    setShowReportModal(false);
+                    await emulator.stop();
+                    navigate('/');
+                  }}
+                  className="w-full py-4 bg-transparent text-zinc-500 font-bold rounded-xl hover:text-white transition-all mt-4"
+                >
+                  Salir sin reportar
                 </button>
               </div>
             </div>

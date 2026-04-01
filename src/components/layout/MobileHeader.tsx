@@ -33,14 +33,14 @@ export default function MobileHeader() {
             </div>
           </div>
           <span className="text-xs font-black italic uppercase tracking-widest text-white">
-            RETROVERSE <span className="text-cyan-electric">OS</span>
+            RETROVERSE <span className="text-cyan-electric">SISTEMA</span>
           </span>
         </Link>
         
         {isOffline && (
           <div className="flex items-center gap-1.5 px-2 py-0.5 bg-rose-500/20 border border-rose-500/40 rounded-md animate-pulse">
             <Radio className="w-2.5 h-2.5 text-rose-500" />
-            <span className="text-[8px] font-black text-rose-500 uppercase tracking-widest">OFFLINE</span>
+            <span className="text-[8px] font-black text-rose-500 uppercase tracking-widest">DESCONECTADO</span>
           </div>
         )}
       </div>

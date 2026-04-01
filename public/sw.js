@@ -20,15 +20,18 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && cacheName !== ROM_CACHE && cacheName !== IMAGE_CACHE && cacheName.startsWith('retroos')) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    Promise.all([
+      self.clients.claim(),
+      caches.keys().then((cacheNames) => {
+        return Promise.all(
+          cacheNames.map((cacheName) => {
+            if (cacheName !== CACHE_NAME && cacheName !== ROM_CACHE && cacheName !== IMAGE_CACHE && cacheName.startsWith('retroos')) {
+              return caches.delete(cacheName);
+            }
+          })
+        );
+      })
+    ])
   );
 });
 
@@ -44,6 +47,7 @@ self.addEventListener('fetch', (event) => {
     const newHeaders = new Headers(response.headers);
     newHeaders.set('Cross-Origin-Embedder-Policy', 'require-corp');
     newHeaders.set('Cross-Origin-Opener-Policy', 'same-origin');
+    newHeaders.set('Cross-Origin-Resource-Policy', 'cross-origin');
     
     return new Response(response.body, {
       status: response.status,

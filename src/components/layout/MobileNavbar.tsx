@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Gamepad2, ShoppingBag, User, Globe, Settings, Trophy } from 'lucide-react';
+import { Gamepad2, ShoppingBag, User, Globe, Settings, Medal } from 'lucide-react';
 import { haptics } from '../../services/haptics';
 import { useUIStore } from '../../store/uiStore';
 
@@ -12,7 +12,7 @@ export default function MobileNavbar() {
   const navItems: Array<{ id: string; icon: any; label: string; path?: string; action?: () => void }> = [
     { id: 'marketplace', icon: ShoppingBag, label: 'MERCADO', path: '/marketplace' },
     { id: 'community', icon: Globe, label: 'RED', path: '/community' },
-    { id: 'achievements', icon: Trophy, label: 'LOGROS', path: '/achievements' },
+    { id: 'achievements', icon: Medal, label: 'LOGROS', path: '/achievements' },
     { id: 'settings', icon: Settings, label: 'SISTEMA', path: '/settings' },
   ];
 
@@ -48,7 +48,7 @@ export default function MobileNavbar() {
                   <div className="absolute -inset-2 bg-cyan-electric/10 rounded-full blur-md" />
                 )}
               </div>
-              <span className={`text-[9px] font-black uppercase tracking-tighter ${active ? 'opacity-100' : 'opacity-60'}`}>
+              <span className={`text-[9px] font-retro uppercase tracking-tighter ${active ? 'opacity-100' : 'opacity-60'}`}>
                 {item.label}
               </span>
             </button>

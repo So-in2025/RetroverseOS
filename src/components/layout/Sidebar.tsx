@@ -9,7 +9,9 @@ import {
   Search,
   Database,
   Trophy,
-  Coins
+  Coins,
+  Swords,
+  Medal
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../services/AuthContext';
@@ -22,7 +24,8 @@ const navItems = [
   { icon: Database, label: 'PREMIUM', path: '/premium' },
   { icon: ShoppingBag, label: 'MERCADO', path: '/marketplace' },
   { icon: Globe, label: 'NETPLAY', path: '/netplay' },
-  { icon: Trophy, label: 'LOGROS', path: '/achievements' },
+  { icon: Swords, label: 'COMPETITIVO', path: '/competitive' },
+  { icon: Medal, label: 'LOGROS', path: '/achievements' },
   { icon: Settings, label: 'SISTEMA', path: '/settings' },
 ];
 
@@ -84,7 +87,7 @@ export default function Sidebar() {
                 crossOrigin="anonymous"
               />
               <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-zinc-900 border border-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                <span className="text-[10px] font-black uppercase tracking-widest text-white">
+                <span className="text-[10px] font-retro uppercase tracking-widest text-white">
                   {user.user_metadata.full_name || 'OPERADOR'}
                 </span>
                 <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900" />
@@ -99,10 +102,10 @@ export default function Sidebar() {
         <div className="group relative w-full flex justify-center p-2 rounded-xl bg-yellow-400/10 border border-yellow-400/20 cursor-default">
           <div className="flex flex-col items-center">
             <Coins className="w-4 h-4 text-yellow-400 mb-1" />
-            <span className="text-[10px] font-black text-yellow-400">{balance}</span>
+            <span className="text-[10px] font-retro text-yellow-400">{balance}</span>
           </div>
           <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-zinc-900 border border-yellow-400/30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-            <span className="text-[10px] font-black uppercase tracking-widest text-yellow-400">
+            <span className="text-[10px] font-retro uppercase tracking-widest text-yellow-400">
               RETROCOINS
             </span>
             <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900" />
@@ -121,7 +124,7 @@ export default function Sidebar() {
         >
           <Search className="w-5 h-5" />
           <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-zinc-900 border border-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white">
+            <span className="text-[10px] font-retro uppercase tracking-widest text-white">
               BUSCAR EN LA RED
             </span>
             <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-zinc-900" />
@@ -160,7 +163,7 @@ export default function Sidebar() {
 
                 {/* Tooltip */}
                 <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-zinc-900 border border-white/10 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-white">
+                  <span className="text-[10px] font-retro uppercase tracking-widest text-white">
                     {item.label}
                   </span>
                   {/* Arrow */}
@@ -180,7 +183,7 @@ export default function Sidebar() {
         >
           <LogOut className="w-5 h-5" />
           <div className="absolute left-full ml-4 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-rose-950/90 border border-rose-500/30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
-            <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">
+            <span className="text-[10px] font-retro uppercase tracking-widest text-rose-500">
               SALIR
             </span>
           </div>

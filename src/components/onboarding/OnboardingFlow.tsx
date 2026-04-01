@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Gamepad2, Sparkles, Rocket, ChevronRight, Check, Heart, Zap, Trophy, History } from 'lucide-react';
+import { Gamepad2, Sparkles, Rocket, ChevronRight, Check, Heart, Zap, Trophy, History, Users } from 'lucide-react';
 import { economyService } from '../../services/economyService';
 import { useAuth } from '../../services/AuthContext';
 import { haptics } from '../../services/haptics';
@@ -58,16 +58,54 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) => {
 
   const steps = [
     {
-      title: "Bienvenido a Retroverse OS",
-      subtitle: "Configura tu algoritmo de descubrimiento personal.",
+      title: "Bienvenido al Retroverse",
+      subtitle: "Tu nexo definitivo con la historia del gaming.",
+      content: (
+        <div className="flex flex-col items-center text-center space-y-8 max-w-md">
+          <div className="relative">
+            <div className="absolute inset-0 bg-cyan-electric/20 blur-3xl rounded-full" />
+            <div className="w-24 h-24 rounded-3xl bg-carbon border-2 border-cyan-electric flex items-center justify-center relative z-10">
+              <Zap className="w-12 h-12 text-cyan-electric animate-pulse" />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 gap-4 text-left">
+            <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/5 border border-white/10">
+              <History className="w-5 h-5 text-cyan-electric mt-1" />
+              <div>
+                <h4 className="text-[10px] font-retro text-white uppercase tracking-widest mb-1">Nostalgia Pura</h4>
+                <p className="text-[9px] text-zinc-500 uppercase leading-relaxed">Miles de clásicos listos para jugar instantáneamente en tu navegador.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/5 border border-white/10">
+              <Trophy className="w-5 h-5 text-magenta-accent mt-1" />
+              <div>
+                <h4 className="text-[10px] font-retro text-white uppercase tracking-widest mb-1">Competencia Global</h4>
+                <p className="text-[9px] text-zinc-500 uppercase leading-relaxed">Arena competitiva con MMR, rankings y torneos en vivo.</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/5 border border-white/10">
+              <Users className="w-5 h-5 text-yellow-400 mt-1" />
+              <div>
+                <h4 className="text-[10px] font-retro text-white uppercase tracking-widest mb-1">Comunidad Activa</h4>
+                <p className="text-[9px] text-zinc-500 uppercase leading-relaxed">Conecta con otros pilotos, comparte logros y forja tu leyenda.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      title: "Configura tu Enlace Neural",
+      subtitle: "Personaliza tu algoritmo de descubrimiento.",
       content: (
         <div className="flex flex-col items-center text-center space-y-6">
           <div className="relative">
             <div className="absolute inset-0 bg-cyan-electric/20 blur-3xl rounded-full" />
             <Gamepad2 className="w-24 h-24 text-cyan-electric relative z-10 animate-pulse" />
           </div>
-          <p className="text-zinc-400 max-w-xs">
-            Nuestra IA de fondo analizará tus gustos para que nunca pierdas tiempo buscando qué jugar.
+          <p className="text-zinc-400 max-w-xs text-sm">
+            Nuestra IA analizará tus gustos para que nunca pierdas tiempo buscando qué jugar.
           </p>
         </div>
       )

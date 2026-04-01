@@ -1,8 +1,11 @@
 import { GameObject } from './metadataNormalization';
 
 const getUrls = (sys: string, title: string) => {
-  const eSys = encodeURIComponent(sys.replace(/ /g, '_'));
-  const eTitle = encodeURIComponent(title.replace(/[&*/:`<>?\|"]/g, '_'));
+  const eSys = sys.replace(/ /g, '_');
+  // Libretro thumbnails replace : with _ and / with _
+  const cleanTitle = title.replace(/[:\/]/g, '_');
+  // Use encodeURI instead of encodeURIComponent to keep ( ) , & etc.
+  const eTitle = encodeURI(cleanTitle);
   return {
     cover: `https://raw.githubusercontent.com/libretro-thumbnails/${eSys}/master/Named_Boxarts/${eTitle}.png`,
     art: `https://raw.githubusercontent.com/libretro-thumbnails/${eSys}/master/Named_Snaps/${eTitle}.png`
@@ -15,6 +18,7 @@ const GEN = 'Sega - Mega Drive - Genesis';
 const GBA = 'Nintendo - Game Boy Advance';
 const N64 = 'Nintendo - Nintendo 64';
 const PSX = 'Sony - PlayStation';
+const ARCADE = 'FBNeo - Arcade Games';
 
 // Myrient Base URLs
 const MYRIENT_NES = 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Nintendo%20Entertainment%20System%20%28Headered%29';
@@ -23,6 +27,7 @@ const MYRIENT_GEN = 'https://myrient.erista.me/files/No-Intro/Sega%20-%20Mega%20
 const MYRIENT_GBA = 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Game%20Boy%20Advance';
 const MYRIENT_N64 = 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Nintendo%2064%20%28BigEndian%29';
 const MYRIENT_PSX = 'https://myrient.erista.me/files/Redump/Sony%20-%20PlayStation';
+const MYRIENT_ARCADE = 'https://myrient.erista.me/files/MAME/MAME%200.78%20ROMs%20%28Merged%29';
 
 export const STATIC_CORE_CATALOG: GameObject[] = [
   // NES
@@ -205,7 +210,8 @@ export const STATIC_CORE_CATALOG: GameObject[] = [
     emulator_core: 'snes9x',
     compatibility_status: 'verified',
     checksum: null,
-    playable: true
+    playable: true,
+    is_arena: true
   },
   {
     game_id: 'DonkeyKongCountryUSA',
@@ -314,7 +320,8 @@ export const STATIC_CORE_CATALOG: GameObject[] = [
     emulator_core: 'genesis_plus_gx',
     compatibility_status: 'verified',
     checksum: null,
-    playable: true
+    playable: true,
+    is_arena: true
   },
   // GBA
   {
@@ -460,7 +467,8 @@ export const STATIC_CORE_CATALOG: GameObject[] = [
     emulator_core: 'mupen64plus_next',
     compatibility_status: 'verified',
     checksum: null,
-    playable: true
+    playable: true,
+    is_arena: true
   },
   {
     game_id: 'LegendOfZeldaOcarinaOfTimeUSA',
@@ -496,7 +504,8 @@ export const STATIC_CORE_CATALOG: GameObject[] = [
     emulator_core: 'mupen64plus_next',
     compatibility_status: 'verified',
     checksum: null,
-    playable: true
+    playable: true,
+    is_arena: true
   },
   // PSX
   {
@@ -533,7 +542,8 @@ export const STATIC_CORE_CATALOG: GameObject[] = [
     emulator_core: 'pcsx_rearmed',
     compatibility_status: 'verified',
     checksum: null,
-    playable: true
+    playable: true,
+    is_arena: true
   },
   {
     game_id: 'MetalGearSolidUSA',
@@ -588,6 +598,63 @@ export const STATIC_CORE_CATALOG: GameObject[] = [
     compatibility_status: 'verified',
     checksum: null,
     playable: true
+  },
+  {
+    game_id: 'TetrisUSA',
+    title: 'Tetris',
+    system: 'NES',
+    system_id: 'nes',
+    year: 1989,
+    publisher: 'Nintendo',
+    developer: 'Nintendo',
+    players: 1,
+    rom_url: `${MYRIENT_NES}/Tetris%20%28USA%29.zip`,
+    cover_url: getUrls(NES, 'Tetris (USA)').cover,
+    artwork_url: getUrls(NES, 'Tetris (USA)').art,
+    rom_size: 40960,
+    emulator_core: 'fceumm',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'NBAJamTEUSA',
+    title: 'NBA Jam Tournament Edition',
+    system: 'SNES',
+    system_id: 'snes',
+    year: 1994,
+    publisher: 'Acclaim',
+    developer: 'Iguana',
+    players: 4,
+    rom_url: `${MYRIENT_SNES}/NBA%20Jam%20Tournament%20Edition%20%28USA%29.zip`,
+    cover_url: getUrls(SNES, 'NBA Jam - Tournament Edition (USA)').cover,
+    artwork_url: getUrls(SNES, 'NBA Jam - Tournament Edition (USA)').art,
+    rom_size: 3145728,
+    emulator_core: 'snes9x',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'KillerInstinctUSA',
+    title: 'Killer Instinct',
+    system: 'SNES',
+    system_id: 'snes',
+    year: 1995,
+    publisher: 'Nintendo',
+    developer: 'Rare',
+    players: 2,
+    rom_url: `${MYRIENT_SNES}/Killer%20Instinct%20%28USA%29%20%28v1.1%29.zip`,
+    cover_url: getUrls(SNES, 'Killer Instinct (USA)').cover,
+    artwork_url: getUrls(SNES, 'Killer Instinct (USA)').art,
+    rom_size: 4194304,
+    emulator_core: 'snes9x',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
   },
   // NEW ADDITIONS - NES
   {
@@ -679,7 +746,8 @@ export const STATIC_CORE_CATALOG: GameObject[] = [
     emulator_core: 'snes9x',
     compatibility_status: 'verified',
     checksum: null,
-    playable: true
+    playable: true,
+    is_arena: true
   },
   {
     game_id: 'StarFoxUSA',
@@ -1320,7 +1388,8 @@ export const STATIC_CORE_CATALOG: GameObject[] = [
     emulator_core: 'snes9x',
     compatibility_status: 'verified',
     checksum: null,
-    playable: true
+    playable: true,
+    is_arena: true
   },
   {
     game_id: 'TMNTIVUSA',
@@ -1884,7 +1953,8 @@ export const STATIC_CORE_CATALOG: GameObject[] = [
     emulator_core: 'mupen64plus_next',
     compatibility_status: 'verified',
     checksum: null,
-    playable: true
+    playable: true,
+    is_arena: true
   },
   {
     game_id: 'LegendOfZeldaOcarinaOfTimeUSA',
@@ -1938,7 +2008,8 @@ export const STATIC_CORE_CATALOG: GameObject[] = [
     emulator_core: 'mupen64plus_next',
     compatibility_status: 'verified',
     checksum: null,
-    playable: true
+    playable: true,
+    is_arena: true
   },
   {
     game_id: 'GoldenEye007USA',
@@ -2300,5 +2371,291 @@ export const STATIC_CORE_CATALOG: GameObject[] = [
     compatibility_status: 'verified',
     checksum: null,
     playable: true
+  },
+  // ARENA COMPETITIVA - NEW TITLES
+  {
+    game_id: 'UMK3Arcade',
+    title: 'Ultimate Mortal Kombat 3',
+    system: 'Arcade',
+    system_id: 'mame',
+    year: 1995,
+    publisher: 'Midway',
+    developer: 'Midway',
+    players: 2,
+    rom_url: `${MYRIENT_ARCADE}/umk3.zip`,
+    cover_url: getUrls(ARCADE, 'Ultimate Mortal Kombat 3 (rev 1.2)').cover,
+    artwork_url: getUrls(ARCADE, 'Ultimate Mortal Kombat 3 (rev 1.2)').art,
+    rom_size: 20000000,
+    emulator_core: 'mame2003_plus',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'MvCArcade',
+    title: 'Marvel vs. Capcom: Clash of Super Heroes',
+    system: 'Arcade',
+    system_id: 'mame',
+    year: 1998,
+    publisher: 'Capcom',
+    developer: 'Capcom',
+    players: 2,
+    rom_url: `${MYRIENT_ARCADE}/mvsc.zip`,
+    cover_url: getUrls(ARCADE, 'Marvel vs. Capcom - Clash of Super Heroes').cover,
+    artwork_url: getUrls(ARCADE, 'Marvel vs. Capcom - Clash of Super Heroes').art,
+    rom_size: 30000000,
+    emulator_core: 'mame2003_plus',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'CrashTeamRacingUSA',
+    title: 'Crash Team Racing',
+    system: 'PSX',
+    system_id: 'psx',
+    year: 1999,
+    publisher: 'Sony Computer Entertainment',
+    developer: 'Naughty Dog',
+    players: 4,
+    rom_url: `${MYRIENT_PSX}/Crash%20Team%20Racing%20%28USA%29.zip`,
+    cover_url: getUrls(PSX, 'Crash Team Racing (USA)').cover,
+    artwork_url: getUrls(PSX, 'Crash Team Racing (USA)').art,
+    rom_size: 400000000,
+    emulator_core: 'pcsx_rearmed',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'FZeroXUSA',
+    title: 'F-Zero X',
+    system: 'N64',
+    system_id: 'n64',
+    year: 1998,
+    publisher: 'Nintendo',
+    developer: 'Nintendo',
+    players: 4,
+    rom_url: `${MYRIENT_N64}/F-Zero%20X%20%28USA%29.zip`,
+    cover_url: getUrls(N64, 'F-Zero X (USA)').cover,
+    artwork_url: getUrls(N64, 'F-Zero X (USA)').art,
+    rom_size: 16777216,
+    emulator_core: 'mupen64plus_next',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'TopGearUSA',
+    title: 'Top Gear',
+    system: 'SNES',
+    system_id: 'snes',
+    year: 1992,
+    publisher: 'Kemco',
+    developer: 'Gremlin Graphics',
+    players: 2,
+    rom_url: `${MYRIENT_SNES}/Top%20Gear%20%28USA%29.zip`,
+    cover_url: getUrls(SNES, 'Top Gear (USA)').cover,
+    artwork_url: getUrls(SNES, 'Top Gear (USA)').art,
+    rom_size: 524288,
+    emulator_core: 'snes9x',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'ISSProEvolutionEurope',
+    title: 'ISS Pro Evolution',
+    system: 'PSX',
+    system_id: 'psx',
+    year: 1999,
+    publisher: 'Konami',
+    developer: 'Konami',
+    players: 2,
+    rom_url: `${MYRIENT_PSX}/ISS%20Pro%20Evolution%20%28Europe%29.zip`,
+    cover_url: getUrls(PSX, 'ISS Pro Evolution (Europe)').cover,
+    artwork_url: getUrls(PSX, 'ISS Pro Evolution (Europe)').art,
+    rom_size: 500000000,
+    emulator_core: 'pcsx_rearmed',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'FIFA98RoadToWorldCupUSA',
+    title: 'FIFA 98: Road to World Cup',
+    system: 'PSX',
+    system_id: 'psx',
+    year: 1997,
+    publisher: 'EA Sports',
+    developer: 'EA Canada',
+    players: 2,
+    rom_url: `${MYRIENT_PSX}/FIFA%2098%20-%20Road%20to%20World%20Cup%20%28USA%29.zip`,
+    cover_url: getUrls(PSX, 'FIFA 98 - Road to World Cup (USA)').cover,
+    artwork_url: getUrls(PSX, 'FIFA 98 - Road to World Cup (USA)').art,
+    rom_size: 500000000,
+    emulator_core: 'pcsx_rearmed',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'TecmoSuperBowlUSA',
+    title: 'Tecmo Super Bowl',
+    system: 'NES',
+    system_id: 'nes',
+    year: 1991,
+    publisher: 'Tecmo',
+    developer: 'Tecmo',
+    players: 2,
+    rom_url: `${MYRIENT_NES}/Tecmo%20Super%20Bowl%20%28USA%29.zip`,
+    cover_url: getUrls(NES, 'Tecmo Super Bowl (USA)').cover,
+    artwork_url: getUrls(NES, 'Tecmo Super Bowl (USA)').art,
+    rom_size: 393232,
+    emulator_core: 'fceumm',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'MetalSlugArcade',
+    title: 'Metal Slug - Super Vehicle-001',
+    system: 'Arcade',
+    system_id: 'mame',
+    year: 1996,
+    publisher: 'SNK',
+    developer: 'Nazca',
+    players: 2,
+    rom_url: `${MYRIENT_ARCADE}/mslug.zip`,
+    cover_url: getUrls(ARCADE, 'Metal Slug - Super Vehicle-001').cover,
+    artwork_url: getUrls(ARCADE, 'Metal Slug - Super Vehicle-001').art,
+    rom_size: 20000000,
+    emulator_core: 'mame2003_plus',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'SnowBrosArcade',
+    title: 'Snow Bros. - Nick & Tom',
+    system: 'Arcade',
+    system_id: 'mame',
+    year: 1990,
+    publisher: 'Toaplan',
+    developer: 'Toaplan',
+    players: 2,
+    rom_url: `${MYRIENT_ARCADE}/snowbros.zip`,
+    cover_url: getUrls(ARCADE, 'Snow Bros. - Nick & Tom (set 1)').cover,
+    artwork_url: getUrls(ARCADE, 'Snow Bros. - Nick & Tom (set 1)').art,
+    rom_size: 1000000,
+    emulator_core: 'mame2003_plus',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'PuyoPuyoSNES',
+    title: 'Puyo Puyo',
+    system: 'SNES',
+    system_id: 'snes',
+    year: 1993,
+    publisher: 'Banpresto',
+    developer: 'Compile',
+    players: 2,
+    rom_url: `${MYRIENT_SNES}/Puyo%20Puyo%20%28Japan%29.zip`,
+    cover_url: getUrls(SNES, 'Puyo Puyo (Japan)').cover,
+    artwork_url: getUrls(SNES, 'Puyo Puyo (Japan)').art,
+    rom_size: 524288,
+    emulator_core: 'snes9x',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'DrMarioUSA',
+    title: 'Dr. Mario',
+    system: 'NES',
+    system_id: 'nes',
+    year: 1990,
+    publisher: 'Nintendo',
+    developer: 'Nintendo',
+    players: 2,
+    rom_url: `${MYRIENT_NES}/Dr.%20Mario%20%28USA%29.zip`,
+    cover_url: getUrls(NES, 'Dr. Mario (USA)').cover,
+    artwork_url: getUrls(NES, 'Dr. Mario (USA)').art,
+    rom_size: 40960,
+    emulator_core: 'fceumm',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'BustAMoveSNES',
+    title: 'Bust-A-Move',
+    system: 'SNES',
+    system_id: 'snes',
+    year: 1995,
+    publisher: 'Taito',
+    developer: 'Taito',
+    players: 2,
+    rom_url: `${MYRIENT_SNES}/Bust-A-Move%20%28USA%29.zip`,
+    cover_url: getUrls(SNES, 'Bust-A-Move (USA)').cover,
+    artwork_url: getUrls(SNES, 'Bust-A-Move (USA)').art,
+    rom_size: 1048576,
+    emulator_core: 'snes9x',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: '1942Arcade',
+    title: '1942',
+    system: 'Arcade',
+    system_id: 'mame',
+    year: 1984,
+    publisher: 'Capcom',
+    developer: 'Capcom',
+    players: 2,
+    rom_url: `${MYRIENT_ARCADE}/1942.zip`,
+    cover_url: getUrls(ARCADE, '1942 (set 1)').cover,
+    artwork_url: getUrls(ARCADE, '1942 (set 1)').art,
+    rom_size: 500000,
+    emulator_core: 'mame2003_plus',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
+  },
+  {
+    game_id: 'GradiusArcade',
+    title: 'Gradius',
+    system: 'Arcade',
+    system_id: 'mame',
+    year: 1985,
+    publisher: 'Konami',
+    developer: 'Konami',
+    players: 2,
+    rom_url: `${MYRIENT_ARCADE}/gradius.zip`,
+    cover_url: getUrls(ARCADE, 'Gradius (set 1)').cover,
+    artwork_url: getUrls(ARCADE, 'Gradius (set 1)').art,
+    rom_size: 500000,
+    emulator_core: 'mame2003_plus',
+    compatibility_status: 'verified',
+    checksum: null,
+    playable: true,
+    is_arena: true
   }
 ];

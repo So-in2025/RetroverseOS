@@ -108,7 +108,11 @@ export const GameCover: React.FC<GameCoverProps> = ({
     console.log(`[Cover] Attempting load for ${title} (ID: ${gameId}) - Source ${sourceIndex + 1}/${sources.length}: ${url}`);
 
     // Use proxy for all external loads to satisfy COEP/CORP requirements
-    const proxiedUrl = (url.startsWith('blob:') || url.startsWith('/')) 
+    // BUT: Skip our tunnel if the URL is already an image proxy (wsrv.nl, weserv.nl, bing.net)
+    // as these proxies already handle CORS and resizing, and double-proxying adds latency and risk.
+    const isAlreadyProxied = url.includes('wsrv.nl') || url.includes('weserv.nl') || url.includes('tse2.mm.bing.net');
+    
+    const proxiedUrl = (url.startsWith('blob:') || url.startsWith('/') || isAlreadyProxied) 
       ? url 
       : `/api/tunnel?url=${encodeURIComponent(url)}`;
     

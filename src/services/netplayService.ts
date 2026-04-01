@@ -69,12 +69,14 @@ class NetplayService {
       return false;
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('netplay_rooms')
       .update({ players_count: 2, status: 'playing' })
-      .eq('id', roomId);
+      .eq('id', roomId)
+      .select()
+      .single();
 
-    if (error) {
+    if (error || !data) {
       console.error('Error joining room:', error);
       return false;
     }

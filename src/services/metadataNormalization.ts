@@ -21,6 +21,7 @@ export interface GameObject {
   compatibility_status: 'compatible' | 'unstable' | 'broken' | 'untested' | 'verified' | 'unknown';
   checksum: string | null;
   playable?: boolean;
+  is_arena?: boolean;
   added_at?: number; // Timestamp when added to local catalog
 }
 
@@ -114,10 +115,15 @@ export const ELITE_TOP_20 = [
 
 export class MetadataNormalizationEngine {
   
-  public static async resolveRomUrl(gameId: string, system?: string): Promise<string | null> {
-    const maxRetries = 4;
-    let attempt = 0;
+  private static readonly PROXIES = [
+    { name: 'LocalTunnel', url: '/api/tunnel?url=', timeout: 45000 },
+    { name: 'Direct', url: '', timeout: 15000 },
+    { name: 'CorsProxy', url: 'https://corsproxy.io/?', timeout: 25000 },
+    { name: 'CodeTabs', url: 'https://api.codetabs.com/v1/proxy?quest=', timeout: 25000 },
+    { name: 'AllOrigins', url: 'https://api.allorigins.win/raw?url=', timeout: 25000 }
+  ];
 
+  public static async resolveRomUrl(gameId: string, system?: string): Promise<string | null> {
     let identifier = gameId;
     let targetRomName: string | null = null;
 
@@ -125,70 +131,65 @@ export class MetadataNormalizationEngine {
       const firstSlash = gameId.indexOf('/');
       identifier = gameId.substring(0, firstSlash);
       targetRomName = gameId.substring(firstSlash + 1);
-    } else {
-      // Legacy format or just an identifier
-      // We don't know if it's identifier_romname or just identifier.
-      // We'll assume the whole thing is the identifier first. If it fails, we'll try splitting.
-      // But for now, let's just use the whole thing as identifier.
-      identifier = gameId;
-      targetRomName = null;
     }
 
-    while (attempt < maxRetries) {
+    const metaTargetUrl = `https://archive.org/metadata/${identifier}`;
+    let lastError = "";
+
+    for (const proxy of this.PROXIES) {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout per attempt
+      const timeoutId = setTimeout(() => controller.abort(), proxy.timeout || 30000);
 
       try {
-        const metaTargetUrl = `https://archive.org/metadata/${identifier}`;
-        const proxyUrl = `/api/tunnel?url=${encodeURIComponent(metaTargetUrl)}`;
-        
-        let response;
-        try {
-          console.log(`[RomResolver] Fetching metadata for ${identifier} (Attempt ${attempt + 1}/${maxRetries})`);
-          response = await fetch(proxyUrl, { signal: controller.signal });
-        } catch (e: any) {
-          console.warn(`[RomResolver] Proxy failed for ${identifier}: ${e.message}`);
-          
-          // If it's the last attempt, try direct
-          if (attempt === maxRetries - 1) {
-            console.log(`[RomResolver] Final attempt for ${identifier}, trying direct...`);
-            try {
-              response = await fetch(metaTargetUrl, { signal: controller.signal });
-            } catch (e2: any) {
-              console.error(`[RomResolver] Direct fetch also failed for ${identifier}:`, e2.message);
-              throw e2;
-            }
-          } else {
-            throw e;
-          }
+        let fetchUrl = metaTargetUrl;
+        if (proxy.name === 'CorsProxy') {
+          fetchUrl = `${proxy.url}${metaTargetUrl}`;
+        } else if (proxy.url) {
+          fetchUrl = `${proxy.url}${encodeURIComponent(metaTargetUrl)}`;
         }
-        
-        if (response && response.ok) {
+
+        console.log(`[RomResolver] Fetching metadata for ${identifier} via ${proxy.name}`);
+        const response = await fetch(fetchUrl, { 
+          signal: controller.signal,
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
+          }
+        });
+
+        if (response.ok) {
           const text = await response.text();
           
           if (!text || text.trim() === '' || text.trim().toLowerCase().startsWith('<!doctype')) {
-             throw new Error("Received HTML or empty response instead of JSON from Archive.org");
+             throw new Error("Received HTML or empty response instead of JSON");
           }
-
+          
           let metaData;
           try {
             metaData = JSON.parse(text);
           } catch (parseError) {
-            console.error(`[RomResolver] Failed to parse JSON for ${identifier}:`, text.substring(0, 100));
-            throw new Error("Invalid JSON response from Archive.org");
+            throw new Error("Invalid JSON response");
+          }
+
+          // Skip restricted or dark items
+          if (metaData.metadata?.is_dark === 'true' || 
+              metaData.metadata?.access_restricted_item === 'true' ||
+              metaData.is_dark || 
+              metaData.is_restricted) {
+            console.warn(`[RomResolver] Item is restricted or dark: ${identifier}`);
+            clearTimeout(timeoutId);
+            return null;
           }
 
           if (metaData && metaData.files) {
             let romFile: ArchiveFile | null = null;
 
             if (targetRomName) {
-              // Try to find the specific ROM file by its exact name or sanitized name
               romFile = metaData.files.find((f: ArchiveFile) => 
                 f.name === targetRomName || f.name.replace(/[^a-zA-Z0-9]/g, '_') === targetRomName
               ) || null;
             }
 
-            // Fallback to finding the main ROM if not found or no targetRomName
             if (!romFile) {
               let validExtensions: string[] = [];
               if (system === 'nes') validExtensions = ['.nes', '.zip'];
@@ -214,51 +215,46 @@ export class MetadataNormalizationEngine {
               clearTimeout(timeoutId);
               const encodedName = romFile.name.split('/').map((part: string) => encodeURIComponent(part)).join('/');
               return `https://archive.org/download/${identifier}/${encodedName}`;
-            } else {
-              console.warn(`[RomResolver] No valid ROM file found in metadata for ${identifier}.`);
-              clearTimeout(timeoutId);
-              return null; 
             }
-          } else {
-            console.warn(`[RomResolver] No files found in metadata for ${identifier}`);
-            clearTimeout(timeoutId);
-            return null;
           }
-        } else if (response) {
-          console.warn(`[RomResolver] Metadata fetch failed for ${identifier} with status ${response.status}`);
-          if (response.status === 404) {
-            if (!gameId.includes('/') && gameId.includes('_') && identifier === gameId) {
-              // Try legacy format fallback
-              const parts = gameId.split('_');
-              identifier = parts[0];
-              targetRomName = parts.slice(1).join('_');
-              console.log(`[RomResolver] Fallback to legacy format: ${identifier}`);
-              continue; // Retry with new identifier
-            }
+          throw new Error("No valid ROM file found in metadata");
+        } else if (response.status === 404) {
+          // Try legacy format fallback if not already tried
+          if (!gameId.includes('/') && gameId.includes('_') && identifier === gameId) {
+            const parts = gameId.split('_');
+            identifier = parts[0];
+            targetRomName = parts.slice(1).join('_');
+            console.log(`[RomResolver] Fallback to legacy format: ${identifier}`);
+            // We need to restart the loop with the new identifier
+            // For simplicity, we'll just return the result of a recursive call with the new ID
             clearTimeout(timeoutId);
-            return null;
+            return this.resolveRomUrl(`${identifier}/${targetRomName}`, system);
           }
-          throw new Error(`HTTP ${response.status}`);
+          clearTimeout(timeoutId);
+          return null;
         }
+        throw new Error(`HTTP ${response.status}`);
       } catch (e: any) {
-        attempt++;
-        console.error(`[RomResolver] Attempt ${attempt} failed for ${identifier}:`, e.message);
-        if (attempt < maxRetries) {
-          // Exponential backoff with jitter
-          const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
-          await new Promise(resolve => setTimeout(resolve, delay));
-        } else {
-          break;
-        }
+        lastError = e.message;
+        console.warn(`[RomResolver] Proxy ${proxy.name} failed for ${identifier}: ${lastError}`);
       } finally {
         clearTimeout(timeoutId);
       }
     }
+
+    console.error(`[RomResolver] All proxies failed for ${identifier}. Last error: ${lastError}`);
     return null;
   }
 
   public static normalizeFast(doc: any): GameObject[] {
     const identifier = doc.identifier;
+    
+    // Skip restricted or dark items
+    if (doc.is_dark === 'true' || doc.access_restricted_item === 'true' || doc.is_dark === true || doc.is_restricted === true) {
+      console.log(`[Metadata] Skipping restricted item in search: ${identifier}`);
+      return [];
+    }
+
     const collection = Array.isArray(doc.collection) ? doc.collection[0] : doc.collection;
     
     let systemKey = '';
@@ -327,7 +323,7 @@ export class MetadataNormalizationEngine {
       for (const f of romFiles) {
         const fileName = typeof f === 'string' ? f : f.name;
         const cleanTitle = this.cleanTitle(fileName);
-        const gameId = `${identifier}_${fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const gameId = `${identifier}/${fileName}`;
         
         // Use a more specific title for cover resolution (keep tags like (USA), (Disc 1), etc.)
         const specificTitle = fileName.replace(/_/g, ' ').replace(/\.[^/.]+$/, "");
@@ -504,7 +500,7 @@ export class MetadataNormalizationEngine {
 
       const currentMapping = SYSTEM_MAPPINGS[currentSystemKey] || SYSTEM_MAPPINGS['Unknown'];
       const cleanTitle = this.cleanTitle(romFile.name);
-      const gameId = `${rawData.identifier}_${romFile.name.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const gameId = `${rawData.identifier}/${romFile.name}`;
       
       const encodedRomName = romFile.name.split('/').map((part: string) => encodeURIComponent(part)).join('/');
       const romUrl = `https://archive.org/download/${rawData.identifier}/${encodedRomName}`;
@@ -775,15 +771,6 @@ export class MetadataNormalizationEngine {
    * Filters by 'No-Intro' or 'Ghostlight' collections.
    */
   public static async searchArchiveOrg(query: string, system?: string, rows: number = 100, page: number = 1): Promise<GameObject[]> {
-    // PROXY ROTATION STRATEGY
-    const proxies = [
-      { name: 'LocalTunnel', url: '/api/tunnel?url=', timeout: 45000 },
-      { name: 'Direct', url: '', timeout: 15000 },
-      { name: 'CorsProxy', url: 'https://corsproxy.io/?', timeout: 25000 },
-      { name: 'CodeTabs', url: 'https://api.codetabs.com/v1/proxy?quest=', timeout: 25000 },
-      { name: 'AllOrigins', url: 'https://api.allorigins.win/raw?url=', timeout: 25000 }
-    ];
-
     // Simplified Query Strategy: "OR" everything to avoid complexity errors
     const systemSubjects: Record<string, string[]> = {
       'arcade': ['mame', 'arcade', 'neogeo'],
@@ -835,7 +822,7 @@ export class MetadataNormalizationEngine {
     }
 
     const sort = 'downloads+desc';
-    const flParams = ['identifier', 'title', 'description', 'creator', 'date', 'subject', 'collection', 'files']
+    const flParams = ['identifier', 'title', 'description', 'creator', 'date', 'subject', 'collection', 'files', 'is_dark', 'access_restricted_item']
       .map(f => `fl[]=${f}`).join('&');
 
     // Primary and Fallback Queries
@@ -862,7 +849,7 @@ export class MetadataNormalizationEngine {
     for (const currentQ of queries) {
       if (searchData || (Date.now() - startTime > globalTimeout)) break;
 
-      for (const proxy of (proxies as any[])) {
+      for (const proxy of (this.PROXIES as any[])) {
         if (searchData || (Date.now() - startTime > globalTimeout)) break;
 
         const endpoints = [];

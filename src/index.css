@@ -17,6 +17,10 @@
   --accent: #ff00ff;
 }
 
+html {
+  font-size: 14px;
+}
+
 body {
   background-color: var(--bg);
   color: var(--ink);

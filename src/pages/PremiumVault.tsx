@@ -113,20 +113,20 @@ export default function PremiumVault() {
                 <Database className="w-8 h-8 text-cyan-electric" />
               </div>
               <div>
-                <h1 className="text-4xl font-black italic uppercase tracking-tighter">BÓVEDA <span className="text-cyan-electric">PREMIUM</span></h1>
-                <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">Acceso de Nivel 5: Sistemas de Alta Fidelidad</p>
+                <h1 className="text-4xl font-retro italic uppercase tracking-tighter">BÓVEDA <span className="text-cyan-electric">PREMIUM</span></h1>
+                <p className="text-[10px] font-retro text-zinc-500 uppercase tracking-widest mt-1">Acceso de Nivel 5: Sistemas de Alta Fidelidad</p>
               </div>
             </div>
             <p className="text-zinc-400 max-w-2xl text-sm leading-relaxed">
               Explora el catálogo definitivo de consolas de sexta y séptima generación. 
-              Nuestra tecnología de <span className="text-emerald-400 font-bold">Edge Computing</span> permite gestionar descargas masivas y emulación de alto rendimiento directamente desde la Red.
+              Nuestra tecnología de <span className="text-emerald-400 font-retro">Edge Computing</span> permite gestionar descargas masivas y emulación de alto rendimiento directamente desde la Red.
             </p>
           </div>
           
           <div className="flex items-center gap-4 bg-zinc-900/50 border border-white/5 p-4 rounded-2xl backdrop-blur-xl">
             <div className="text-right">
-              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Estado del Servidor</p>
-              <p className="text-xs font-black text-emerald-500 uppercase tracking-tight">ÓPTIMO / 1.2 GBPS</p>
+              <p className="text-[10px] font-retro text-zinc-500 uppercase tracking-widest">Estado del Servidor</p>
+              <p className="text-xs font-retro text-emerald-500 uppercase tracking-tight">ÓPTIMO / 1.2 GBPS</p>
             </div>
             <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
               <Zap className="w-5 h-5 text-emerald-500 animate-pulse" />
@@ -146,7 +146,7 @@ export default function PremiumVault() {
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="BUSCAR TÍTULO PREMIUM (EJ: GOD OF WAR, HALO, SMASH...)"
-              className="w-full bg-transparent border-none pl-14 pr-6 py-5 text-sm font-bold uppercase tracking-widest focus:ring-0 placeholder:text-zinc-700"
+              className="w-full bg-transparent border-none pl-14 pr-6 py-5 text-sm font-retro uppercase tracking-widest focus:ring-0 placeholder:text-zinc-700"
             />
           </div>
           <div className="flex gap-2 p-2 bg-black/40 rounded-2xl overflow-x-auto hide-scrollbar">
@@ -155,7 +155,7 @@ export default function PremiumVault() {
                 key={sys.id}
                 onClick={() => setSelectedSystem(sys.id)}
                 className={`
-                  px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2
+                  px-6 py-3 rounded-xl text-[10px] font-retro uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2
                   ${selectedSystem === sys.id 
                     ? 'bg-white text-black shadow-xl' 
                     : 'text-zinc-500 hover:text-white hover:bg-white/5'}
@@ -168,7 +168,7 @@ export default function PremiumVault() {
           </div>
           <button 
             onClick={handleSearch}
-            className="px-10 py-5 bg-cyan-electric text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-cyan-electric/80 transition-all shadow-[0_0_30px_rgba(0,242,255,0.3)]"
+            className="px-10 py-5 bg-cyan-electric text-black rounded-2xl font-retro text-xs uppercase tracking-widest hover:bg-cyan-electric/80 transition-all shadow-[0_0_30px_rgba(0,242,255,0.3)]"
           >
             LOCALIZAR
           </button>
@@ -180,7 +180,7 @@ export default function PremiumVault() {
         {loading ? (
           <div className="py-24 flex flex-col items-center justify-center gap-6">
             <Loader2 className="w-12 h-12 text-cyan-electric animate-spin" />
-            <p className="text-xs font-black text-zinc-500 uppercase tracking-widest animate-pulse">Sincronizando con la Bóveda de Archive.org...</p>
+            <p className="text-xs font-retro text-zinc-500 uppercase tracking-widest animate-pulse">Sincronizando con la Bóveda de Archive.org...</p>
           </div>
         ) : results.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -201,20 +201,20 @@ export default function PremiumVault() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent" />
                   <div className="absolute top-4 left-4 flex gap-2">
-                    <span className="px-3 py-1 bg-black/80 backdrop-blur-md rounded-lg text-[8px] font-black text-white border border-white/10 uppercase tracking-widest">
+                    <span className="px-3 py-1 bg-black/80 backdrop-blur-md rounded-lg text-[8px] font-retro text-white border border-white/10 uppercase tracking-widest">
                       {game.system_id}
                     </span>
-                    <span className="px-3 py-1 bg-cyan-electric/20 backdrop-blur-md rounded-lg text-[8px] font-black text-cyan-electric border border-cyan-electric/30 uppercase tracking-widest">
+                    <span className="px-3 py-1 bg-cyan-electric/20 backdrop-blur-md rounded-lg text-[8px] font-retro text-cyan-electric border border-cyan-electric/30 uppercase tracking-widest">
                       PREMIUM
                     </span>
                   </div>
                 </div>
 
                 <div className="p-6">
-                  <h3 className="text-xl font-black italic uppercase tracking-tighter mb-2 group-hover:text-cyan-electric transition-colors">
+                  <h3 className="text-xl font-retro italic uppercase tracking-tighter mb-2 group-hover:text-cyan-electric transition-colors">
                     {game.title}
                   </h3>
-                  <p className="text-zinc-500 text-xs mb-6 line-clamp-2 uppercase font-bold leading-relaxed">
+                  <p className="text-zinc-500 text-xs mb-6 line-clamp-2 uppercase font-retro leading-relaxed">
                     {game.description}
                   </p>
 
@@ -222,12 +222,12 @@ export default function PremiumVault() {
                     <button 
                       onClick={() => handleDownload(game)}
                       disabled={downloadingId === game.game_id}
-                      className="flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      className="flex items-center justify-center gap-2 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-retro uppercase tracking-widest transition-all"
                     >
                       {downloadingId === game.game_id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
                       {downloadingId === game.game_id ? 'VERIFICANDO...' : 'DESCARGAR'}
                     </button>
-                    <button className="flex items-center justify-center gap-2 py-3 bg-cyan-electric/10 hover:bg-cyan-electric/20 border border-cyan-electric/20 text-cyan-electric rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                    <button className="flex items-center justify-center gap-2 py-3 bg-cyan-electric/10 hover:bg-cyan-electric/20 border border-cyan-electric/20 text-cyan-electric rounded-xl text-[10px] font-retro uppercase tracking-widest transition-all">
                       <Play className="w-4 h-4 fill-current" /> JUGAR
                     </button>
                   </div>
@@ -235,19 +235,19 @@ export default function PremiumVault() {
 
                 {/* Technical Specs Overlay */}
                 <div className="absolute inset-0 bg-zinc-950/95 backdrop-blur-xl p-8 opacity-0 group-hover:opacity-0 transition-opacity flex flex-col justify-center">
-                  <h4 className="text-cyan-electric font-black text-xs uppercase tracking-widest mb-6">Especificaciones de Enlace</h4>
+                  <h4 className="text-cyan-electric font-retro text-xs uppercase tracking-widest mb-6">Especificaciones de Enlace</h4>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                      <span className="text-[10px] text-zinc-500 font-bold uppercase">Núcleo</span>
-                      <span className="text-[10px] text-white font-black uppercase">{game.emulator_core}</span>
+                      <span className="text-[10px] text-zinc-500 font-retro uppercase">Núcleo</span>
+                      <span className="text-[10px] text-white font-retro uppercase">{game.emulator_core}</span>
                     </div>
                     <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                      <span className="text-[10px] text-zinc-500 font-bold uppercase">Tamaño</span>
-                      <span className="text-[10px] text-white font-black uppercase">~4.3 GB</span>
+                      <span className="text-[10px] text-zinc-500 font-retro uppercase">Tamaño</span>
+                      <span className="text-[10px] text-white font-retro uppercase">~4.3 GB</span>
                     </div>
                     <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                      <span className="text-[10px] text-zinc-500 font-bold uppercase">Latencia</span>
-                      <span className="text-[10px] text-emerald-500 font-black uppercase">BAJA (P2P)</span>
+                      <span className="text-[10px] text-zinc-500 font-retro uppercase">Latencia</span>
+                      <span className="text-[10px] text-emerald-500 font-retro uppercase">BAJA (P2P)</span>
                     </div>
                   </div>
                 </div>
@@ -259,8 +259,8 @@ export default function PremiumVault() {
             <div className="w-24 h-24 rounded-full bg-zinc-900 flex items-center justify-center mb-8 border border-white/5">
               <HardDrive className="w-10 h-10 text-zinc-700" />
             </div>
-            <h2 className="text-2xl font-black italic uppercase tracking-tighter mb-4">SINCRONIZACIÓN REQUERIDA</h2>
-            <p className="text-zinc-500 max-w-md text-sm uppercase font-bold tracking-widest leading-relaxed">
+            <h2 className="text-2xl font-retro italic uppercase tracking-tighter mb-4">SINCRONIZACIÓN REQUERIDA</h2>
+            <p className="text-zinc-500 max-w-md text-sm uppercase font-retro tracking-widest leading-relaxed">
               Introduce un término de búsqueda para localizar recursos en la Bóveda de Archive.org.
             </p>
           </div>
@@ -272,21 +272,21 @@ export default function PremiumVault() {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-emerald-500" />
-            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Enlace Encriptado</span>
+            <span className="text-[10px] font-retro text-zinc-500 uppercase tracking-widest">Enlace Encriptado</span>
           </div>
           <div className="flex items-center gap-2">
             <Cpu className="w-5 h-5 text-cyan-electric" />
-            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Optimización de Núcleo</span>
+            <span className="text-[10px] font-retro text-zinc-500 uppercase tracking-widest">Optimización de Núcleo</span>
           </div>
           <div className="flex items-center gap-2">
             <Globe className="w-5 h-5 text-magenta-accent" />
-            <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Red Global P2P</span>
+            <span className="text-[10px] font-retro text-zinc-500 uppercase tracking-widest">Red Global P2P</span>
           </div>
         </div>
         
         <div className="flex items-center gap-4 px-6 py-3 bg-rose-500/10 border border-rose-500/20 rounded-2xl">
           <AlertTriangle className="w-4 h-4 text-rose-500" />
-          <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">
+          <p className="text-[9px] font-retro text-rose-500 uppercase tracking-widest">
             AVISO: Los juegos de alta fidelidad requieren una conexión de +50MB para una experiencia fluida.
           </p>
         </div>

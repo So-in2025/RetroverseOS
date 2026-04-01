@@ -91,15 +91,15 @@ export default function Home() {
               transition={{ duration: 0.8 }}
             >
               <div className="flex items-center gap-3 mb-4">
-                <span className="px-3 py-1 rounded-lg bg-cyan-electric/20 text-cyan-electric text-[10px] font-black uppercase tracking-widest border border-cyan-electric/30 backdrop-blur-md">
+                <span className="px-3 py-1 rounded-lg bg-cyan-electric/20 text-cyan-electric text-[10px] font-retro uppercase tracking-widest border border-cyan-electric/30 backdrop-blur-md">
                   Título Destacado
                 </span>
-                <span className="px-3 py-1 rounded-lg bg-white/10 text-white text-[10px] font-black uppercase tracking-widest border border-white/10 backdrop-blur-md">
+                <span className="px-3 py-1 rounded-lg bg-white/10 text-white text-[10px] font-retro uppercase tracking-widest border border-white/10 backdrop-blur-md">
                   {featuredGame.system}
                 </span>
               </div>
               
-              <h1 className="text-5xl md:text-8xl font-black mb-6 leading-tight tracking-tighter italic uppercase">
+              <h1 className="text-5xl md:text-8xl font-retro mb-6 leading-tight tracking-tighter italic uppercase">
                 {featuredGame.title}
               </h1>
               
@@ -110,14 +110,14 @@ export default function Home() {
                     AudioEngine.playSelectSound();
                     haptics.medium();
                   }}
-                  className="px-8 py-4 bg-cyan-electric text-black rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(0,242,255,0.4)] hover:scale-105 flex items-center gap-3"
+                  className="px-8 py-4 bg-cyan-electric text-black rounded-2xl font-retro text-sm uppercase tracking-widest transition-all shadow-[0_0_30px_rgba(0,242,255,0.4)] hover:scale-105 flex items-center gap-3"
                 >
                   <Play className="w-5 h-5 fill-current" />
                   Iniciar Enlace
                 </Link>
                 <Link 
                   to={`/game/${featuredGame.game_id}`}
-                  className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all border border-white/10 backdrop-blur-md flex items-center gap-3"
+                  className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white rounded-2xl font-retro text-sm uppercase tracking-widest transition-all border border-white/10 backdrop-blur-md flex items-center gap-3"
                 >
                   Datos Tácticos
                 </Link>
@@ -148,7 +148,7 @@ export default function Home() {
                     {!hasBYOK && (
                       <button 
                         onClick={() => setShowBYOKModal(true)}
-                        className="text-[10px] font-black uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-all flex items-center gap-2"
+                        className="text-[10px] font-retro uppercase tracking-widest bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1.5 rounded-lg hover:bg-emerald-500/20 transition-all flex items-center gap-2"
                       >
                         <Zap className="w-3 h-3" />
                         Mejorar con BYOK
@@ -177,9 +177,9 @@ export default function Home() {
             <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=800&h=400')] bg-cover bg-center opacity-40 group-hover:scale-105 transition-transform duration-700" />
             <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />
             <div className="relative z-10 p-8 h-full flex flex-col justify-end">
-              <h3 className="text-2xl font-black italic uppercase tracking-tighter mb-2">Torneos en Vivo</h3>
+              <h3 className="text-2xl font-retro italic uppercase tracking-tighter mb-2">Torneos en Vivo</h3>
               <p className="text-zinc-400 text-sm mb-6 max-w-sm">Únete al Campeonato de Invierno y compite por 50,000 CR.</p>
-              <Link to="/community?tab=tournaments" className="w-fit px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-500 transition-all">
+              <Link to="/community?tab=tournaments" className="w-fit px-6 py-3 bg-emerald-600 text-white rounded-xl font-retro text-xs uppercase tracking-widest hover:bg-emerald-500 transition-all">
                 Entrar a la Arena
               </Link>
             </div>
@@ -189,9 +189,9 @@ export default function Home() {
             <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=800&h=400')] bg-cover bg-center opacity-40 group-hover:scale-105 transition-transform duration-700" />
             <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent" />
             <div className="relative z-10 p-8 h-full flex flex-col justify-end">
-              <h3 className="text-2xl font-black italic uppercase tracking-tighter mb-2">Clasificaciones Globales</h3>
+              <h3 className="text-2xl font-retro italic uppercase tracking-tighter mb-2">Clasificaciones Globales</h3>
               <p className="text-zinc-400 text-sm mb-6 max-w-sm">Mira dónde te posicionas frente a los mejores tacticianos del mundo.</p>
-              <Link to="/community?tab=leaderboards" className="w-fit px-6 py-3 bg-zinc-800 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-zinc-700 transition-all border border-white/10">
+              <Link to="/community?tab=leaderboards" className="w-fit px-6 py-3 bg-zinc-800 text-white rounded-xl font-retro text-xs uppercase tracking-widest hover:bg-zinc-700 transition-all border border-white/10">
                 Ver Clasificaciones
               </Link>
             </div>
@@ -240,7 +240,7 @@ function FeatureCard({ icon, title, description }: { icon: React.ReactNode, titl
       <div className="mb-4 p-3 bg-zinc-800 rounded-lg w-fit group-hover:scale-110 transition-transform">
         {icon}
       </div>
-      <h3 className="text-xl font-black uppercase italic tracking-tighter mb-2 text-white">{title}</h3>
+      <h3 className="text-xl font-retro uppercase italic tracking-tighter mb-2 text-white">{title}</h3>
       <p className="text-zinc-400 text-sm leading-relaxed">{description}</p>
     </div>
   );

@@ -132,7 +132,7 @@ export default function Settings() {
         const stat = stats.find(s => s.gameId === rom.gameId);
         return {
           gameId: rom.gameId,
-          title: game?.title || 'Unknown Game',
+          title: game?.title || 'Juego Desconocido',
           size: rom.size,
           playCount: stat?.playCount || 0,
           lastPlayed: rom.lastAccessed
@@ -245,11 +245,11 @@ export default function Settings() {
       <div className="lg:hidden fixed top-0 left-0 right-0 bg-zinc-950/90 backdrop-blur-xl border-b border-white/5 z-40 px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Cpu className="w-5 h-5 text-emerald-500" />
-          <h1 className="font-black italic uppercase tracking-tighter text-sm">Configuración del Sistema</h1>
+          <h1 className="font-retro italic uppercase tracking-tighter text-sm">Configuración del Sistema</h1>
         </div>
         <button 
           onClick={handleSave}
-          className={`px-4 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest transition-all ${
+          className={`px-4 py-1.5 rounded-lg font-retro text-[10px] uppercase tracking-widest transition-all ${
             saved ? 'bg-emerald-500 text-white' : 'bg-emerald-600 text-white'
           }`}
         >
@@ -262,7 +262,7 @@ export default function Settings() {
         {/* Desktop Header */}
         <div className="hidden lg:flex flex-col md:flex-row justify-between items-start md:items-end mb-8 border-b border-white/10 pb-6 gap-6">
           <div className="w-full">
-            <h1 className="text-2xl md:text-4xl font-black italic uppercase tracking-tighter mb-2 flex items-center gap-3">
+            <h1 className="text-2xl md:text-4xl font-retro italic uppercase tracking-tighter mb-2 flex items-center gap-3">
               <Cpu className="w-6 h-6 md:w-8 md:h-8 text-emerald-500" />
               Configuración del Motor
             </h1>
@@ -270,12 +270,12 @@ export default function Settings() {
           </div>
           
           <div className="flex w-full md:w-auto gap-3">
-            <button className="flex-1 md:flex-none px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all border border-white/10 flex items-center justify-center gap-2">
+            <button className="flex-1 md:flex-none px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-retro text-[10px] uppercase tracking-widest transition-all border border-white/10 flex items-center justify-center gap-2">
               <RotateCcw className="w-4 h-4" /> Reiniciar
             </button>
             <button 
               onClick={handleSave}
-              className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg ${
+              className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl font-retro text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-lg ${
                 saved ? 'bg-emerald-500 text-white shadow-emerald-900/50' : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/20'
               }`}
             >
@@ -293,7 +293,7 @@ export default function Settings() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex-none md:flex-none flex items-center justify-center md:justify-start gap-3 px-5 py-3 md:py-4 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap border ${
+                className={`flex-none md:flex-none flex items-center justify-center md:justify-start gap-3 px-5 py-3 md:py-4 rounded-xl font-retro text-[10px] uppercase tracking-widest transition-all whitespace-nowrap border ${
                   activeTab === tab.id 
                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-inner' 
                     : 'text-zinc-500 hover:text-white hover:bg-white/5 border-transparent'
@@ -318,12 +318,12 @@ export default function Settings() {
                   exit={{ opacity: 0, x: -20 }}
                   className="space-y-8"
                 >
-                  <h2 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2 border-b border-white/5 pb-4">
+                  <h2 className="text-xl md:text-2xl font-retro italic uppercase tracking-tighter mb-6 flex items-center gap-2 border-b border-white/5 pb-4">
                     <Monitor className="w-5 h-5 md:w-6 md:h-6 text-emerald-500" /> Configuración de Video
                   </h2>
                   
                   <div className="mb-8">
-                    <p className="font-black text-xs uppercase tracking-widest text-white mb-3">Perfil de Calidad Visual</p>
+                    <p className="font-retro text-xs uppercase tracking-widest text-white mb-3">Perfil de Calidad Visual</p>
                     <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                       {[
                         { id: 'potato', label: 'Baja (Potato)', desc: 'Rendimiento Máximo' },
@@ -353,7 +353,7 @@ export default function Settings() {
                               : 'bg-black/20 border-white/5 hover:bg-white/5'
                           }`}
                         >
-                          <p className={`font-black text-[10px] uppercase tracking-widest ${videoSettings.qualityPreset === preset.id ? 'text-emerald-400' : 'text-white'}`}>{preset.label}</p>
+                          <p className={`font-retro text-[10px] uppercase tracking-widest ${videoSettings.qualityPreset === preset.id ? 'text-emerald-400' : 'text-white'}`}>{preset.label}</p>
                           <p className="text-[9px] text-zinc-500 mt-1">{preset.desc}</p>
                         </button>
                       ))}
@@ -365,7 +365,7 @@ export default function Settings() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/5">
                         <div className="pr-4">
-                          <p className="font-black text-xs uppercase tracking-widest text-white">Emulación CRT</p>
+                          <p className="font-retro text-xs uppercase tracking-widest text-white">Emulación CRT</p>
                           <p className="text-[10px] text-zinc-500 mt-1">Simular pantalla de televisión clásica</p>
                         </div>
                         <button 
@@ -378,7 +378,7 @@ export default function Settings() {
 
                       <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/5">
                         <div className="pr-4">
-                          <p className="font-black text-xs uppercase tracking-widest text-white">Filtro Bilineal</p>
+                          <p className="font-retro text-xs uppercase tracking-widest text-white">Filtro Bilineal</p>
                           <p className="text-[10px] text-zinc-500 mt-1">Suavizar bordes pixelados</p>
                         </div>
                         <button 
@@ -391,7 +391,7 @@ export default function Settings() {
 
                       <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/5">
                         <div className="pr-4">
-                          <p className="font-black text-xs uppercase tracking-widest text-white">Mejora de Texturas (3D)</p>
+                          <p className="font-retro text-xs uppercase tracking-widest text-white">Mejora de Texturas (3D)</p>
                           <p className="text-[10px] text-zinc-500 mt-1">Aplica MSAA 16x y Trilineal (N64/PSX)</p>
                         </div>
                         <button 
@@ -404,7 +404,7 @@ export default function Settings() {
 
                       <div className="flex items-center justify-between p-4 bg-black/20 rounded-xl border border-white/5">
                         <div className="pr-4">
-                          <p className="font-black text-xs uppercase tracking-widest text-white">V-Sync</p>
+                          <p className="font-retro text-xs uppercase tracking-widest text-white">V-Sync</p>
                           <p className="text-[10px] text-zinc-500 mt-1">Prevenir desgarro de pantalla</p>
                         </div>
                         <button 
@@ -420,7 +420,7 @@ export default function Settings() {
                     <div className="space-y-4">
                       <div className="p-4 bg-black/20 rounded-xl border border-white/5">
                         <div className="flex justify-between mb-2">
-                          <p className="font-black text-xs uppercase tracking-widest text-white">Intensidad de Scanlines</p>
+                          <p className="font-retro text-xs uppercase tracking-widest text-white">Intensidad de Scanlines</p>
                           <span className="text-emerald-400 font-mono text-[10px]">{videoSettings.scanlines}%</span>
                         </div>
                         <input 
@@ -434,13 +434,13 @@ export default function Settings() {
                       </div>
 
                       <div className="p-4 bg-black/20 rounded-xl border border-white/5">
-                        <p className="font-black text-xs uppercase tracking-widest text-white mb-3">Relación de Aspecto</p>
+                        <p className="font-retro text-xs uppercase tracking-widest text-white mb-3">Relación de Aspecto</p>
                         <div className="flex gap-2">
                           {['4:3', '16:9', 'Original'].map((ratio) => (
                             <button 
                               key={ratio}
                               onClick={() => setVideoSettings({...videoSettings, aspectRatio: ratio, qualityPreset: 'custom'})}
-                              className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
+                              className={`flex-1 py-2 rounded-lg text-[10px] font-retro uppercase tracking-widest transition-colors ${
                                 videoSettings.aspectRatio === ratio 
                                   ? 'bg-emerald-600 text-white' 
                                   : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
@@ -453,7 +453,7 @@ export default function Settings() {
                       </div>
 
                       <div className="p-4 bg-black/20 rounded-xl border border-white/5">
-                        <p className="font-black text-xs uppercase tracking-widest text-white mb-3">Estilo Visual (CRT)</p>
+                        <p className="font-retro text-xs uppercase tracking-widest text-white mb-3">Estilo Visual (CRT)</p>
                         <div className="grid grid-cols-2 gap-2">
                           {[
                             { id: 'classic', label: 'Clásico' },
@@ -464,7 +464,7 @@ export default function Settings() {
                             <button 
                               key={filter.id}
                               onClick={() => setVideoSettings({...videoSettings, activeFilter: filter.id as any, qualityPreset: 'custom'})}
-                              className={`py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
+                              className={`py-2 rounded-lg text-[10px] font-retro uppercase tracking-widest transition-colors ${
                                 videoSettings.activeFilter === filter.id 
                                   ? 'bg-emerald-600 text-white' 
                                   : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
@@ -477,13 +477,13 @@ export default function Settings() {
                       </div>
 
                       <div className="p-4 bg-black/20 rounded-xl border border-white/5">
-                        <p className="font-black text-xs uppercase tracking-widest text-white mb-3">Resolución</p>
+                        <p className="font-retro text-xs uppercase tracking-widest text-white mb-3">Resolución</p>
                         <div className="flex gap-2">
                           {['Nativa', '1080p', '4K'].map((res) => (
                             <button 
                               key={res}
                               onClick={() => setVideoSettings({...videoSettings, resolution: res, qualityPreset: 'custom'})}
-                              className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
+                              className={`flex-1 py-2 rounded-lg text-[10px] font-retro uppercase tracking-widest transition-colors ${
                                 videoSettings.resolution === res 
                                   ? 'bg-emerald-600 text-white' 
                                   : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
@@ -509,7 +509,7 @@ export default function Settings() {
                   exit={{ opacity: 0, x: -20 }}
                   className="space-y-8"
                 >
-                  <h2 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2 border-b border-white/5 pb-4">
+                  <h2 className="text-xl md:text-2xl font-retro italic uppercase tracking-tighter mb-6 flex items-center gap-2 border-b border-white/5 pb-4">
                     <Volume2 className="w-5 h-5 md:w-6 md:h-6 text-emerald-500" /> Configuración de Audio
                   </h2>
                   
@@ -521,7 +521,7 @@ export default function Settings() {
                     ].map((vol) => (
                       <div key={vol.id} className="p-4 bg-black/20 rounded-xl border border-white/5">
                         <div className="flex justify-between mb-4">
-                          <p className="font-black text-xs uppercase tracking-widest text-white">{vol.label}</p>
+                          <p className="font-retro text-xs uppercase tracking-widest text-white">{vol.label}</p>
                           <span className="text-emerald-400 font-mono text-[10px]">{(audioSettings as any)[vol.id]}%</span>
                         </div>
                         <input 
@@ -535,14 +535,14 @@ export default function Settings() {
                     ))}
 
                     <div className="p-4 bg-black/20 rounded-xl border border-white/5 mt-6">
-                      <p className="font-black text-xs uppercase tracking-widest text-white mb-1">Modo de Latencia</p>
+                      <p className="font-retro text-xs uppercase tracking-widest text-white mb-1">Modo de Latencia</p>
                       <p className="text-[10px] text-zinc-500 mb-4">El modo ultra bajo puede causar chasquidos en conexiones lentas.</p>
                       <div className="flex flex-wrap gap-2">
                         {['ultra-low', 'normal', 'safe'].map((mode) => (
                           <button 
                             key={mode}
                             onClick={() => setAudioSettings({...audioSettings, latencyMode: mode})}
-                            className={`flex-1 min-w-[80px] py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
+                            className={`flex-1 min-w-[80px] py-3 rounded-lg text-[10px] font-retro uppercase tracking-widest transition-colors ${
                               audioSettings.latencyMode === mode 
                                 ? 'bg-emerald-600 text-white' 
                                 : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
@@ -567,7 +567,7 @@ export default function Settings() {
                   className="space-y-8"
                 >
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-white/5 pb-4 mb-6 gap-4">
-                    <h2 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter flex items-center gap-2">
+                    <h2 className="text-xl md:text-2xl font-retro italic uppercase tracking-tighter flex items-center gap-2">
                       <Gamepad2 className="w-5 h-5 md:w-6 md:h-6 text-emerald-500" /> Mapeo de Entradas
                     </h2>
                     <div className="flex items-center gap-2">
@@ -576,11 +576,11 @@ export default function Settings() {
                           up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight',
                           a: '2', b: '1', x: '5', y: '4', l: '6', r: '3', start: 'Enter', select: '+'
                         })}
-                        className="text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-emerald-400 bg-zinc-900 hover:bg-zinc-800 px-3 py-1.5 rounded-lg border border-white/5 transition-colors"
+                        className="text-[10px] font-retro uppercase tracking-widest text-zinc-400 hover:text-emerald-400 bg-zinc-900 hover:bg-zinc-800 px-3 py-1.5 rounded-lg border border-white/5 transition-colors"
                       >
                         Restablecer
                       </button>
-                      <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-zinc-500 bg-zinc-950 px-3 py-1.5 rounded-lg border border-white/5">
+                      <div className="flex items-center gap-2 text-[10px] font-retro uppercase tracking-widest text-zinc-500 bg-zinc-950 px-3 py-1.5 rounded-lg border border-white/5">
                         <Keyboard className="w-3.5 h-3.5" /> Teclado Activo
                       </div>
                     </div>
@@ -591,7 +591,7 @@ export default function Settings() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 max-w-4xl mx-auto">
                     {/* D-PAD */}
                     <div className="space-y-4">
-                      <h3 className="text-emerald-500 font-black text-[10px] uppercase tracking-widest mb-4 text-center">Pad Direccional</h3>
+                      <h3 className="text-emerald-500 font-retro text-[10px] uppercase tracking-widest mb-4 text-center">Pad Direccional</h3>
                       <div className="grid grid-cols-3 gap-2 max-w-[200px] mx-auto">
                         <div />
                         <KeyBindBtn id="up" label="ARRIBA" value={controls.up} active={activeKeyBind} set={setActiveKeyBind} />
@@ -604,7 +604,7 @@ export default function Settings() {
 
                     {/* Action Buttons */}
                     <div className="space-y-4">
-                      <h3 className="text-emerald-500 font-black text-[10px] uppercase tracking-widest mb-4 text-center">Botones de Acción</h3>
+                      <h3 className="text-emerald-500 font-retro text-[10px] uppercase tracking-widest mb-4 text-center">Botones de Acción</h3>
                       <div className="grid grid-cols-3 gap-2 max-w-[200px] mx-auto">
                         <KeyBindBtn id="l" label="L" value={controls.l} active={activeKeyBind} set={setActiveKeyBind} />
                         <KeyBindBtn id="x" label="X" value={controls.x} active={activeKeyBind} set={setActiveKeyBind} />
@@ -626,7 +626,7 @@ export default function Settings() {
                   </div>
 
                   <div className="mt-12 pt-8 border-t border-white/5">
-                    <h3 className="text-lg font-black italic uppercase tracking-tighter flex items-center gap-2 mb-4">
+                    <h3 className="text-lg font-retro italic uppercase tracking-tighter flex items-center gap-2 mb-4">
                       <Gamepad2 className="w-5 h-5 text-emerald-500" /> Configuración del Mando
                     </h3>
                     <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mb-6 leading-relaxed">Conecta un mando Bluetooth o USB. El motor detecta automáticamente los diseños estándar.</p>
@@ -636,11 +636,11 @@ export default function Settings() {
                           <Gamepad2 className="w-5 h-5 text-emerald-400" />
                         </div>
                         <div>
-                          <p className="font-black text-xs uppercase tracking-widest text-white">Auto-Detección</p>
+                          <p className="font-retro text-xs uppercase tracking-widest text-white">Auto-Detección</p>
                           <p className="text-[10px] text-zinc-500">Soporta XInput y DirectInput de forma nativa.</p>
                         </div>
                       </div>
-                      <div className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-lg border border-emerald-500/20">
+                      <div className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-[10px] font-retro uppercase tracking-widest rounded-lg border border-emerald-500/20">
                         Activo
                       </div>
                     </div>
@@ -657,56 +657,56 @@ export default function Settings() {
                   exit={{ opacity: 0, x: -20 }}
                   className="space-y-8"
                 >
-                  <h2 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2 border-b border-white/5 pb-4">
+                  <h2 className="text-xl md:text-2xl font-retro italic uppercase tracking-tighter mb-6 flex items-center gap-2 border-b border-white/5 pb-4">
                     <Cpu className="w-5 h-5 md:w-6 md:h-6 text-emerald-500" /> System & Emulation
                   </h2>
                   
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                     <div className="p-5 bg-black/20 rounded-xl border border-white/5">
-                      <h3 className="font-black text-xs uppercase tracking-widest text-white mb-2">Sincronización en la Nube</h3>
+                      <h3 className="font-retro text-xs uppercase tracking-widest text-white mb-2">Sincronización en la Nube</h3>
                       <p className="text-[10px] text-zinc-500 mb-4">Copia de seguridad automática de tus partidas en la nube.</p>
-                      <button className="px-4 py-2.5 bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 rounded-lg font-black text-[10px] uppercase tracking-widest w-full hover:bg-emerald-600/20 transition-colors">
+                      <button className="px-4 py-2.5 bg-emerald-600/10 text-emerald-400 border border-emerald-500/20 rounded-lg font-retro text-[10px] uppercase tracking-widest w-full hover:bg-emerald-600/20 transition-colors">
                         Forzar Sincronización
                       </button>
                     </div>
 
                     <div className="p-5 bg-black/20 rounded-xl border border-white/5">
-                      <h3 className="font-black text-xs uppercase tracking-widest text-white mb-2 flex items-center gap-2"><Trash2 className="w-4 h-4 text-red-500" /> Limpiar Caché</h3>
+                      <h3 className="font-retro text-xs uppercase tracking-widest text-white mb-2 flex items-center gap-2"><Trash2 className="w-4 h-4 text-red-500" /> Limpiar Caché</h3>
                       <p className="text-[10px] text-zinc-500 mb-4">Libera espacio local eliminando los recursos descargados.</p>
-                      <button onClick={handleClearCatalog} className="px-4 py-2.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg font-black text-[10px] uppercase tracking-widest w-full hover:bg-red-500/20 transition-colors">
+                      <button onClick={handleClearCatalog} className="px-4 py-2.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg font-retro text-[10px] uppercase tracking-widest w-full hover:bg-red-500/20 transition-colors">
                         PURGAR AHORA
                       </button>
                     </div>
 
                     <div className="p-5 bg-black/20 rounded-xl border border-white/5">
-                      <h3 className="font-black text-xs uppercase tracking-widest text-white mb-2 flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-500" /> Reiniciar Sistema</h3>
+                      <h3 className="font-retro text-xs uppercase tracking-widest text-white mb-2 flex items-center gap-2"><Zap className="w-4 h-4 text-yellow-500" /> Reiniciar Sistema</h3>
                       <p className="text-[10px] text-zinc-500 mb-4">Reinicia la aplicación para aplicar cambios profundos del sistema.</p>
-                      <button onClick={handleReboot} className="px-4 py-2.5 bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded-lg font-black text-[10px] uppercase tracking-widest w-full hover:bg-yellow-500/20 transition-colors">
+                      <button onClick={handleReboot} className="px-4 py-2.5 bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 rounded-lg font-retro text-[10px] uppercase tracking-widest w-full hover:bg-yellow-500/20 transition-colors">
                         REINICIAR
                       </button>
                     </div>
 
                     <div className="p-5 bg-black/20 rounded-xl border border-white/5 lg:col-span-2">
-                      <h3 className="font-black text-xs uppercase tracking-widest text-white mb-2 flex items-center gap-2"><User className="w-4 h-4 text-cyan-500" /> Perfil del Operador</h3>
+                      <h3 className="font-retro text-xs uppercase tracking-widest text-white mb-2 flex items-center gap-2"><User className="w-4 h-4 text-cyan-500" /> Perfil del Operador</h3>
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
                         <div>
                           <p className="text-[10px] text-zinc-500">Gestiona tu cuenta y consulta tu saldo actual.</p>
                           <div className="flex items-center gap-2 text-amber-500 mt-2">
                             <Coins className="w-4 h-4" />
-                            <span className="text-xs font-black tracking-widest">{credits} CRÉDITOS</span>
+                            <span className="text-xs font-retro tracking-widest">{credits} CRÉDITOS</span>
                           </div>
                         </div>
-                        <button onClick={() => navigate('/profile')} className="w-full sm:w-auto px-4 py-2 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-lg font-black text-[10px] uppercase tracking-widest hover:bg-cyan-500/20 transition-colors">
+                        <button onClick={() => navigate('/profile')} className="w-full sm:w-auto px-4 py-2 bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 rounded-lg font-retro text-[10px] uppercase tracking-widest hover:bg-cyan-500/20 transition-colors">
                           Ver Perfil
                         </button>
                       </div>
-                      <button onClick={logout} className="px-4 py-2.5 bg-zinc-800 text-zinc-500 border border-white/5 rounded-lg font-black text-[10px] uppercase tracking-widest w-full hover:bg-zinc-700 hover:text-white transition-colors flex items-center justify-center gap-2">
+                      <button onClick={logout} className="px-4 py-2.5 bg-zinc-800 text-zinc-500 border border-white/5 rounded-lg font-retro text-[10px] uppercase tracking-widest w-full hover:bg-zinc-700 hover:text-white transition-colors flex items-center justify-center gap-2">
                         <LogOut className="w-4 h-4" /> Desconectar
                       </button>
                     </div>
 
                     <div className="p-5 bg-black/20 rounded-xl border border-white/5 lg:col-span-2">
-                      <h3 className="font-black text-xs uppercase tracking-widest text-white mb-2">Idioma del Sistema</h3>
+                      <h3 className="font-retro text-xs uppercase tracking-widest text-white mb-2">Idioma del Sistema</h3>
                       <p className="text-[10px] text-zinc-500 mb-4">Selecciona el idioma de la interfaz y de la IA.</p>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                         {[
@@ -718,7 +718,7 @@ export default function Settings() {
                           <button 
                             key={lang.id}
                             onClick={() => setLanguage(lang.id)}
-                            className={`py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors ${
+                            className={`py-2 rounded-lg text-[10px] font-retro uppercase tracking-widest transition-colors ${
                               language === lang.id 
                                 ? 'bg-emerald-600 text-white' 
                                 : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
@@ -731,7 +731,7 @@ export default function Settings() {
                     </div>
 
                     <div className="p-5 bg-black/20 rounded-xl border border-white/5 lg:col-span-2">
-                      <h3 className="font-black text-xs uppercase tracking-widest text-white mb-2">Selección de Núcleo</h3>
+                      <h3 className="font-retro text-xs uppercase tracking-widest text-white mb-2">Selección de Núcleo</h3>
                       <p className="text-[10px] text-zinc-500 mb-4">Elige el núcleo de emulación predeterminado para sistemas específicos.</p>
                       <div className="space-y-3">
                         <div className="flex justify-between items-center p-3 bg-zinc-950 rounded-lg border border-white/5">
@@ -763,20 +763,20 @@ export default function Settings() {
                   exit={{ opacity: 0, x: -20 }}
                   className="space-y-8"
                 >
-                  <h2 className="text-xl md:text-2xl font-black italic uppercase tracking-tighter mb-6 flex items-center gap-2 border-b border-white/5 pb-4">
+                  <h2 className="text-xl md:text-2xl font-retro italic uppercase tracking-tighter mb-6 flex items-center gap-2 border-b border-white/5 pb-4">
                     <ShieldCheck className="w-5 h-5 md:w-6 md:h-6 text-cyan-electric" /> Diagnósticos de Sentinel
                   </h2>
                   
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
                     <div className="p-5 bg-black/20 rounded-xl border border-white/5 flex flex-col items-center justify-center text-center">
                       <Activity className="w-8 h-8 text-cyan-electric mb-3" />
-                      <h3 className="font-black text-3xl text-white mb-1">{sentinelStats.testedToday}</h3>
+                      <h3 className="font-retro text-3xl text-white mb-1">{sentinelStats.testedToday}</h3>
                       <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Sectores Escaneados</p>
                     </div>
 
                     <div className="p-5 bg-black/20 rounded-xl border border-white/5 flex flex-col items-center justify-center text-center">
                       <Check className="w-8 h-8 text-emerald-500 mb-3" />
-                      <h3 className="font-black text-3xl text-white mb-1">
+                      <h3 className="font-retro text-3xl text-white mb-1">
                         {sentinelStats.testedToday > 0 ? Math.round((sentinelStats.successful / sentinelStats.testedToday) * 100) : 0}%
                       </h3>
                       <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Tasa de Éxito</p>
@@ -784,12 +784,12 @@ export default function Settings() {
 
                     <div className="p-5 bg-black/20 rounded-xl border border-white/5 flex flex-col items-center justify-center text-center">
                       <RotateCcw className="w-8 h-8 text-magenta-accent mb-3" />
-                      <h3 className="font-black text-3xl text-white mb-1">{sentinelStats.repairs}</h3>
+                      <h3 className="font-retro text-3xl text-white mb-1">{sentinelStats.repairs}</h3>
                       <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Auto-Reparaciones</p>
                     </div>
 
                     <div className="p-5 bg-black/20 rounded-xl border border-white/5 lg:col-span-3">
-                      <h3 className="font-black text-xs uppercase tracking-widest text-white mb-2 flex items-center gap-2">
+                      <h3 className="font-retro text-xs uppercase tracking-widest text-white mb-2 flex items-center gap-2">
                         <Zap className="w-4 h-4 text-cyan-electric" /> Forzar Reparación Global
                       </h3>
                       <p className="text-[10px] text-zinc-500 mb-4">

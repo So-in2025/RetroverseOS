@@ -3,7 +3,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../services/AuthContext';
 import { supabase } from '../services/supabase';
-import { Gamepad2, Lock, ArrowRight, Power, Cpu, ShieldCheck, Terminal, Scan, Loader2, User as UserIcon } from 'lucide-react';
+import { Gamepad2, Lock, ArrowRight, Power, Cpu, ShieldCheck, Terminal, Scan, Loader2, User as UserIcon, Trophy, Users, History, Zap, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function Login() {
@@ -12,6 +12,7 @@ export default function Login() {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [bootSequence, setBootSequence] = useState(true);
   const [bootStep, setBootStep] = useState(0);
+  const [showAuthOptions, setShowAuthOptions] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -153,188 +154,245 @@ export default function Login() {
         ) : (
           <motion.div 
             key="login"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, ease: "circOut" }}
-            className="relative z-10 w-full max-w-md flex flex-col items-center justify-center"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="relative z-10 w-full h-full flex flex-col items-center justify-center p-6"
           >
-            {/* Main Login Interface */}
-            <div className="w-full relative group">
-              {/* Holographic Border Effect */}
-              <div className="absolute -inset-1 bg-gradient-to-b from-cyan-electric/20 to-transparent rounded-3xl opacity-50 blur-sm pointer-events-none" />
-              
-              <div className="relative bg-black/90 backdrop-blur-3xl border border-white/10 rounded-3xl p-12 shadow-2xl overflow-hidden">
-                {/* Scanline Overlay */}
-                <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-0 pointer-events-none opacity-30 bg-[size:100%_2px,3px_100%]" />
-
-                <div className="relative z-10 flex flex-col items-center">
-                  {/* Header Icon */}
+            {/* Hero Section */}
+            <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+              <motion.div 
+                initial={{ x: -50, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ delay: 0.2, duration: 0.8 }}
+                className="space-y-10"
+              >
+                <div className="space-y-4">
                   <motion.div 
-                    initial={{ y: -20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                    className="mb-8 relative"
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-electric/10 border border-cyan-electric/20 text-cyan-electric text-[10px] font-bold uppercase tracking-[0.3em]"
                   >
-                    <div className="absolute inset-0 bg-cyan-electric blur-xl opacity-20 rounded-full animate-pulse" />
-                    <div className="relative w-24 h-24 rounded-2xl bg-zinc-900 border border-cyan-electric/30 flex items-center justify-center shadow-[0_0_30px_rgba(0,242,255,0.1)]">
-                      <Scan className="w-12 h-12 text-cyan-electric" />
+                    <Zap className="w-3 h-3 animate-pulse" /> Enlace Neural Establecido
+                  </motion.div>
+                  <h1 className="text-7xl lg:text-9xl font-black italic tracking-tighter leading-none select-none">
+                    RETRO<br />
+                    <span className="text-cyan-electric drop-shadow-[0_0_30px_rgba(0,242,255,0.3)]">VERSE</span>
+                  </h1>
+                  <p className="text-xl text-zinc-400 font-light leading-relaxed max-w-lg">
+                    La evolución del gaming clásico. Una red global diseñada para revivir la gloria del pasado con la tecnología del futuro.
+                  </p>
+                </div>
+
+                {/* Pillars with improved visuals */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+                  <motion.div whileHover={{ y: -5 }} className="space-y-4 group">
+                    <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-white/5 flex items-center justify-center group-hover:border-cyan-electric/50 transition-colors shadow-xl">
+                      <History className="w-6 h-6 text-cyan-electric" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-white mb-1">Nostalgia</h3>
+                      <p className="text-[10px] text-zinc-500 leading-relaxed uppercase tracking-tighter">Acceso instantáneo a la bóveda más grande de la historia.</p>
                     </div>
                   </motion.div>
+                  <motion.div whileHover={{ y: -5 }} className="space-y-4 group">
+                    <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-white/5 flex items-center justify-center group-hover:border-magenta-accent/50 transition-colors shadow-xl">
+                      <Trophy className="w-6 h-6 text-magenta-accent" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-white mb-1">Competencia</h3>
+                      <p className="text-[10px] text-zinc-500 leading-relaxed uppercase tracking-tighter">Arena competitiva con MMR global y torneos diarios.</p>
+                    </div>
+                  </motion.div>
+                  <motion.div whileHover={{ y: -5 }} className="space-y-4 group">
+                    <div className="w-12 h-12 rounded-2xl bg-zinc-900 border border-white/5 flex items-center justify-center group-hover:border-emerald-500/50 transition-colors shadow-xl">
+                      <Users className="w-6 h-6 text-emerald-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-widest text-white mb-1">Comunidad</h3>
+                      <p className="text-[10px] text-zinc-500 leading-relaxed uppercase tracking-tighter">Netplay sin lag. Juega con cualquier persona, en cualquier lugar.</p>
+                    </div>
+                  </motion.div>
+                </div>
+              </motion.div>
 
-                  <h1 className="text-3xl font-black text-white tracking-tighter italic mb-1 text-center">
-                    VERIFICACIÓN DE <span className="text-cyan-electric">IDENTIDAD</span>
-                  </h1>
-                  <p className="text-zinc-500 text-[10px] uppercase tracking-[0.3em] mb-10 text-center">
-                    Puerta de Enlace Segura v2.0 // OAuth 2.0 Habilitado
-                  </p>
+              {/* Action Area */}
+              <motion.div 
+                initial={{ x: 50, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ delay: 0.4, duration: 0.8 }}
+                className="flex flex-col items-center lg:items-end justify-center"
+              >
+                <div className="w-full max-w-sm relative group">
+                  {/* Outer Glow */}
+                  <div className="absolute -inset-8 bg-cyan-electric/10 rounded-[60px] blur-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />
+                  
+                  <div className="relative bg-zinc-900/40 backdrop-blur-3xl border border-white/10 rounded-[40px] p-10 lg:p-14 shadow-2xl overflow-hidden">
+                    {/* Scanline Overlay */}
+                    <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-0 pointer-events-none opacity-20 bg-[size:100%_2px,3px_100%]" />
 
-                  <div className="w-full space-y-4">
-                    <AnimatePresence>
-                      {error && (
-                        <motion.div 
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="p-3 bg-rose-500/10 border-l-2 border-rose-500 text-rose-500 text-[10px] font-bold text-center uppercase tracking-widest"
-                        >
-                          {error}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    {!showEmailForm ? (
-                      <div className="space-y-4">
-                        <button
-                          onClick={handleGoogleLogin}
-                          disabled={isLoggingIn}
-                          className="group w-full py-5 bg-white text-black rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-cyan-electric transition-all shadow-lg hover:shadow-[0_0_40px_rgba(0,242,255,0.4)] flex items-center justify-center gap-3 relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <span className="relative z-10 flex items-center gap-2">
-                            {isLoggingIn ? (
-                              <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Conectando...
-                              </>
-                            ) : (
-                              <>
-                                Iniciar sesión con Google <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                              </>
-                            )}
-                          </span>
-                        </button>
-
-                        <button
-                          onClick={() => setShowEmailForm(true)}
-                          disabled={isLoggingIn}
-                          className="group w-full py-5 bg-zinc-900 border border-white/10 text-white rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-zinc-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                        >
-                          <Terminal className="w-4 h-4" />
-                          Usar Correo Electrónico
-                        </button>
-
-                        <div className="flex items-center gap-4 py-2">
-                          <div className="h-px flex-1 bg-white/10" />
-                          <span className="text-[8px] text-zinc-600 uppercase tracking-widest">O</span>
-                          <div className="h-px flex-1 bg-white/10" />
+                    <div className="relative z-10 space-y-10">
+                      <div className="text-center lg:text-left">
+                        <div className="flex items-center justify-center lg:justify-start gap-3 mb-2">
+                          <div className="w-2 h-2 rounded-full bg-cyan-electric animate-pulse" />
+                          <h2 className="text-2xl font-black italic tracking-tight uppercase">Acceso <span className="text-cyan-electric">Global</span></h2>
                         </div>
-
-                        <button
-                          onClick={handleGuestLogin}
-                          disabled={isLoggingIn}
-                          className="group w-full py-4 bg-transparent border border-white/5 text-zinc-500 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:text-white hover:border-white/20 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                        >
-                          <UserIcon className="w-3 h-3" />
-                          Entrar como Invitado
-                        </button>
-
-                        <button
-                          onClick={handleDevLogin}
-                          disabled={isLoggingIn}
-                          className="group w-full py-4 bg-transparent border border-cyan-electric/20 text-cyan-electric rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-cyan-electric/10 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-                        >
-                          <Terminal className="w-3 h-3" />
-                          Entrar como Desarrollador
-                        </button>
+                        <p className="text-[10px] text-zinc-500 uppercase tracking-[0.3em]">Protocolo de Enlace Seguro v2.0</p>
                       </div>
-                    ) : (
-                      <motion.form 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        onSubmit={handleEmailAuth} 
-                        className="space-y-4"
-                      >
-                        <div className="space-y-2">
-                          <label className="text-[9px] text-zinc-500 uppercase tracking-widest ml-1">Terminal_ID (Email)</label>
-                          <input 
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            required
-                            className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-cyan-electric/50 transition-colors"
-                            placeholder="user@retroverse.os"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-[9px] text-zinc-500 uppercase tracking-widest ml-1">Access_Code (Password)</label>
-                          <input 
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            required
-                            className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-cyan-electric/50 transition-colors"
-                            placeholder="••••••••"
-                          />
-                        </div>
-                        
-                        <button
-                          type="submit"
-                          disabled={isLoggingIn}
-                          className="w-full py-4 bg-cyan-electric text-black rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-cyan-400 transition-all shadow-lg disabled:opacity-50"
-                        >
-                          {isLoggingIn ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (isSignUp ? 'Crear Cuenta' : 'Acceder')}
-                        </button>
 
-                        <div className="flex flex-col gap-2 pt-2">
-                          <button
-                            type="button"
-                            onClick={() => setIsSignUp(!isSignUp)}
-                            className="text-[9px] text-zinc-500 uppercase tracking-widest hover:text-cyan-electric transition-colors"
-                          >
-                            {isSignUp ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setShowEmailForm(false)}
-                            className="text-[9px] text-zinc-400 uppercase tracking-widest hover:text-white transition-colors flex items-center justify-center gap-1"
-                          >
-                            <ArrowRight className="w-3 h-3 rotate-180" /> Volver
-                          </button>
-                        </div>
-                      </motion.form>
-                    )}
+                      <div className="space-y-6">
+                        <AnimatePresence mode="wait">
+                          {!showAuthOptions ? (
+                            <motion.button
+                              key="enter-btn"
+                              initial={{ opacity: 0, scale: 0.9 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 1.1, filter: 'blur(10px)' }}
+                              onClick={() => setShowAuthOptions(true)}
+                              className="group w-full py-8 bg-white text-black rounded-[24px] font-black text-sm uppercase tracking-[0.4em] hover:bg-cyan-electric transition-all shadow-[0_0_60px_rgba(255,255,255,0.1)] hover:shadow-[0_0_60px_rgba(0,242,255,0.5)] flex flex-col items-center justify-center gap-2 relative overflow-hidden"
+                            >
+                              <span className="relative z-10 flex items-center gap-3">
+                                INICIAR ENLACE <ArrowRight className="w-5 h-5 group-hover:translate-x-3 transition-transform" />
+                              </span>
+                              <span className="text-[8px] text-black/40 font-bold tracking-[0.2em] relative z-10">PRESIONA PARA ACCEDER</span>
+                              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]" />
+                            </motion.button>
+                          ) : showEmailForm ? (
+                            <motion.form 
+                              key="email-form"
+                              initial={{ opacity: 0, y: 20 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              onSubmit={handleEmailAuth} 
+                              className="space-y-4"
+                            >
+                              <div className="space-y-2">
+                                <label className="text-[9px] text-zinc-500 uppercase tracking-widest ml-1">Terminal_ID (Email)</label>
+                                <input 
+                                  type="email"
+                                  value={email}
+                                  onChange={(e) => setEmail(e.target.value)}
+                                  required
+                                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-cyan-electric/50 transition-colors"
+                                  placeholder="user@retroverse.os"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <label className="text-[9px] text-zinc-500 uppercase tracking-widest ml-1">Access_Code (Password)</label>
+                                <input 
+                                  type="password"
+                                  value={password}
+                                  onChange={(e) => setPassword(e.target.value)}
+                                  required
+                                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-xs focus:outline-none focus:border-cyan-electric/50 transition-colors"
+                                  placeholder="••••••••"
+                                />
+                              </div>
+                              
+                              <button
+                                type="submit"
+                                disabled={isLoggingIn}
+                                className="w-full py-4 bg-cyan-electric text-black rounded-xl font-black text-xs uppercase tracking-[0.2em] hover:bg-cyan-400 transition-all shadow-lg disabled:opacity-50"
+                              >
+                                {isLoggingIn ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (isSignUp ? 'Crear Cuenta' : 'Acceder')}
+                              </button>
 
-                    <p className="text-[9px] text-zinc-600 text-center uppercase tracking-widest leading-relaxed">
-                      Al acceder a esta terminal, aceptas los <br />
-                      <span className="text-zinc-400">Términos de Servicio de Retroverse OS</span>
-                    </p>
+                              <div className="flex flex-col gap-2 pt-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setIsSignUp(!isSignUp)}
+                                  className="text-[9px] text-zinc-500 uppercase tracking-widest hover:text-cyan-electric transition-colors"
+                                >
+                                  {isSignUp ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Regístrate'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowEmailForm(false)}
+                                  className="text-[9px] text-zinc-400 uppercase tracking-widest hover:text-white transition-colors flex items-center justify-center gap-1"
+                                >
+                                  <ArrowRight className="w-3 h-3 rotate-180" /> Volver
+                                </button>
+                              </div>
+                            </motion.form>
+                          ) : (
+                            <motion.div 
+                              key="auth-options"
+                              initial={{ opacity: 0, y: 30 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="space-y-4"
+                            >
+                              <button
+                                onClick={handleGoogleLogin}
+                                disabled={isLoggingIn}
+                                className="w-full py-5 bg-white text-black rounded-2xl font-black text-xs uppercase tracking-[0.2em] hover:bg-cyan-electric transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50"
+                              >
+                                {isLoggingIn ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Globe className="w-5 h-5" /> Google Auth</>}
+                              </button>
+                              
+                              <div className="grid grid-cols-2 gap-4">
+                                <button
+                                  onClick={handleGuestLogin}
+                                  disabled={isLoggingIn}
+                                  className="py-5 bg-zinc-800/50 border border-white/5 text-zinc-400 rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:text-white hover:bg-zinc-800 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                  <UserIcon className="w-4 h-4" /> Invitado
+                                </button>
+                                <button
+                                  onClick={handleDevLogin}
+                                  disabled={isLoggingIn}
+                                  className="py-5 bg-zinc-800/50 border border-cyan-electric/20 text-cyan-electric rounded-2xl font-bold text-[10px] uppercase tracking-widest hover:bg-cyan-electric/10 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                  <Terminal className="w-4 h-4" /> Dev
+                                </button>
+                              </div>
+
+                              <button
+                                onClick={() => setShowEmailForm(true)}
+                                className="w-full py-4 bg-zinc-900 border border-white/10 text-white rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-zinc-800 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                              >
+                                <Terminal className="w-4 h-4" /> Email Login
+                              </button>
+
+                              <button
+                                onClick={() => setShowAuthOptions(false)}
+                                className="w-full py-2 text-[9px] text-zinc-600 uppercase tracking-widest hover:text-zinc-400 transition-colors flex items-center justify-center gap-2"
+                              >
+                                <ArrowRight className="w-3 h-3 rotate-180" /> VOLVER AL PANEL PRINCIPAL
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+
+                      <div className="pt-4 border-t border-white/5">
+                        <p className="text-[9px] text-zinc-600 text-center uppercase tracking-widest leading-relaxed">
+                          Al acceder, confirmas tu enlace con la red <br />
+                          <span className="text-zinc-400">Retroverse OS Global Network</span>
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </div>
 
+
             {/* Footer Status */}
-            <div className="mt-12 flex items-center justify-center gap-8 text-[10px] font-mono text-zinc-600 uppercase tracking-widest w-full">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                RED: EN LÍNEA
+            <div className="absolute bottom-12 left-12 right-12 flex items-center justify-between text-[10px] font-mono text-zinc-600 uppercase tracking-[0.3em]">
+              <div className="flex items-center gap-8">
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  RED: EN LÍNEA
+                </div>
+                <div className="hidden md:flex items-center gap-2">
+                  <Cpu className="w-3 h-3" />
+                  CPU: 12%
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Cpu className="w-3 h-3" />
-                CPU: 12%
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-cyan-electric/50" />
-                VER: 2.0.1
+              <div className="flex items-center gap-8">
+                <div className="hidden md:block">ESTADO: LISTO PARA ENLACE</div>
+                <div className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-cyan-electric/50" />
+                  VER: 2.0.1
+                </div>
               </div>
             </div>
           </motion.div>

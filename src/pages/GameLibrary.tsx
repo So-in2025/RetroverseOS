@@ -420,19 +420,19 @@ export default function GameLibrary() {
         <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-4">
           <div className="flex items-center gap-12">
             <div className="flex flex-col">
-              <h1 className="text-2xl font-black italic uppercase tracking-tighter flex items-center gap-2">
+              <h1 className="text-lg font-retro italic uppercase tracking-tighter flex items-center gap-2">
                 <Gamepad2 className="w-8 h-8 text-cyan-electric" />
                 RETROVERSE <span className="text-cyan-electric">OS</span>
               </h1>
               <div className="flex items-center gap-2 mt-1">
                 <div className="flex items-center gap-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                  <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">CORES: OK</span>
+                  <span className="text-[8px] font-retro text-emerald-500 uppercase tracking-widest">CORES: OK</span>
                 </div>
                 <div className="w-px h-2 bg-white/10" />
                 <div className="flex items-center gap-1">
                   <div className="w-1.5 h-1.5 rounded-full bg-cyan-electric shadow-[0_0_8px_rgba(0,242,255,0.5)]" />
-                  <span className="text-[8px] font-black text-cyan-electric uppercase tracking-widest">ARCHIVE: CONNECTED</span>
+                  <span className="text-[8px] font-retro text-cyan-electric uppercase tracking-widest">ARCHIVE: CONNECTED</span>
                 </div>
               </div>
             </div>
@@ -459,7 +459,7 @@ export default function GameLibrary() {
                     }`}
                   >
                     <mode.icon className="w-3 h-3" />
-                    <span className="text-[9px] font-black uppercase tracking-widest">{mode.label}</span>
+                    <span className="text-[9px] font-retro uppercase tracking-widest">{mode.label}</span>
                   </button>
                 ))}
              </div>
@@ -537,12 +537,12 @@ export default function GameLibrary() {
           <div className="flex items-center gap-4 bg-zinc-900/80 backdrop-blur-xl border border-white/10 px-6 py-2 rounded-2xl shadow-2xl">
             <div className="flex items-center gap-2 text-zinc-500">
               <Disc className="w-4 h-4" />
-              <span className="text-[10px] font-black uppercase tracking-widest">SISTEMA:</span>
+              <span className="text-[10px] font-retro uppercase tracking-widest">SISTEMA:</span>
             </div>
             <select
               value={selectedSystem}
               onChange={(e) => setSelectedSystem(e.target.value)}
-              className="bg-transparent text-cyan-electric text-xs font-black uppercase tracking-widest focus:outline-none cursor-pointer hover:text-white transition-colors"
+              className="bg-transparent text-cyan-electric text-xs font-retro uppercase tracking-widest focus:outline-none cursor-pointer hover:text-white transition-colors"
             >
               <option value="All" className="bg-zinc-900 text-white">TODAS LAS CONSOLAS</option>
               <option value="downloaded" className="bg-zinc-900 text-cyan-electric font-bold italic">★ BAJADOS (LOCAL)</option>
@@ -569,21 +569,21 @@ export default function GameLibrary() {
                   className="text-center space-y-2 w-full px-8"
                 >
                   <div className="flex items-center justify-center gap-3">
-                    <span className="px-3 py-1 bg-white/10 backdrop-blur-md border border-white/20 rounded text-[10px] font-black uppercase tracking-widest text-white shadow-lg">
+                    <span className="px-3 py-1 bg-white/10 backdrop-blur-md border border-white/20 rounded text-[10px] font-retro uppercase tracking-widest text-white shadow-lg">
                       {heroGame.system}
                     </span>
-                    <span className="px-3 py-1 bg-cyan-electric/10 border border-cyan-electric/20 rounded text-[10px] font-black uppercase tracking-widest text-cyan-electric shadow-lg">
+                    <span className="px-3 py-1 bg-cyan-electric/10 border border-cyan-electric/20 rounded text-[10px] font-retro uppercase tracking-widest text-cyan-electric shadow-lg">
                       {heroGame.year || 'UNKNOWN'}
                     </span>
                     {heroGame.players > 1 && (
-                      <span className="px-3 py-1 bg-magenta-accent/10 border border-magenta-accent/20 rounded text-[10px] font-black uppercase tracking-widest text-magenta-accent shadow-lg">
+                      <span className="px-3 py-1 bg-magenta-accent/10 border border-magenta-accent/20 rounded text-[10px] font-retro uppercase tracking-widest text-magenta-accent shadow-lg">
                         MULTIPLAYER
                       </span>
                     )}
                   </div>
 
                   <div className="h-24 flex items-center justify-center w-full">
-                    <h2 className="text-4xl md:text-5xl lg:text-6xl font-black text-white uppercase italic tracking-tighter leading-none drop-shadow-[0_0_30px_rgba(0,0,0,0.8)] max-w-6xl mx-auto line-clamp-2 text-center px-4 w-full">
+                    <h2 className="text-xl md:text-2xl lg:text-3xl font-retro text-white uppercase italic tracking-tighter leading-none drop-shadow-[0_0_30px_rgba(0,0,0,0.8)] max-w-6xl mx-auto line-clamp-2 text-center px-4 w-full">
                       {heroGame.title}
                     </h2>
                   </div>
@@ -1118,9 +1118,9 @@ export default function GameLibrary() {
             >
               <div className="flex items-center gap-4 mb-4 text-rose-500">
                 <AlertTriangle className="w-8 h-8" />
-                <h2 className="text-xl font-black uppercase tracking-widest">¿Purgar Caché Total?</h2>
+                <h2 className="text-lg font-black uppercase tracking-widest">¿Purgar Caché Total?</h2>
               </div>
-              <p className="text-zinc-400 text-sm mb-6">
+              <p className="text-zinc-400 text-xs mb-6">
                 Esto borrará el catálogo y <strong>todas las ROMs descargadas</strong>. Esta acción no se puede deshacer.
               </p>
               <div className="flex justify-end gap-3">
@@ -1160,17 +1160,17 @@ export default function GameLibrary() {
             >
               <div className="flex items-center gap-4 mb-4 text-cyan-electric">
                 <Zap className="w-8 h-8" />
-                <h2 className="text-xl font-black uppercase tracking-widest">¿Forzar Reparación Global?</h2>
+                <h2 className="text-lg font-black uppercase tracking-widest">¿Forzar Reparación Global?</h2>
               </div>
               
               {repairResult ? (
-                <div className="text-emerald-400 text-sm mb-6 font-mono">
+                <div className="text-emerald-400 text-xs mb-6 font-mono">
                   {repairResult}
                   <br/><br/>Reiniciando sistema...
                 </div>
               ) : (
                 <>
-                  <p className="text-zinc-400 text-sm mb-6">
+                  <p className="text-zinc-400 text-xs mb-6">
                     Esto restablecerá todos los juegos "rotos" para que el sistema intente descargarlos de nuevo.
                   </p>
                   <div className="flex justify-end gap-3">

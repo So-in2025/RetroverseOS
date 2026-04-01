@@ -30,7 +30,7 @@ export default function TacticalOverlay({ advice, isVisible }: TacticalOverlayPr
                 <Zap className="w-5 h-5 text-cyan-electric animate-pulse" />
               </div>
               <div>
-                <h4 className="text-xs font-black text-white uppercase tracking-widest italic">Tactical AI</h4>
+                <h4 className="text-xs font-retro text-white uppercase tracking-widest italic">Tactical AI</h4>
                 <p className="text-[10px] font-bold text-cyan-electric/60 uppercase tracking-tighter">Strategist Link Active</p>
               </div>
             </div>

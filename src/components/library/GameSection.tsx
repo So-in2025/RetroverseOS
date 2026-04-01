@@ -73,7 +73,7 @@ const GameSection: React.FC<GameSectionProps> = ({ title, games, variant = 'defa
   return (
     <div className="mb-12 z-20 relative pointer-events-auto group/section">
       <div className="flex items-center justify-between mb-6 px-4">
-        <h2 className="text-2xl font-black text-white uppercase tracking-widest flex items-center gap-3 italic flex-shrink-0">
+        <h2 className="text-2xl font-retro text-white uppercase tracking-widest flex items-center gap-3 italic flex-shrink-0">
           <span className={`w-1.5 h-8 rounded-full ${
             variant === 'live' ? 'bg-rose-500 animate-pulse' : 
             variant === 'online' ? 'bg-emerald-500' : 

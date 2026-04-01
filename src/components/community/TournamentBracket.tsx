@@ -65,11 +65,11 @@ export default function TournamentBracket({ tournamentTitle, onClose }: BracketP
       >
         <div className="p-6 border-b border-white/5 flex items-center justify-between bg-black/20">
           <div>
-            <h2 className="text-2xl font-black italic uppercase tracking-tighter text-white flex items-center gap-3">
+            <h2 className="text-2xl font-retro italic uppercase tracking-tighter text-white flex items-center gap-3">
               <Trophy className="w-6 h-6 text-yellow-500" />
               {tournamentTitle}
             </h2>
-            <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mt-1">Live Bracket Progression</p>
+            <p className="text-zinc-500 text-xs font-retro uppercase tracking-widest mt-1">Live Bracket Progression</p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-xl transition-colors text-zinc-500 hover:text-white">
             <Swords className="w-6 h-6" />
@@ -80,7 +80,7 @@ export default function TournamentBracket({ tournamentTitle, onClose }: BracketP
           <div className="flex gap-12 md:gap-24 min-w-max items-center h-full">
             {rounds.map((round, roundIdx) => (
               <div key={round.name} className="flex flex-col gap-12 md:gap-24">
-                <h3 className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.3em] text-center mb-4">
+                <h3 className="text-[10px] font-retro text-zinc-600 uppercase tracking-[0.3em] text-center mb-4">
                   {round.name}
                 </h3>
                 <div className="flex flex-col justify-around gap-16 flex-1">
@@ -91,17 +91,17 @@ export default function TournamentBracket({ tournamentTitle, onClose }: BracketP
                         <div className={`flex items-center justify-between p-3 border-b border-white/5 ${match.winner === 1 ? 'bg-emerald-500/5' : ''}`}>
                           <div className="flex items-center gap-2 min-w-0">
                             <div className={`w-1.5 h-1.5 rounded-full ${match.winner === 1 ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-zinc-800'}`} />
-                            <span className={`text-xs font-bold truncate ${match.winner === 1 ? 'text-white' : 'text-zinc-500'}`}>{match.p1}</span>
+                            <span className={`text-xs font-retro uppercase tracking-widest truncate ${match.winner === 1 ? 'text-white' : 'text-zinc-500'}`}>{match.p1}</span>
                           </div>
-                          <span className="font-mono text-xs font-bold text-zinc-400">{match.s1 ?? '-'}</span>
+                          <span className="font-retro text-xs text-zinc-400">{match.s1 ?? '-'}</span>
                         </div>
                         {/* Player 2 */}
                         <div className={`flex items-center justify-between p-3 ${match.winner === 2 ? 'bg-emerald-500/5' : ''}`}>
                           <div className="flex items-center gap-2 min-w-0">
                             <div className={`w-1.5 h-1.5 rounded-full ${match.winner === 2 ? 'bg-emerald-500 shadow-[0_0_8px_#10b981]' : 'bg-zinc-800'}`} />
-                            <span className={`text-xs font-bold truncate ${match.winner === 2 ? 'text-white' : 'text-zinc-500'}`}>{match.p2}</span>
+                            <span className={`text-xs font-retro uppercase tracking-widest truncate ${match.winner === 2 ? 'text-white' : 'text-zinc-500'}`}>{match.p2}</span>
                           </div>
-                          <span className="font-mono text-xs font-bold text-zinc-400">{match.s2 ?? '-'}</span>
+                          <span className="font-retro text-xs text-zinc-400">{match.s2 ?? '-'}</span>
                         </div>
                       </div>
 
@@ -124,14 +124,14 @@ export default function TournamentBracket({ tournamentTitle, onClose }: BracketP
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Active Match</span>
+              <span className="text-[10px] font-retro text-zinc-500 uppercase tracking-widest">Active Match</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-zinc-800" />
-              <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Scheduled</span>
+              <span className="text-[10px] font-retro text-zinc-500 uppercase tracking-widest">Scheduled</span>
             </div>
           </div>
-          <button className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/20">
+          <button className="px-6 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-retro text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-emerald-900/20">
             Join Spectator Mode
           </button>
         </div>

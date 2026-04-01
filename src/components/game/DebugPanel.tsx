@@ -58,8 +58,8 @@ export default function DebugPanel({ onClose }: DebugPanelProps) {
                 <ShieldAlert className="w-6 h-6 text-rose-500" />
               </div>
               <div>
-                <h2 className="text-rose-500 font-black uppercase tracking-widest text-lg leading-none">Neural Debugger</h2>
-                <span className="text-[10px] text-rose-500/60 uppercase font-bold">API Pool Orchestrator v2.4.0</span>
+                <h2 className="text-rose-500 font-retro uppercase tracking-widest text-lg leading-none">Neural Debugger</h2>
+                <span className="text-[10px] text-rose-500/60 uppercase font-retro tracking-widest">API Pool Orchestrator v2.4.0</span>
               </div>
             </div>
             <button 
@@ -73,16 +73,16 @@ export default function DebugPanel({ onClose }: DebugPanelProps) {
           {/* Stats Bar */}
           <div className="bg-zinc-900/50 p-4 border-b border-white/5 grid grid-cols-3 gap-4">
             <div className="flex flex-col">
-              <span className="text-[10px] text-zinc-500 uppercase font-bold">Total Nodes</span>
-              <span className="text-xl font-black text-white">{keys.length}</span>
+              <span className="text-[10px] text-zinc-500 uppercase font-retro tracking-widest">Total Nodes</span>
+              <span className="text-xl font-retro text-white">{keys.length}</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] text-zinc-500 uppercase font-bold">Active Links</span>
-              <span className="text-xl font-black text-emerald-500">{keys.filter(k => !k.isExhausted).length}</span>
+              <span className="text-[10px] text-zinc-500 uppercase font-retro tracking-widest">Active Links</span>
+              <span className="text-xl font-retro text-emerald-500">{keys.filter(k => !k.isExhausted).length}</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[10px] text-zinc-500 uppercase font-bold">Exhausted</span>
-              <span className="text-xl font-black text-rose-500">{keys.filter(k => k.isExhausted).length}</span>
+              <span className="text-[10px] text-zinc-500 uppercase font-retro tracking-widest">Exhausted</span>
+              <span className="text-xl font-retro text-rose-500">{keys.filter(k => k.isExhausted).length}</span>
             </div>
           </div>
 
@@ -108,10 +108,10 @@ export default function DebugPanel({ onClose }: DebugPanelProps) {
                         {k.key.substring(0, 12)}••••••••••••{k.key.substring(k.key.length - 4)}
                       </span>
                       <div className="flex items-center gap-3 mt-1">
-                        <span className={`text-[9px] font-black uppercase ${k.isExhausted ? 'text-rose-500' : 'text-emerald-500'}`}>
+                        <span className={`text-[9px] font-retro uppercase tracking-widest ${k.isExhausted ? 'text-rose-500' : 'text-emerald-500'}`}>
                           {k.isExhausted ? 'Exhausted' : 'Operational'}
                         </span>
-                        <span className="text-[9px] text-zinc-500 font-bold uppercase">
+                        <span className="text-[9px] text-zinc-500 font-retro uppercase tracking-widest">
                           Last Sync: {k.lastUsed ? new Date(k.lastUsed).toLocaleTimeString() : 'Never'}
                         </span>
                       </div>
@@ -130,7 +130,7 @@ export default function DebugPanel({ onClose }: DebugPanelProps) {
               {keys.length === 0 && (
                 <div className="text-center py-12 border-2 border-dashed border-white/5 rounded-2xl">
                   <Terminal className="w-12 h-12 text-zinc-800 mx-auto mb-4" />
-                  <p className="text-zinc-600 text-sm font-bold uppercase tracking-widest">No Neural Nodes Detected</p>
+                  <p className="text-zinc-600 text-sm font-retro uppercase tracking-widest">No Neural Nodes Detected</p>
                 </div>
               )}
             </div>
@@ -154,13 +154,13 @@ export default function DebugPanel({ onClose }: DebugPanelProps) {
                 />
                 <button 
                   onClick={handleAddKey}
-                  className="px-4 py-2 bg-rose-500 text-black font-black uppercase text-xs rounded-xl hover:bg-white transition-colors"
+                  className="px-4 py-2 bg-rose-500 text-black font-retro uppercase text-xs rounded-xl hover:bg-white transition-colors"
                 >
                   Inject
                 </button>
                 <button 
                   onClick={() => setIsAdding(false)}
-                  className="px-4 py-2 bg-white/5 text-white font-black uppercase text-xs rounded-xl hover:bg-white/10 transition-colors"
+                  className="px-4 py-2 bg-white/5 text-white font-retro uppercase text-xs rounded-xl hover:bg-white/10 transition-colors"
                 >
                   Cancel
                 </button>
@@ -168,7 +168,7 @@ export default function DebugPanel({ onClose }: DebugPanelProps) {
             ) : (
               <button 
                 onClick={() => setIsAdding(true)}
-                className="w-full py-3 bg-white/5 border border-white/10 rounded-xl text-zinc-400 font-black uppercase text-xs tracking-widest hover:bg-white/10 hover:text-white transition-all flex items-center justify-center gap-2"
+                className="w-full py-3 bg-white/5 border border-white/10 rounded-xl text-zinc-400 font-retro uppercase text-xs tracking-widest hover:bg-white/10 hover:text-white transition-all flex items-center justify-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 Add Neural Node

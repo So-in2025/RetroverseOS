@@ -17,6 +17,10 @@ import Community from './pages/Community';
 import Achievements from './pages/Achievements';
 import Settings from './pages/Settings';
 import NetplayLobby from './pages/NetplayLobby';
+import CompetitiveHome from './pages/competitive/CompetitiveHome';
+import Leaderboard from './pages/competitive/Leaderboard';
+import Matchmaking from './pages/competitive/Matchmaking';
+import Tournaments from './pages/competitive/Tournaments';
 import Login from './pages/Login';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import NotificationSystem from './components/NotificationSystem';
@@ -195,8 +199,11 @@ function AppContent() {
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/community" element={<Community />} />
             <Route path="/achievements" element={<Achievements />} />
-            <Route path="/tournaments" element={<Community />} />
+            <Route path="/tournaments" element={<Tournaments />} />
             <Route path="/netplay" element={<NetplayLobby />} />
+            <Route path="/competitive" element={<CompetitiveHome />} />
+            <Route path="/competitive/leaderboard" element={<Leaderboard />} />
+            <Route path="/competitive/matchmaking" element={<Matchmaking />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>

@@ -51,13 +51,28 @@ window.onerror = (message, source, lineno, colno, error) => {
   }
 };
 
-// Register Service Worker for Offline Support
+// Register Service Worker for Offline Support and SAB enablement
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // SharedArrayBuffer is now handled via Vercel headers (COOP/COEP)
-    // We register our custom sw.js for offline shell and asset caching
     navigator.serviceWorker.register('/sw.js').then(registration => {
       console.log('✅ [Main] ServiceWorker registered:', registration.scope);
+      
+      // If we're not cross-origin isolated, we need to reload the page
+      // so the service worker can intercept the main document request
+      // and add the COOP/COEP headers.
+      if (window.crossOriginIsolated === false) {
+        // Wait for the service worker to be active and controlling the page
+        if (registration.active && !navigator.serviceWorker.controller) {
+          console.log('🔄 [Main] Reloading to enable SharedArrayBuffer (COOP/COEP)...');
+          window.location.reload();
+        }
+        
+        // Also listen for the controllerchange event
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          console.log('🔄 [Main] Controller changed, reloading...');
+          window.location.reload();
+        });
+      }
     }).catch(err => {
       console.error('❌ [Main] ServiceWorker registration failed:', err);
     });

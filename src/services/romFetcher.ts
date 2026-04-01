@@ -125,189 +125,224 @@ export class ROMFetchService {
       }
     }
 
-    // 0. Agentic Discovery Engine (NEW)
-    let finalUrl = url;
-    let usedDiscovery = false;
-    try {
-        const brain = new ROMDiscoveryBrain();
-        const candidate = await brain.findBestCandidate(gameId, system || '');
-        if (candidate) {
-            console.log(`[ROM Fetch] Discovery Engine found better URL: ${candidate.url}`);
-            finalUrl = candidate.url;
-            usedDiscovery = true;
-        }
-    } catch (e) {
-        console.warn('[ROM Fetch] Discovery Engine failed, falling back to original URL:', e);
-    }
+    const maxRetries = 2;
+    let attempt = 0;
+    let lastError: any = null;
 
-    // 0. Resolve 'archive:' URLs
-    if (finalUrl.startsWith('archive:')) {
-        const { MetadataNormalizationEngine } = await import('./metadataNormalization');
-        const identifier = finalUrl.replace('archive:', '');
-        const resolvedUrl = await MetadataNormalizationEngine.resolveRomUrl(identifier, system);
-        if (resolvedUrl) {
-            finalUrl = resolvedUrl;
-        } else {
-            throw new Error(`No se pudo resolver el enlace de la ROM: ${finalUrl}`);
-        }
-    }
-
-    // 0. Auto-correct old URLs that used raw extensions instead of .zip for nointro sets
-    let originalUrl = finalUrl;
-    let autoCorrected = false;
-    if (finalUrl.includes('archive.org/download/nointro.') && !finalUrl.endsWith('.zip')) {
-      finalUrl = finalUrl.replace(/\.(nes|sfc|smc|md|gen|gba|gbc|gb|n64|z64|v64)$/i, '.zip');
-      autoCorrected = true;
-      console.log(`[ROM Fetch] Auto-corrected URL to: ${finalUrl}`);
-    }
-
-    // 1. Check Cache
-    const cachedRom = await storage.getCachedRom(gameId);
-    if (cachedRom && cachedRom.blob.size > 1024) {
-      // Validate that the cached ROM is not an HTML error page
-      const header = await cachedRom.blob.slice(0, 100).text();
-      if (!header.trim().toLowerCase().startsWith('<') && !header.toLowerCase().includes('<!doctype html>')) {
-        
-        // Check if the cached ROM is a ZIP and we are not mame/neogeo
-        const magicBuffer = await cachedRom.blob.slice(0, 4).arrayBuffer();
-        const magicBytes = new Uint8Array(magicBuffer);
-        const isCachedZip = magicBytes[0] === 0x50 && magicBytes[1] === 0x4B;
-        
-        if (isCachedZip && system !== 'mame' && system !== 'neogeo') {
-          console.warn(`[ROM Fetch] Found unextracted ZIP in cache for non-arcade system. Clearing cache and re-fetching...`);
-          await storage.deleteCachedRom(gameId);
-        } else {
-          console.log(`[ROM Fetch] Cache hit for ${gameId} (${(cachedRom.blob.size / 1024).toFixed(2)} KB)`);
-          onProgress?.('Cargando desde caché...');
-          await storage.updateRomAccessTime(gameId);
-          return cachedRom.blob;
-        }
-      } else {
-        console.warn(`[ROM Fetch] Cache hit for ${gameId} but file appears to be HTML. Re-downloading...`);
-      }
-    } else if (cachedRom) {
-      console.warn(`[ROM Fetch] Cache hit for ${gameId} but file is too small (${cachedRom.blob.size} bytes). Re-downloading...`);
-    }
-
-    const doFetch = async (targetUrl: string) => {
-      console.log(`[ROM Fetch] Cache miss for ${gameId}. Downloading from ${targetUrl}...`);
-      onProgress?.('Iniciando descarga...');
-      sentinel.logRomFetch(gameId, targetUrl, 'start');
-      
-      // 2. Define Validator for Zip Integrity and HTML errors
-      const blobValidator = async (blob: Blob) => {
-        // Validation: Discard if < 4KB
-        if (blob.size < 4096) {
-          throw new Error(`Downloaded ROM is too small (${blob.size} bytes). Sector de Datos Dañado.`);
-        }
-        const header = await blob.slice(0, 100).text();
-        if (header.trim().toLowerCase().startsWith('<') || header.toLowerCase().includes('<!doctype html>')) {
-          throw new Error('Downloaded ROM is an HTML error page. Sector de Datos Dañado.');
-        }
-      };
-
-      // 3. Fetch from Network with Progress
-      const response = await this.fetchWithProgress(targetUrl, onProgress);
-      
-      // Read stream to report progress
-      const contentLength = response.headers.get('content-length');
-      const total = contentLength ? parseInt(contentLength, 10) : 0;
-      let loaded = 0;
-      
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error('Response body is not readable');
-      
-      const chunks: Uint8Array[] = [];
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (value) {
-          chunks.push(value);
-          loaded += value.length;
-          if (total && onProgress) {
-            const percent = Math.round((loaded / total) * 100);
-            onProgress(`Descargando... ${percent}%`);
-          } else if (onProgress) {
-            onProgress(`Descargando... ${(loaded / 1024 / 1024).toFixed(2)} MB`);
-          }
-        }
-      }
-      
-      let blob = new Blob(chunks);
-      
-      // 3.5 Validate the downloaded blob
-      await blobValidator(blob);
-      
-      // NEW: Robust ROM Validation
-      if (system) {
-          const validation = await ROMValidator.validate(blob, system);
-          if (!validation.isValid) {
-              throw new Error(`ROM Validation Failed: ${validation.error}`);
-          }
-      }
-
-      // 4. Handle Compressed Files (.zip)
-      // We check the magic number (PK) to be sure it's actually a zip file,
-      // regardless of the URL extension.
-      const magicBuffer = await blob.slice(0, 4).arrayBuffer();
-      const magicBytes = new Uint8Array(magicBuffer);
-      const isZip = magicBytes[0] === 0x50 && magicBytes[1] === 0x4B; // P, K
-
-      if (isZip && system !== 'mame' && system !== 'neogeo') {
-        onProgress?.('Extrayendo archivo principal...');
-        try {
-          blob = await this.extractMainFileFromZip(blob, system);
-        } catch (extractErr) {
-          console.error('[ROM Fetch] Error extracting ZIP:', extractErr);
-          throw new Error('El archivo ZIP está corrupto o incompleto.');
-        }
-      }
-
-      // 5. Save to Cache
+    while (attempt <= maxRetries) {
       try {
-        await this.saveToCache(gameId, blob);
-        sentinel.logRomFetch(gameId, targetUrl, 'success', { size: blob.size });
-      } catch (e) {
-        console.warn(`[ROM Fetch] Failed to cache ROM ${gameId}:`, e);
-      }
-
-      return blob;
-    };
-
-    try {
-      return await doFetch(finalUrl);
-    } catch (e) {
-      if (autoCorrected) {
-        console.warn(`[ROM Fetch] Auto-corrected URL failed: ${e}. Trying original URL: ${originalUrl}`);
+        // 0. Agentic Discovery Engine (NEW)
+        let finalUrl = url;
+        let usedDiscovery = false;
         try {
-          return await doFetch(originalUrl);
-        } catch (originalErr) {
-          // Fall through to discovery fallback if original also fails
-          e = originalErr;
+            const brain = new ROMDiscoveryBrain();
+            const candidate = await brain.findBestCandidate(gameId, system || '');
+            if (candidate) {
+                console.log(`[ROM Fetch] Discovery Engine found better URL: ${candidate.url}`);
+                finalUrl = candidate.url;
+                usedDiscovery = true;
+            }
+        } catch (e) {
+            console.warn('[ROM Fetch] Discovery Engine failed, falling back to original URL:', e);
         }
-      }
 
-      if (usedDiscovery && system) {
-        console.warn(`[ROM Fetch] Discovered URL failed: ${e}. Clearing cache and trying original URL...`);
-        const { DiscoveryCache } = await import('./DiscoveryCache');
-        await DiscoveryCache.clear(gameId, system);
-        
-        let fallbackUrl = url;
-        if (fallbackUrl.startsWith('archive:')) {
+        // 0. Resolve 'archive:' URLs
+        if (finalUrl.startsWith('archive:')) {
             const { MetadataNormalizationEngine } = await import('./metadataNormalization');
-            const identifier = fallbackUrl.replace('archive:', '');
+            const identifier = finalUrl.replace('archive:', '');
             const resolvedUrl = await MetadataNormalizationEngine.resolveRomUrl(identifier, system);
             if (resolvedUrl) {
-                fallbackUrl = resolvedUrl;
+                finalUrl = resolvedUrl;
             } else {
-                throw new Error(`No se pudo resolver el enlace de la ROM: ${fallbackUrl}`);
+                throw new Error(`No se pudo resolver el enlace de la ROM: ${finalUrl}`);
             }
         }
-        
-        return await doFetch(fallbackUrl);
+
+        // 0. Auto-correct old URLs that used raw extensions instead of .zip for nointro sets
+        let originalUrl = finalUrl;
+        let autoCorrected = false;
+        if (finalUrl.includes('archive.org/download/nointro.') && !finalUrl.endsWith('.zip')) {
+          finalUrl = finalUrl.replace(/\.(nes|sfc|smc|md|gen|gba|gbc|gb|n64|z64|v64)$/i, '.zip');
+          autoCorrected = true;
+          console.log(`[ROM Fetch] Auto-corrected URL to: ${finalUrl}`);
+        }
+
+        // 1. Check Cache
+        const cachedRom = await storage.getCachedRom(gameId);
+        if (cachedRom && cachedRom.blob.size > 1024) {
+          // Validate that the cached ROM is not an HTML error page
+          const header = await cachedRom.blob.slice(0, 100).text();
+          if (!header.trim().toLowerCase().startsWith('<') && !header.toLowerCase().includes('<!doctype html>')) {
+            
+            // Check if the cached ROM is a ZIP and we are not mame/neogeo
+            const magicBuffer = await cachedRom.blob.slice(0, 4).arrayBuffer();
+            const magicBytes = new Uint8Array(magicBuffer);
+            const isCachedZip = magicBytes[0] === 0x50 && magicBytes[1] === 0x4B;
+            
+            if (isCachedZip && system !== 'mame' && system !== 'neogeo') {
+              console.warn(`[ROM Fetch] Found unextracted ZIP in cache for non-arcade system. Clearing cache and re-fetching...`);
+              await storage.deleteCachedRom(gameId);
+            } else {
+              console.log(`[ROM Fetch] Cache hit for ${gameId} (${(cachedRom.blob.size / 1024).toFixed(2)} KB)`);
+              onProgress?.('Cargando desde caché...');
+              await storage.updateRomAccessTime(gameId);
+              return cachedRom.blob;
+            }
+          } else {
+            console.warn(`[ROM Fetch] Cache hit for ${gameId} but file appears to be HTML. Re-downloading...`);
+          }
+        } else if (cachedRom) {
+          console.warn(`[ROM Fetch] Cache hit for ${gameId} but file is too small (${cachedRom.blob.size} bytes). Re-downloading...`);
+        }
+
+        const doFetch = async (targetUrl: string) => {
+          console.log(`[ROM Fetch] Cache miss for ${gameId}. Downloading from ${targetUrl}...`);
+          onProgress?.('Iniciando descarga...');
+          sentinel.logRomFetch(gameId, targetUrl, 'start');
+          
+          // 2. Define Validator for Zip Integrity and HTML errors
+          const blobValidator = async (blob: Blob) => {
+            // Validation: Discard if < 4KB
+            if (blob.size < 4096) {
+              throw new Error(`Downloaded ROM is too small (${blob.size} bytes). Sector de Datos Dañado.`);
+            }
+            const header = await blob.slice(0, 100).text();
+            if (header.trim().toLowerCase().startsWith('<') || header.toLowerCase().includes('<!doctype html>')) {
+              throw new Error('Downloaded ROM is an HTML error page. Sector de Datos Dañado.');
+            }
+          };
+
+          // 3. Fetch from Network with Progress
+          const response = await this.fetchWithProgress(targetUrl, onProgress);
+          
+          // Read stream to report progress
+          const contentLength = response.headers.get('content-length');
+          const total = contentLength ? parseInt(contentLength, 10) : 0;
+          let loaded = 0;
+          
+          const reader = response.body?.getReader();
+          if (!reader) throw new Error('Response body is not readable');
+          
+          const chunks: Uint8Array[] = [];
+          while (true) {
+            try {
+              const { done, value } = await reader.read();
+              if (done) break;
+              if (value) {
+                chunks.push(value);
+                loaded += value.length;
+                if (total && onProgress) {
+                  const percent = Math.round((loaded / total) * 100);
+                  onProgress(`Descargando... ${percent}%`);
+                } else if (onProgress) {
+                  onProgress(`Descargando... ${(loaded / 1024 / 1024).toFixed(2)} MB`);
+                }
+              }
+            } catch (readErr: any) {
+              console.error('[ROM Fetch] Stream read error:', readErr);
+              throw new Error(`Error de conexión durante la descarga: ${readErr.message}`);
+            }
+          }
+          
+          // Check for partial download
+          if (total > 0 && loaded < total) {
+            console.error(`[ROM Fetch] Partial download detected: ${loaded}/${total} bytes`);
+            throw new Error(`Descarga incompleta (${Math.round(loaded/total*100)}%). El servidor cerró la conexión prematuramente.`);
+          }
+          
+          let blob = new Blob(chunks);
+          
+          // 3.5 Validate the downloaded blob
+          await blobValidator(blob);
+          
+          // NEW: Robust ROM Validation
+          if (system) {
+              const validation = await ROMValidator.validate(blob, system);
+              if (!validation.isValid) {
+                  throw new Error(`ROM Validation Failed: ${validation.error}`);
+              }
+          }
+
+          // 4. Handle Compressed Files (.zip)
+          // We check the magic number (PK) to be sure it's actually a zip file,
+          // regardless of the URL extension.
+          const magicBuffer = await blob.slice(0, 4).arrayBuffer();
+          const magicBytes = new Uint8Array(magicBuffer);
+          const isZip = magicBytes[0] === 0x50 && magicBytes[1] === 0x4B; // P, K
+
+          if (isZip && system !== 'mame' && system !== 'neogeo') {
+            onProgress?.('Extrayendo archivo principal...');
+            try {
+              blob = await this.extractMainFileFromZip(blob, system);
+            } catch (extractErr: any) {
+              console.error('[ROM Fetch] Error extracting ZIP:', extractErr);
+              const isInvalidDistance = extractErr.message?.includes('invalid distance');
+              const errorMsg = isInvalidDistance 
+                ? 'El archivo ZIP está corrupto (error de descompresión). Es posible que la descarga se haya corrompido en el túnel.'
+                : `Error al extraer el ZIP: ${extractErr.message || 'Archivo corrupto'}`;
+              throw new Error(errorMsg);
+            }
+          }
+
+          // 5. Save to Cache
+          try {
+            await this.saveToCache(gameId, blob);
+            sentinel.logRomFetch(gameId, targetUrl, 'success', { size: blob.size });
+          } catch (e) {
+            console.warn(`[ROM Fetch] Failed to cache ROM ${gameId}:`, e);
+          }
+
+          return blob;
+        };
+
+        try {
+          return await doFetch(finalUrl);
+        } catch (e) {
+          if (autoCorrected) {
+            console.warn(`[ROM Fetch] Auto-corrected URL failed: ${e}. Trying original URL: ${originalUrl}`);
+            try {
+              return await doFetch(originalUrl);
+            } catch (originalErr) {
+              // Fall through to discovery fallback if original also fails
+              e = originalErr;
+            }
+          }
+
+          if (usedDiscovery && system) {
+            console.warn(`[ROM Fetch] Discovered URL failed: ${e}. Clearing cache and trying original URL...`);
+            const { DiscoveryCache } = await import('./DiscoveryCache');
+            await DiscoveryCache.clear(gameId, system);
+            
+            let fallbackUrl = url;
+            if (fallbackUrl.startsWith('archive:')) {
+                const { MetadataNormalizationEngine } = await import('./metadataNormalization');
+                const identifier = fallbackUrl.replace('archive:', '');
+                const resolvedUrl = await MetadataNormalizationEngine.resolveRomUrl(identifier, system);
+                if (resolvedUrl) {
+                    fallbackUrl = resolvedUrl;
+                } else {
+                    throw new Error(`No se pudo resolver el enlace de la ROM: ${fallbackUrl}`);
+                }
+            }
+            
+            return await doFetch(fallbackUrl);
+          }
+          throw e;
+        }
+      } catch (e: any) {
+        lastError = e;
+        attempt++;
+        if (attempt <= maxRetries) {
+          const waitTime = 2000 * attempt;
+          console.warn(`[ROM Fetch] Attempt ${attempt} failed for ${gameId}: ${e.message}. Retrying in ${waitTime}ms...`);
+          onProgress?.(`Reintentando descarga (${attempt}/${maxRetries})...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
       }
-      throw e;
     }
+
+    sentinel.logRomFetch(gameId, url, 'error', { error: lastError.message });
+    throw lastError;
   }
 
 

@@ -8,6 +8,7 @@ import { GameCover } from '../components/library/GameCover';
 import { aiCoach } from '../services/aiCoaching';
 import ReactMarkdown from 'react-markdown';
 import { BYOKModal } from '../components/ai/BYOKModal';
+import { statsService } from '../competitive/statsService';
 
 export default function GameDetail() {
   const { gameId } = useParams();
@@ -17,6 +18,15 @@ export default function GameDetail() {
   const [isBriefingLoading, setIsBriefingLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showBYOKModal, setShowBYOKModal] = useState(false);
+  const [activePlayers, setActivePlayers] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      const data = await statsService.getCompetitiveStats();
+      setActivePlayers(data.activePlayers);
+    };
+    fetchStats();
+  }, []);
 
   const handleRequestBriefing = async () => {
     if (!game) return;
@@ -59,8 +69,8 @@ export default function GameDetail() {
     return (
       <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Juego no encontrado</h1>
-          <Link to="/" className="text-emerald-400 hover:text-emerald-300">Volver al Sistema</Link>
+          <h1 className="text-2xl font-retro mb-4 uppercase tracking-widest">Juego no encontrado</h1>
+          <Link to="/" className="text-emerald-400 hover:text-emerald-300 font-retro text-xs uppercase tracking-widest">Volver al Sistema</Link>
         </div>
       </div>
     );
@@ -120,18 +130,18 @@ export default function GameDetail() {
               transition={{ delay: 0.1 }}
             >
               <div className="flex items-center gap-3 mb-4">
-                <span className="px-3 py-1 rounded bg-white/10 text-sm font-bold tracking-wider uppercase border border-white/10">{game.system}</span>
+                <span className="px-3 py-1 rounded bg-white/10 text-sm font-retro tracking-widest uppercase border border-white/10">{game.system}</span>
                 {game.year && (
-                  <span className="px-3 py-1 rounded bg-white/5 text-sm text-gray-400 border border-white/5">{game.year}</span>
+                  <span className="px-3 py-1 rounded bg-white/5 text-sm text-gray-400 border border-white/5 font-retro tracking-widest">{game.year}</span>
                 )}
                 {game.genre && (
-                  <span className="px-3 py-1 rounded bg-emerald-500/20 text-emerald-400 text-sm font-bold border border-emerald-500/30">{game.genre}</span>
+                  <span className="px-3 py-1 rounded bg-emerald-500/20 text-emerald-400 text-sm font-retro tracking-widest border border-emerald-500/30 uppercase">{game.genre}</span>
                 )}
               </div>
               
-              <h1 className="text-5xl md:text-7xl font-black mb-6 leading-tight tracking-tight">{game.title}</h1>
+              <h1 className="text-3xl md:text-5xl font-retro mb-6 leading-tight tracking-tighter uppercase italic">{game.title}</h1>
               
-              <p className="text-lg text-gray-300 max-w-2xl mb-8 leading-relaxed">
+              <p className="text-base text-gray-300 max-w-2xl mb-8 leading-relaxed">
                 {game.description || 'No hay descripción disponible.'}
               </p>
 
@@ -140,7 +150,7 @@ export default function GameDetail() {
                 {game.playable !== false ? (
                   <Link 
                     to={`/play/${gameId}`}
-                    className="flex items-center gap-3 px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-lg transition-all shadow-lg shadow-emerald-900/50 hover:scale-105"
+                    className="flex items-center gap-3 px-8 py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-retro text-base transition-all shadow-lg shadow-emerald-900/50 hover:scale-105 uppercase tracking-widest"
                   >
                     <Play className="w-6 h-6 fill-current" />
                     Jugar Ahora
@@ -148,7 +158,7 @@ export default function GameDetail() {
                 ) : (
                   <button 
                     disabled
-                    className="flex items-center gap-3 px-8 py-4 bg-zinc-700 text-zinc-400 rounded-xl font-bold text-lg cursor-not-allowed opacity-75"
+                    className="flex items-center gap-3 px-8 py-4 bg-zinc-700 text-zinc-400 rounded-xl font-retro text-base cursor-not-allowed opacity-75 uppercase tracking-widest"
                     title="Este título es parte de la red en la nube y requiere una licencia."
                   >
                     <Play className="w-6 h-6 fill-current" />
@@ -156,7 +166,7 @@ export default function GameDetail() {
                   </button>
                 )}
                 
-                <button className="px-6 py-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-white/10 transition-colors font-medium flex items-center gap-2">
+                <button className="px-6 py-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 border border-white/10 transition-colors font-retro text-xs uppercase tracking-widest flex items-center gap-2">
                   <Users className="w-5 h-5" />
                   Invitar Amigos
                 </button>
@@ -173,26 +183,28 @@ export default function GameDetail() {
               {/* Stats / Meta */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-8 border-t border-white/10 pt-8 mb-12">
                 <div>
-                  <p className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Editor</p>
-                  <p className="font-medium text-zinc-200">{game.publisher || 'Desconocido'}</p>
+                  <p className="text-zinc-500 text-xs uppercase tracking-widest mb-1 font-retro">Editor</p>
+                  <p className="font-retro text-zinc-200 uppercase tracking-widest text-sm">{game.publisher || 'Desconocido'}</p>
                 </div>
                 <div>
-                  <p className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Jugadores Activos</p>
+                  <p className="text-zinc-500 text-xs uppercase tracking-widest mb-1 font-retro">Jugadores Activos</p>
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <p className="font-medium text-emerald-400">1,248</p>
+                    <p className="font-retro text-emerald-400 text-sm">
+                      {activePlayers !== null ? activePlayers.toLocaleString() : "—"}
+                    </p>
                   </div>
                 </div>
                 <div>
-                  <p className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Rango de Comunidad</p>
+                  <p className="text-zinc-500 text-xs uppercase tracking-widest mb-1 font-retro">Rango de Comunidad</p>
                   <div className="flex items-center gap-2">
                     <Trophy className="w-4 h-4 text-yellow-500" />
-                    <p className="font-medium text-white">#42</p>
+                    <p className="font-retro text-white text-sm">#42</p>
                   </div>
                 </div>
                 <div>
-                  <p className="text-zinc-500 text-xs uppercase tracking-wider mb-1">Temporada Competitiva</p>
-                  <p className="font-medium text-white">Temporada 4</p>
+                  <p className="text-zinc-500 text-xs uppercase tracking-widest mb-1 font-retro">Temporada Competitiva</p>
+                  <p className="font-retro text-white text-sm uppercase tracking-widest">Temporada 4</p>
                 </div>
               </div>
 
@@ -201,11 +213,11 @@ export default function GameDetail() {
                 {/* AI Intel Panel */}
                 <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-8 backdrop-blur-sm">
                   <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-black italic uppercase tracking-tighter flex items-center gap-3">
+                    <h3 className="text-xl font-retro italic uppercase tracking-tighter flex items-center gap-3">
                       <BrainCircuit className="w-6 h-6 text-emerald-500" />
                       Base de Datos de IA de Inteligencia
                     </h3>
-                    <div className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-500 uppercase tracking-widest">
+                    <div className="px-2 py-1 rounded bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-retro text-emerald-500 uppercase tracking-widest">
                       Datos Verificados
                     </div>
                   </div>
@@ -213,10 +225,10 @@ export default function GameDetail() {
                   <div className="prose prose-invert prose-sm max-w-none">
                     <div className="text-zinc-400 leading-relaxed space-y-4">
                       <p>
-                        <span className="text-white font-bold block mb-1 uppercase tracking-wider text-xs">📜 Historia e Impacto:</span>
+                        <span className="text-white font-retro block mb-1 uppercase tracking-widest text-xs">📜 Historia e Impacto:</span>
                         {game.description || 'Cargando archivos históricos...'}
                       </p>
-                      <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl italic text-xs text-emerald-400/80">
+                      <div className="p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl italic text-xs text-emerald-400/80 font-retro uppercase tracking-widest">
                         "Este título redefinió el panorama del {game.genre || 'género'} tras su lanzamiento en {game.year || 'su época'}, estableciendo mecánicas que todavía se utilizan en el juego competitivo moderno."
                       </div>
                     </div>
@@ -224,7 +236,7 @@ export default function GameDetail() {
                   
                   <button 
                     onClick={handleRequestBriefing}
-                    className="mt-8 w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all text-zinc-400 hover:text-white"
+                    className="mt-8 w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-[10px] font-retro uppercase tracking-widest transition-all text-zinc-400 hover:text-white"
                   >
                     Solicitar Informe Táctico Completo
                   </button>
@@ -234,22 +246,22 @@ export default function GameDetail() {
                 <div className="space-y-8">
                   <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
                     <div className="flex justify-between items-center mb-4">
-                      <h3 className="font-bold text-lg flex items-center gap-2">
+                      <h3 className="font-retro text-lg flex items-center gap-2 uppercase tracking-widest">
                         <Trophy className="w-5 h-5 text-emerald-500" />
                         Mejores Jugadores
                       </h3>
-                      <Link to="/community" className="text-sm text-emerald-400 hover:text-emerald-300">Ver Clasificaciones Completas</Link>
+                      <Link to="/community" className="text-xs text-emerald-400 hover:text-emerald-300 font-retro uppercase tracking-widest">Ver Clasificaciones Completas</Link>
                     </div>
                     <div className="space-y-3">
                       {[1, 2, 3].map((rank) => (
                         <div key={rank} className="flex items-center justify-between p-3 bg-black/20 rounded-lg hover:bg-white/5 transition-colors">
                           <div className="flex items-center gap-3">
-                            <span className={`w-6 h-6 flex items-center justify-center rounded text-xs font-bold ${rank === 1 ? 'bg-yellow-500/20 text-yellow-500' : 'bg-zinc-800 text-zinc-500'}`}>
+                            <span className={`w-6 h-6 flex items-center justify-center rounded text-[10px] font-retro ${rank === 1 ? 'bg-yellow-500/20 text-yellow-500' : 'bg-zinc-800 text-zinc-500'}`}>
                               {rank}
                             </span>
-                            <span className="font-medium text-zinc-200">ProPlayer_{rank}</span>
+                            <span className="font-retro text-zinc-200 text-xs uppercase tracking-widest">JugadorPro_{rank}</span>
                           </div>
-                          <span className="font-mono text-emerald-400 text-sm">{3000 - (rank * 50)} MMR</span>
+                          <span className="font-retro text-emerald-400 text-xs uppercase tracking-widest">{3000 - (rank * 50)} MMR</span>
                         </div>
                       ))}
                     </div>
@@ -257,19 +269,19 @@ export default function GameDetail() {
 
                   <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-6">
                     <div className="flex justify-between items-center mb-4">
-                      <h3 className="font-bold text-lg flex items-center gap-2">
+                      <h3 className="font-retro text-lg flex items-center gap-2 uppercase tracking-widest">
                         <Users className="w-5 h-5 text-cyan-electric" />
                         Salas Activas
                       </h3>
-                      <span className="text-[10px] font-mono text-zinc-500">12 SESIONES EN VIVO</span>
+                      <span className="text-[10px] font-retro text-zinc-500 uppercase tracking-widest">12 SESIONES EN VIVO</span>
                     </div>
                     <div className="flex -space-x-2">
                       {[1, 2, 3, 4, 5].map(i => (
-                        <div key={i} className="w-8 h-8 rounded-full border-2 border-zinc-900 bg-zinc-800 flex items-center justify-center text-[10px] font-bold">
-                          U{i}
+                        <div key={i} className="w-8 h-8 rounded-full border-2 border-zinc-900 bg-zinc-800 flex items-center justify-center text-[10px] font-retro">
+                          J{i}
                         </div>
                       ))}
-                      <div className="w-8 h-8 rounded-full border-2 border-zinc-900 bg-cyan-electric/20 text-cyan-electric flex items-center justify-center text-[10px] font-bold">
+                      <div className="w-8 h-8 rounded-full border-2 border-zinc-900 bg-cyan-electric/20 text-cyan-electric flex items-center justify-center text-[10px] font-retro">
                         +7
                       </div>
                     </div>
@@ -292,7 +304,7 @@ export default function GameDetail() {
               className="bg-zinc-900 border border-white/10 rounded-3xl max-w-2xl w-full max-h-[80vh] flex flex-col overflow-hidden shadow-2xl"
             >
               <div className="p-6 border-b border-white/10 flex items-center justify-between">
-                <h3 className="text-xl font-black italic uppercase tracking-tighter flex items-center gap-3">
+                <h3 className="text-xl font-retro italic uppercase tracking-tighter flex items-center gap-3">
                   <BrainCircuit className="w-6 h-6 text-emerald-500" />
                   Informe <span className="text-emerald-500">Táctico</span>
                 </h3>
@@ -307,7 +319,7 @@ export default function GameDetail() {
                 {isBriefingLoading ? (
                   <div className="flex flex-col items-center justify-center py-12 text-center">
                     <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
-                    <p className="font-mono text-xs uppercase tracking-widest text-zinc-500">Generando datos tácticos desde la red neuronal...</p>
+                    <p className="font-retro text-[10px] uppercase tracking-widest text-zinc-500">Generando datos tácticos desde la red neuronal...</p>
                   </div>
                 ) : (
                   <div className="prose prose-invert prose-emerald max-w-none">
@@ -315,7 +327,7 @@ export default function GameDetail() {
                     {aiBriefing?.includes('BYOK') && (
                       <button 
                         onClick={() => setShowBYOKModal(true)}
-                        className="mt-6 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-sm uppercase tracking-widest transition-all w-full flex items-center justify-center gap-2"
+                        className="mt-6 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-retro text-xs uppercase tracking-widest transition-all w-full flex items-center justify-center gap-2"
                       >
                         <Zap className="w-5 h-5" />
                         Configurar BYOK

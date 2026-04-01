@@ -113,7 +113,7 @@ export default function Community() {
       {/* Native Header */}
       <div className="pt-14 pb-4 px-4 md:pt-10 md:px-8 bg-zinc-950">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-black italic uppercase tracking-tighter mb-1">Centro de la Comunidad</h1>
+          <h1 className="text-3xl font-retro italic uppercase tracking-tighter mb-1">Centro de la Comunidad</h1>
           <p className="text-zinc-400 text-sm font-medium">Conecta. Compite. Domina.</p>
         </div>
       </div>
@@ -134,7 +134,7 @@ export default function Community() {
                 AudioEngine.playSelectSound();
                 haptics.light();
               }}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-black text-xs tracking-wider transition-all whitespace-nowrap flex-none ${
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-retro text-xs tracking-wider transition-all whitespace-nowrap flex-none ${
                 activeTab === tab.id 
                   ? 'bg-emerald-500 text-black shadow-[0_0_15px_rgba(16,185,129,0.4)]' 
                   : 'bg-zinc-900 text-zinc-500 border border-white/5'
@@ -164,7 +164,7 @@ export default function Community() {
                 {/* Live Activity Ticker */}
                 <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2 overflow-hidden relative">
                   <div className="flex items-center gap-3 whitespace-nowrap animate-marquee">
-                    <div className="flex items-center gap-2 text-emerald-400 text-[10px] font-black uppercase tracking-widest">
+                    <div className="flex items-center gap-2 text-emerald-400 text-[10px] font-retro uppercase tracking-widest">
                       <Activity className="w-3 h-3" /> LIVE:
                     </div>
                     <span className="text-zinc-300 text-[10px] font-medium uppercase tracking-wider">
@@ -454,7 +454,7 @@ export default function Community() {
                 <div className="relative z-10 p-6 md:p-8">
                   <div className="flex items-center justify-between mb-8">
                     <div>
-                      <h2 className="text-2xl md:text-3xl font-black italic uppercase tracking-tighter text-white flex items-center gap-3">
+                      <h2 className="text-2xl md:text-3xl font-retro italic uppercase tracking-tighter text-white flex items-center gap-3">
                         <Cpu className="w-8 h-8 text-emerald-400" />
                         Mission Control IA
                       </h2>
@@ -700,7 +700,7 @@ export default function Community() {
                       </div>
 
                       <div className="bg-zinc-900 border border-white/5 rounded-xl p-4">
-                        <h4 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-3">Distribución de Tráfico</h4>
+                        <h4 className="text-[10px] font-retro text-zinc-500 uppercase tracking-widest mb-3">Distribución de Tráfico</h4>
                         <div className="space-y-3">
                           {[
                             { label: 'Norteamérica', val: 45 },

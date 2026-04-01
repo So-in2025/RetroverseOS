@@ -164,22 +164,22 @@ export default function Marketplace() {
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-3 md:py-4 flex flex-col sm:flex-row justify-between items-center gap-3 md:gap-4">
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <ShoppingCart className="w-5 h-5 md:w-6 md:h-6 text-emerald-500" />
-            <h1 className="text-xl md:text-2xl font-bold tracking-tight">Mercado</h1>
+            <h1 className="text-lg md:text-xl font-retro tracking-tight">Mercado</h1>
           </div>
           
           <div className="flex items-center justify-between w-full sm:w-auto gap-3 md:gap-4 bg-black/40 px-3 md:px-4 py-1.5 md:py-2 rounded-xl border border-white/5">
             <div className="flex items-center gap-3 border-r border-white/10 pr-3">
-              <span className="text-[10px] md:text-sm text-zinc-400 font-medium uppercase tracking-wider">Tickets:</span>
+              <span className="text-[10px] md:text-xs text-zinc-400 font-medium uppercase tracking-wider">Tickets:</span>
               <div className="flex items-center gap-1.5 md:gap-2">
                 <Star className="w-3 h-3 md:w-4 md:h-4 text-yellow-400 fill-yellow-400/20" />
-                <span className="text-lg md:text-xl font-mono font-bold text-white">2</span>
+                <span className="text-base md:text-lg font-mono font-bold text-white">2</span>
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-[10px] md:text-sm text-zinc-400 font-medium uppercase tracking-wider">Balance:</span>
+              <span className="text-[10px] md:text-xs text-zinc-400 font-medium uppercase tracking-wider">Balance:</span>
               <div className="flex items-center gap-1.5 md:gap-2">
                 <Hexagon className="w-3 h-3 md:w-4 md:h-4 text-emerald-400 fill-emerald-400/20" />
-                <span className="text-lg md:text-xl font-mono font-bold text-white">{balance.toLocaleString()}</span>
+                <span className="text-base md:text-lg font-mono font-bold text-white">{balance.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -199,11 +199,11 @@ export default function Marketplace() {
           
           <div className="relative z-10 p-6 md:p-12 flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="max-w-xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-4 md:mb-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[9px] md:text-[10px] font-retro uppercase tracking-wider mb-4 md:mb-6">
                 <Crown className="w-3 h-3 md:w-4 md:h-4" /> Suscripción Premium
               </div>
-              <h2 className="text-3xl md:text-5xl font-bold mb-3 md:mb-4 leading-tight text-white">Retro Pass<br/><span className="text-emerald-400">Acceso Total</span></h2>
-              <p className="text-zinc-300 text-sm md:text-base mb-6 md:mb-8 leading-relaxed">
+              <h2 className="text-2xl md:text-4xl font-retro mb-3 md:mb-4 leading-tight text-white">Retro Pass<br/><span className="text-emerald-400">Acceso Total</span></h2>
+              <p className="text-zinc-300 text-xs md:text-sm mb-6 md:mb-8 leading-relaxed">
                 Acceso instantáneo a todas las consolas, Cloud Sync ilimitado, servidores de baja latencia y resolución 4K desbloqueada. La experiencia definitiva para el Ronin profesional.
               </p>
               
@@ -253,7 +253,7 @@ export default function Marketplace() {
                   haptics.light();
                   setActiveCategory(category.id);
                 }}
-                className={`flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-medium text-xs md:text-sm transition-all whitespace-nowrap ${
+                className={`flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-retro text-xs md:text-sm transition-all whitespace-nowrap ${
                   activeCategory === category.id 
                     ? 'bg-white text-black shadow-lg' 
                     : 'bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 border border-white/5'
@@ -312,12 +312,12 @@ export default function Marketplace() {
                     <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent opacity-80" />
                     
                     {/* Rarity Badge */}
-                    <div className={`absolute top-3 left-3 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border backdrop-blur-md ${getRarityColor(item.rarity)}`}>
+                    <div className={`absolute top-3 left-3 px-2 py-1 rounded text-[10px] font-retro uppercase tracking-wider border backdrop-blur-md ${getRarityColor(item.rarity)}`}>
                       {getRarityLabel(item.rarity)}
                     </div>
 
                     {isOwned && (
-                      <div className="absolute top-3 right-3 px-2 py-1 rounded bg-emerald-500/90 text-white text-[10px] font-bold uppercase tracking-wider backdrop-blur-md flex items-center gap-1">
+                      <div className="absolute top-3 right-3 px-2 py-1 rounded bg-emerald-500/90 text-white text-[10px] font-retro uppercase tracking-wider backdrop-blur-md flex items-center gap-1">
                         <Check className="w-3 h-3" /> Poseído
                       </div>
                     )}
@@ -325,8 +325,8 @@ export default function Marketplace() {
 
                   {/* Item Details */}
                   <div className="p-5 flex flex-col flex-1">
-                    <h3 className="text-lg font-bold text-white mb-2 group-hover:text-emerald-400 transition-colors">{item.name}</h3>
-                    <p className="text-sm text-zinc-400 line-clamp-2 mb-4 flex-1">{item.description}</p>
+                    <h3 className="text-base font-retro text-white mb-2 group-hover:text-emerald-400 transition-colors">{item.name}</h3>
+                    <p className="text-xs text-zinc-400 line-clamp-2 mb-4 flex-1">{item.description}</p>
                     
                     <div className="flex items-center justify-between mt-auto pt-4 border-t border-white/5">
                       {!isOwned ? (
