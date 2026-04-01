@@ -6,6 +6,7 @@ import { useAuth } from '../../services/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sword, X, Search, AlertCircle, CheckCircle2, Loader2, Trophy, Gamepad2, Users } from 'lucide-react';
+import { GameCover } from '../../components/library/GameCover';
 
 function GameCard({ game, isSelected, onSelect, isCurated }: { 
   game: any, 
@@ -13,19 +14,6 @@ function GameCard({ game, isSelected, onSelect, isCurated }: {
   onSelect: () => void,
   isCurated?: boolean
 }) {
-  const [imgSrc, setImgSrc] = useState(game.cover_url);
-  const [hasError, setHasError] = useState(false);
-
-  const handleError = () => {
-    if (imgSrc === game.cover_url && game.artwork_url) {
-      setImgSrc(game.artwork_url);
-    } else if (!hasError) {
-      // If both cover and artwork fail, show a generic placeholder or keep it empty
-      // but don't use a generated photo.
-      setHasError(true);
-    }
-  };
-
   return (
     <motion.button
       whileHover={{ scale: 1.02, y: -2 }}
@@ -37,16 +25,19 @@ function GameCard({ game, isSelected, onSelect, isCurated }: {
           : 'border-white/5 hover:border-white/20 bg-carbon/40'
       }`}
     >
-      <img 
-        src={imgSrc} 
-        alt={game.title}
-        onError={handleError}
-        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-80 group-hover:opacity-100"
-        referrerPolicy="no-referrer"
+      <GameCover 
+        gameId={game.game_id}
+        archiveId={game.archive_id}
+        title={game.title}
+        systemId={game.system_id}
+        primaryUrl={game.cover_url}
+        className="w-full h-full opacity-80 group-hover:opacity-100 transition-opacity"
+        aspectRatio="portrait"
+        showLoading={false}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-carbon via-carbon/40 to-transparent opacity-90" />
+      <div className="absolute inset-0 bg-gradient-to-t from-carbon via-carbon/40 to-transparent opacity-90 pointer-events-none" />
       
-      <div className="absolute bottom-0 left-0 right-0 p-3 text-left">
+      <div className="absolute bottom-0 left-0 right-0 p-3 text-left pointer-events-none">
         <div className="flex items-center gap-1.5 mb-1">
           <span className="text-[6px] font-mono text-cyan-electric uppercase tracking-[0.1em] px-1 py-0.5 bg-cyan-electric/5 rounded-sm border border-cyan-electric/10">
             {game.system}
@@ -66,7 +57,7 @@ function GameCard({ game, isSelected, onSelect, isCurated }: {
         <motion.div 
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
-          className="absolute top-2 right-2 w-6 h-6 bg-cyan-electric rounded-full flex items-center justify-center shadow-lg"
+          className="absolute top-2 right-2 w-6 h-6 bg-cyan-electric rounded-full flex items-center justify-center shadow-lg z-20"
         >
           <Sword className="w-3 h-3 text-carbon" />
         </motion.div>
@@ -269,14 +260,17 @@ export default function Matchmaking() {
                         className="space-y-4"
                       >
                         <div className="aspect-video rounded-xl overflow-hidden border border-white/10 relative group">
-                          <img 
-                            src={selectedGame.artwork_url || selectedGame.cover_url} 
-                            alt={selectedGame.title}
-                            className="w-full h-full object-cover"
-                            referrerPolicy="no-referrer"
+                          <GameCover 
+                            gameId={selectedGame.game_id}
+                            archiveId={selectedGame.archive_id}
+                            title={selectedGame.title}
+                            systemId={selectedGame.system_id}
+                            primaryUrl={selectedGame.artwork_url || selectedGame.cover_url}
+                            className="w-full h-full"
+                            aspectRatio="landscape"
                           />
-                          <div className="absolute inset-0 bg-carbon/40 backdrop-blur-[2px]" />
-                          <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="absolute inset-0 bg-carbon/40 backdrop-blur-[2px] pointer-events-none" />
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <Gamepad2 className="w-8 h-8 text-cyan-electric/50" />
                           </div>
                         </div>

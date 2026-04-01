@@ -48,7 +48,9 @@ const LIBRETRO_SYSTEM_MAP: Record<string, string> = {
   'neogeo': 'SNK_-_Neo_Geo',
   'MAME': 'MAME',
   'mame': 'MAME',
-  'arcade': 'MAME'
+  'arcade': 'MAME',
+  'fbneo': 'FBNeo_-_Arcade_Games',
+  'FBNeo - Arcade Games': 'FBNeo_-_Arcade_Games'
 };
 
 const ARCHIVE_SYSTEM_MAP: Record<string, string> = {
