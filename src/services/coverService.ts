@@ -168,11 +168,7 @@ export class CoverService {
       }
     });
 
-    const result = [...new Set(finalSources.filter(Boolean))];
-    if (result.length === 0) {
-        console.warn(`[CoverService] No sources found for ${title} (${system})`);
-    }
-    return result;
+    return [...new Set(finalSources.filter(Boolean))];
   }
 
   /**

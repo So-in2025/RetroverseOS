@@ -41,28 +41,6 @@ export const GameCover: React.FC<GameCoverProps> = ({
     return CoverService.getCoverSources(title, systemId, archiveId || gameId, primaryUrl);
   }, [title, systemId, archiveId, gameId, primaryUrl]);
 
-  const [isVisible, setIsVisible] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // IntersectionObserver para lazy loading
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
-
   const isMounted = useRef(true);
 
   useEffect(() => {
@@ -72,9 +50,8 @@ export const GameCover: React.FC<GameCoverProps> = ({
 
   const prevGameId = useRef(gameId);
 
-  // Cargar desde cache al montar y ser visible
+  // Cargar desde cache al montar
   useEffect(() => {
-    if (!isVisible) return;
     if (prevGameId.current === gameId && currentSrc) return;
     prevGameId.current = gameId;
 
@@ -133,7 +110,7 @@ export const GameCover: React.FC<GameCoverProps> = ({
     });
 
     return () => { isMountedLocal = false; };
-  }, [gameId, isVisible]);
+  }, [gameId]);
 
   const loadFromNetwork = async () => {
     if (isCached || status === 'success') return;
@@ -155,47 +132,23 @@ export const GameCover: React.FC<GameCoverProps> = ({
 
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // Aumentado a 8s
+        const timeoutId = setTimeout(() => controller.abort(), 4000); // Reduced to 4s
 
-        console.log(`[Cover] Attempting source ${currentIndex + 1}/${sources.length} for ${title}: ${url}`);
-        
-        // Intentar cargar la URL original primero si es una URL de github/archive
-        const originalUrl = url.replace('https://wsrv.nl/?url=', '').split('&')[0];
-        const decodedUrl = decodeURIComponent(originalUrl);
-        
-        // Intentar cargar la versión proxyzada (wsrv.nl)
         const response = await fetch(proxiedUrl, { 
           signal: controller.signal,
           referrerPolicy: 'no-referrer'
         });
-        
-        // Si falla, intentar la URL original directamente
-        let finalResponse = response;
-        if (!response.ok) {
-          console.warn(`[Cover] Proxy failed for ${title}, trying original: ${decodedUrl}`);
-          finalResponse = await fetch(decodedUrl, { 
-            signal: controller.signal,
-            referrerPolicy: 'no-referrer'
-          });
-        }
-
         clearTimeout(timeoutId);
 
-        if (finalResponse.status === 429) {
-          console.warn(`[Cover] Rate limited for ${title}`);
+        if (response.status === 429) {
+          // Rate limited, stop trying for this game to avoid spamming
           throw new Error('Rate limited');
         }
 
-        if (!finalResponse.ok) {
-          console.warn(`[Cover] HTTP ${finalResponse.status} for ${title}`);
-          throw new Error(`HTTP ${finalResponse.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
-        const blob = await finalResponse.blob();
-        if (!blob.type.startsWith('image/')) {
-          console.warn(`[Cover] Not an image for ${title}`);
-          throw new Error('Not an image');
-        }
+        const blob = await response.blob();
+        if (!blob.type.startsWith('image/')) throw new Error('Not an image');
 
         // Persistir en cache via cacheManager (LRU)
         await cacheManager.putCover(gameId, blob);
@@ -213,7 +166,6 @@ export const GameCover: React.FC<GameCoverProps> = ({
         setStatus('success');
         setIsCached(true);
         success = true;
-        console.log(`[Cover] Successfully loaded ${title} from source ${currentIndex + 1}`);
       } catch (e: any) {
         if (e.message === 'Rate limited') {
           setStatus('error');
@@ -252,7 +204,7 @@ export const GameCover: React.FC<GameCoverProps> = ({
   };
 
   return (
-    <div ref={containerRef} className={`relative overflow-hidden bg-zinc-900/50 group shadow-2xl ${aspectClasses[aspectRatio]} ${className}`}>
+    <div className={`relative overflow-hidden bg-zinc-900/50 group shadow-2xl ${aspectClasses[aspectRatio]} ${className}`}>
       {/* Reflection Effect */}
       <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none z-10" />
       

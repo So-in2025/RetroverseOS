@@ -63,7 +63,7 @@ self.addEventListener('fetch', (event) => {
   };
 
   // 1. ROMs: Cache-First
-  if (url.pathname.includes('/roms/') || url.href.includes('archive.org')) {
+  if (url.pathname.includes('/roms/') || url.href.includes('archive.org') || url.href.includes('erista.me')) {
     event.respondWith(handleCacheFirst(ROM_CACHE, event.request).then(addHeaders));
     return;
   }

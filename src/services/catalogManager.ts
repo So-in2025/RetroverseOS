@@ -13,23 +13,23 @@ const GBA = 'gba';
 const N64 = 'n64';
 const PSX = 'psx';
 
-// Myrient Base URLs (Replaced with Archive.org collections due to Myrient shutdown)
-const MYRIENT_NES = 'https://archive.org/download/nointro.nes';
-const MYRIENT_SNES = 'https://archive.org/download/nointro.snes';
-const MYRIENT_GEN = 'https://archive.org/download/nointro.md';
-const MYRIENT_GBA = 'https://archive.org/download/nointro.gba';
-const MYRIENT_GBC = 'https://archive.org/download/nointro.gbc';
-const MYRIENT_GB = 'https://archive.org/download/nointro.gb';
-const MYRIENT_N64 = 'https://archive.org/download/n64-roms';
-const MYRIENT_PSX = 'https://archive.org/download/chd_psx';
-const MYRIENT_ATARI_2600 = 'https://archive.org/download/nointro.atari2600';
-const MYRIENT_ATARI_7800 = 'https://archive.org/download/nointro.atari7800';
-const MYRIENT_LYNX = 'https://archive.org/download/nointro.lynx';
-const MYRIENT_MASTERSYSTEM = 'https://archive.org/download/nointro.ms';
-const MYRIENT_GAMEGEAR = 'https://archive.org/download/nointro.gg';
-const MYRIENT_PCENGINE = 'https://archive.org/download/nointro.pce';
-const MYRIENT_WONDERSWAN = 'https://archive.org/download/nointro.ws';
-const MYRIENT_NGP = 'https://archive.org/download/nointro.ngp';
+// Myrient Base URLs (Duplicated here for independence or imported)
+const MYRIENT_NES = 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Nintendo%20Entertainment%20System%20%28Headered%29';
+const MYRIENT_SNES = 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Super%20Nintendo%20Entertainment%20System';
+const MYRIENT_GEN = 'https://myrient.erista.me/files/No-Intro/Sega%20-%20Mega%20Drive%20-%20Genesis';
+const MYRIENT_GBA = 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Game%20Boy%20Advance';
+const MYRIENT_GBC = 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Game%20Boy%20Color';
+const MYRIENT_GB = 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Game%20Boy';
+const MYRIENT_N64 = 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Nintendo%2064%20%28BigEndian%29';
+const MYRIENT_PSX = 'https://myrient.erista.me/files/Redump/Sony%20-%20PlayStation';
+const MYRIENT_ATARI_2600 = 'https://myrient.erista.me/files/No-Intro/Atari%20-%202600';
+const MYRIENT_ATARI_7800 = 'https://myrient.erista.me/files/No-Intro/Atari%20-%207800';
+const MYRIENT_LYNX = 'https://myrient.erista.me/files/No-Intro/Atari%20-%20Lynx';
+const MYRIENT_MASTERSYSTEM = 'https://myrient.erista.me/files/No-Intro/Sega%20-%20Master%20System%20-%20Mark%20III';
+const MYRIENT_GAMEGEAR = 'https://myrient.erista.me/files/No-Intro/Sega%20-%20Game%20Gear';
+const MYRIENT_PCENGINE = 'https://myrient.erista.me/files/No-Intro/NEC%20-%20PC%20Engine%20-%20TurboGrafx%2016';
+const MYRIENT_WONDERSWAN = 'https://myrient.erista.me/files/No-Intro/Bandai%20-%20WonderSwan';
+const MYRIENT_NGP = 'https://myrient.erista.me/files/No-Intro/SNK%20-%20Neo%20Geo%20Pocket';
 
 // Libretro System Names for Thumbnails
 const LIBRETRO_SYSTEMS: Record<string, string> = {
