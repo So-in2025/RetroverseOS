@@ -123,6 +123,74 @@ async function startServer() {
     res.json({ found: false, content: null });
   });
 
+  // --- RATE LIMITING ---
+  const rateLimits: Record<string, { count: number, reset: number }> = {};
+  const rateLimitMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress) as string;
+    const now = Date.now();
+    
+    if (!rateLimits[ip] || now > rateLimits[ip].reset) {
+      rateLimits[ip] = { count: 1, reset: now + 60000 }; // 1 minute window
+    } else {
+      rateLimits[ip].count++;
+    }
+
+    if (rateLimits[ip].count > 1000) { // Increased to 1000 for cover fetching
+      return res.status(429).json({ error: "Too many requests" });
+    }
+    next();
+  };
+  app.use("/api/", rateLimitMiddleware);
+
+  // --- SECURE ECONOMY & COMPETITIVE (Server-Side Source of Truth) ---
+  // In a real app, these would be backed by a database like Supabase/Firebase
+  const userBalances: Record<string, number> = {};
+  const userMMR: Record<string, number> = {};
+
+  app.get("/api/economy/balance/:userId", (req, res) => {
+    const { userId } = req.params;
+    res.json({ balance: userBalances[userId] || 0 });
+  });
+
+  app.post("/api/economy/transaction", (req, res) => {
+    const { userId, amount, type, reason, signature } = req.body;
+    
+    // VALIDATION: In production, we would verify a cryptographic signature 
+    // from the game engine or a trusted client-side component.
+    if (!userId || typeof amount !== 'number') return res.status(400).json({ error: "Invalid request" });
+
+    const currentBalance = userBalances[userId] || 0;
+    if (type === 'spend' && currentBalance < amount) {
+      return res.status(400).json({ error: "Insufficient funds" });
+    }
+
+    const newBalance = type === 'earn' ? currentBalance + amount : currentBalance - amount;
+    userBalances[userId] = newBalance;
+
+    console.log(`[Economy] Transaction for ${userId}: ${type} ${amount} (${reason}). New Balance: ${newBalance}`);
+    res.json({ success: true, balance: newBalance });
+  });
+
+  app.post("/api/competitive/result", (req, res) => {
+    const { userId, gameId, score, result, matchId } = req.body;
+    
+    // VALIDATION: Verify match integrity
+    if (!userId || !gameId || typeof score !== 'number') return res.status(400).json({ error: "Invalid result" });
+
+    const currentMMR = userMMR[userId] || 1000;
+    let mmrChange = 0;
+
+    if (result === 'win') mmrChange = 25;
+    else if (result === 'loss') mmrChange = -15;
+    else if (result === 'draw') mmrChange = 5;
+
+    const newMMR = Math.max(0, currentMMR + mmrChange);
+    userMMR[userId] = newMMR;
+
+    console.log(`[Competitive] Result for ${userId} in ${gameId}: ${result} (Score: ${score}). New MMR: ${newMMR}`);
+    res.json({ success: true, mmr: newMMR, mmrChange });
+  });
+
   // --- SENTINEL TELEMETRY ENDPOINT ---
   app.post("/api/sentinel/report", (req, res) => {
     const report = req.body;
@@ -143,9 +211,23 @@ async function startServer() {
       return res.status(400).json({ error: 'Missing url parameter' });
     }
 
-    const allowedDomains = ['archive.org', 'raw.githubusercontent.com', 'cdn.jsdelivr.net', 'myrient.erista.me', 'github.com', 'wsrv.nl', 'weserv.nl', 'tse2.mm.bing.net', 'images.unsplash.com'];
+    const allowedDomains = [
+      'archive.org', 
+      'raw.githubusercontent.com', 
+      'cdn.jsdelivr.net', 
+      'github.com', 
+      'wsrv.nl', 
+      'weserv.nl', 
+      'mm.bing.net', 
+      'bing.net',
+      'google.com',
+      'googleusercontent.com',
+      'images.unsplash.com',
+      'libretro.com'
+    ];
+    let parsedTarget: URL;
     try {
-      const parsedTarget = new URL(url.startsWith('//') ? 'https:' + url : (url.startsWith('http') ? url : 'https://' + url));
+      parsedTarget = new URL(url.startsWith('//') ? 'https:' + url : (url.startsWith('http') ? url : 'https://' + url));
       if (!allowedDomains.some(domain => parsedTarget.hostname.endsWith(domain))) {
         console.warn(`[Tunnel] Blocked unauthorized domain: ${parsedTarget.hostname}`);
         return res.status(403).json({ error: `Domain ${parsedTarget.hostname} not allowed in tunnel` });
@@ -162,8 +244,7 @@ async function startServer() {
     console.log(`[Tunnel] Fetching: ${targetUrl} (Range: ${range || 'none'})`);
 
     const isArchive = targetUrl.includes('archive.org');
-    const isMyrient = targetUrl.includes('myrient.erista.me');
-    const maxRetries = (isArchive || isMyrient) ? 10 : 7; 
+    const maxRetries = isArchive ? 10 : 7; 
     let attempt = 0;
     let lastError: any = null;
 
@@ -213,7 +294,7 @@ async function startServer() {
           fetchHeaders['Range'] = range;
         }
 
-        const response = await fetch(targetUrl, {
+        const response = await fetch(parsedTarget.href, {
           signal: controller.signal,
           headers: fetchHeaders,
           // @ts-ignore
@@ -350,7 +431,7 @@ async function startServer() {
         const isHtmlError = error.message?.includes('Received HTML instead of Binary');
         
         // 401/403 can sometimes be temporary blocks or anti-bot glitches on Archive.org
-        const isAuthRetryable = (isArchive || isMyrient) && (error.message?.includes('401') || error.message?.includes('403'));
+        const isAuthRetryable = isArchive && (error.message?.includes('401') || error.message?.includes('403'));
         const isFatalStatus = error.message?.includes('404') || (!isAuthRetryable && (error.message?.includes('401') || error.message?.includes('403')));
         
         console.error(`[Tunnel] Attempt ${attempt} failed for ${targetUrl}: ${error.message}${isConnReset ? ' (Connection Reset/Fetch Failed)' : ''}`);

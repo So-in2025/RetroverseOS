@@ -3,25 +3,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Outlet } from 'react-router-dom';
 import Sidebar from './components/layout/Sidebar';
 import SocialPanel from './components/layout/SocialPanel';
-import GameLibrary from './pages/GameLibrary';
-import Home from './pages/Home';
-import GameDetail from './pages/GameDetail';
-import GameRoom from './pages/GameRoom';
-import PremiumVault from './pages/PremiumVault';
-import Profile from './pages/Profile';
-import Marketplace from './pages/Marketplace';
-import Community from './pages/Community';
-import Achievements from './pages/Achievements';
-import Settings from './pages/Settings';
-import NetplayLobby from './pages/NetplayLobby';
-import CompetitiveHome from './pages/competitive/CompetitiveHome';
-import Leaderboard from './pages/competitive/Leaderboard';
-import Matchmaking from './pages/competitive/Matchmaking';
-import Tournaments from './pages/competitive/Tournaments';
-import Login from './pages/Login';
+import { PageLoader } from './components/PageLoader';
+import { ErrorBoundary } from './components/ErrorBoundary';
+
+// Lazy loaded components
+const GameLibrary = lazy(() => import('./pages/GameLibrary'));
+const Home = lazy(() => import('./pages/Home'));
+const GameDetail = lazy(() => import('./pages/GameDetail'));
+const GameRoom = lazy(() => import('./pages/GameRoom'));
+const PremiumVault = lazy(() => import('./pages/PremiumVault'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Marketplace = lazy(() => import('./pages/Marketplace'));
+const Community = lazy(() => import('./pages/Community'));
+const Achievements = lazy(() => import('./pages/Achievements'));
+const Settings = lazy(() => import('./pages/Settings'));
+const NetplayLobby = lazy(() => import('./pages/NetplayLobby'));
+const CompetitiveHome = lazy(() => import('./pages/competitive/CompetitiveHome'));
+const Leaderboard = lazy(() => import('./pages/competitive/Leaderboard'));
+const Matchmaking = lazy(() => import('./pages/competitive/Matchmaking'));
+const Tournaments = lazy(() => import('./pages/competitive/Tournaments'));
+const Login = lazy(() => import('./pages/Login'));
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import NotificationSystem from './components/NotificationSystem';
 
@@ -34,7 +39,6 @@ import DebugPanel from './components/game/DebugPanel';
 import SystemOverlay from './components/game/SystemOverlay';
 import ConsoleNotification from './components/game/ConsoleNotification';
 import { useUIStore } from './store/uiStore';
-import { useEffect, useState } from 'react';
 import { SentinelEngine } from './services/gcts';
 
 import { sentinel } from './services/sentinel';
@@ -89,6 +93,10 @@ function Layout() {
     if (import.meta.env.DEV) {
       SentinelEngine.startBackgroundWorker();
     }
+    
+    // Start Sentinel Auditing
+    sentinel.start();
+
     return () => {
       if (import.meta.env.DEV) {
         SentinelEngine.stopBackgroundWorker();
@@ -110,7 +118,9 @@ function Layout() {
       </AnimatePresence>
       <ConsoleNotification />
       <main className={`${!isGameRoom ? 'lg:ml-20' : ''} ${!isGameRoom && socialPanelOpen ? 'xl:mr-64' : ''} min-h-screen relative ${!isGameRoom ? 'pt-16 lg:pt-0 pb-24 lg:pb-0' : ''} transition-all duration-300`}>
-        <Outlet />
+        <Suspense fallback={<PageLoader />}>
+          <Outlet />
+        </Suspense>
       </main>
     </>
   );
@@ -122,7 +132,7 @@ import { storage } from './services/storage';
 import OnboardingFlow from './components/onboarding/OnboardingFlow';
 import { recommendationEngine } from './services/recommendationEngine';
 import BootAnimation from './components/layout/BootAnimation';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { economy } from './services/economy';
 import { customization } from './services/customization';
 import { achievements } from './services/achievements';
@@ -185,29 +195,33 @@ function AppContent() {
         )}
       </AnimatePresence>
       <NotificationSystem />
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        
-        <Route element={<ProtectedRoute />}>
-          <Route element={<Layout />}>
-            <Route path="/" element={<GameLibrary />} />
-            <Route path="/dashboard" element={<Home />} />
-            <Route path="/game/:gameId" element={<GameDetail />} />
-            <Route path="/play/:gameId" element={<GameRoom />} />
-            <Route path="/premium" element={<PremiumVault />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/marketplace" element={<Marketplace />} />
-            <Route path="/community" element={<Community />} />
-            <Route path="/achievements" element={<Achievements />} />
-            <Route path="/tournaments" element={<Tournaments />} />
-            <Route path="/netplay" element={<NetplayLobby />} />
-            <Route path="/competitive" element={<CompetitiveHome />} />
-            <Route path="/competitive/leaderboard" element={<Leaderboard />} />
-            <Route path="/competitive/matchmaking" element={<Matchmaking />} />
-            <Route path="/settings" element={<Settings />} />
-          </Route>
-        </Route>
-      </Routes>
+      <ErrorBoundary>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            
+            <Route element={<ProtectedRoute />}>
+              <Route element={<Layout />}>
+                <Route path="/" element={<GameLibrary />} />
+                <Route path="/dashboard" element={<Home />} />
+                <Route path="/game/:gameId" element={<GameDetail />} />
+                <Route path="/play/:gameId" element={<GameRoom />} />
+                <Route path="/premium" element={<PremiumVault />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/marketplace" element={<Marketplace />} />
+                <Route path="/community" element={<Community />} />
+                <Route path="/achievements" element={<Achievements />} />
+                <Route path="/tournaments" element={<Tournaments />} />
+                <Route path="/netplay" element={<NetplayLobby />} />
+                <Route path="/competitive" element={<CompetitiveHome />} />
+                <Route path="/competitive/leaderboard" element={<Leaderboard />} />
+                <Route path="/competitive/matchmaking" element={<Matchmaking />} />
+                <Route path="/settings" element={<Settings />} />
+              </Route>
+            </Route>
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </>
   );
 }

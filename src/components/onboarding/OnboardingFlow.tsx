@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Gamepad2, Sparkles, Rocket, ChevronRight, Check, Heart, Zap, Trophy, History, Users } from 'lucide-react';
 import { economyService } from '../../services/economyService';
 import { useAuth } from '../../services/AuthContext';

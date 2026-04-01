@@ -150,15 +150,15 @@ export class ArchiveScoutAgent implements ScoutAgent {
                   const size = parseInt(f.size || '0');
                   
                   // Basic validation: must have size and valid extension
-                  if (size <= 0) return false;
+                  if (size < 4096) return false; // Skip tiny files (often text files disguised as zips)
 
                   // Evitar archivos masivos que probablemente son colecciones completas
                   // Un juego de NES/GB/GBA raramente pasa de 32MB (excepto CD-ROMs como PSX)
-                  const isCD = system === 'PS1' || system === 'PS2' || system === 'Sega CD' || system === 'Dreamcast';
-                  if (!isCD && size > 50 * 1024 * 1024) return false; // > 50MB es sospechoso para cartuchos
+                  const isCD = system === 'psx' || system === 'PS1' || system === 'PS2' || system === 'segacd' || system === 'Sega CD' || system === 'Dreamcast' || system === 'saturn';
+                  if (!isCD && size > 100 * 1024 * 1024) return false; // > 100MB es sospechoso para cartuchos
 
                   return name.endsWith('.zip') || 
-                         name.endsWith('.nes') || name.endsWith('.sfc') || 
+                         name.endsWith('.nes') || name.endsWith('.fds') || name.endsWith('.sfc') || 
                          name.endsWith('.smc') || name.endsWith('.md') || 
                          name.endsWith('.gen') || name.endsWith('.gba') || 
                          name.endsWith('.gbc') || name.endsWith('.gb') || 
@@ -185,6 +185,12 @@ export class ArchiveScoutAgent implements ScoutAgent {
                     if (titleMatch.length >= 3 && aCleanName.includes(titleMatch)) aScore += 10;
                     if (titleMatch.length >= 3 && bCleanName.includes(titleMatch)) bScore += 10;
                     
+                    // Penalize .fds if it's a standard NES search
+                    if (system.toLowerCase() === 'nes') {
+                      if (aName.endsWith('.fds')) aScore -= 5;
+                      if (bName.endsWith('.fds')) bScore -= 5;
+                    }
+
                     // If one has a much better score, use it
                     if (aScore !== bScore) return bScore - aScore;
                     
@@ -203,20 +209,6 @@ export class ArchiveScoutAgent implements ScoutAgent {
                     latency: 0,
                     metadata: { identifier: doc.identifier, filename: bestFile.name, size: bestFile.size }
                   });
-
-                  // Add Myrient candidate if possible (much faster)
-                  const myrientBase = this.getMyrientBaseUrl(system);
-                  if (myrientBase && bestFile.name.endsWith('.zip')) {
-                    // For Myrient, we DO want just the filename, as Myrient doesn't use subdirectories
-                    const cleanFileName = bestFile.name.split(/[/\\]/).pop() || bestFile.name;
-                    candidates.push({
-                      url: `${myrientBase}${encodeURIComponent(cleanFileName)}`,
-                      source: 'Myrient',
-                      reliabilityScore: 0.95, // Higher reliability score to prefer Myrient
-                      latency: 0,
-                      metadata: { identifier: 'myrient', filename: cleanFileName, size: bestFile.size }
-                    });
-                  }
                 }
               }
             } catch (err) {
@@ -235,26 +227,5 @@ export class ArchiveScoutAgent implements ScoutAgent {
 
     console.log(`[Scout] No se encontraron resultados para ${cleanGameId} en ${system} tras varios intentos.`);
     return [];
-  }
-
-  private getMyrientBaseUrl(system: string): string | null {
-    const s = system.toLowerCase();
-    if (s.includes('nes') || s.includes('nintendo entertainment system')) return 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Nintendo%20Entertainment%20System/';
-    if (s.includes('snes') || s.includes('super nintendo')) return 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Super%20Nintendo%20Entertainment%20System/';
-    if (s.includes('genesis') || s.includes('mega drive')) return 'https://myrient.erista.me/files/No-Intro/Sega%20-%20Mega%20Drive%20-%20Genesis/';
-    if (s.includes('gba') || s.includes('game boy advance')) return 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Game%20Boy%20Advance/';
-    if (s.includes('gbc') || s.includes('game boy color')) return 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Game%20Boy%20Color/';
-    if (s.includes('gb') || s.includes('game boy')) return 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Game%20Boy/';
-    if (s.includes('n64') || s.includes('nintendo 64')) return 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Nintendo%2064%20(BigEndian)/';
-    if (s.includes('psx') || s.includes('playstation')) return 'https://myrient.erista.me/files/Redump/Sony%20-%20PlayStation/';
-    if (s.includes('master system')) return 'https://myrient.erista.me/files/No-Intro/Sega%20-%20Master%20System%20-%20Mark%20III/';
-    if (s.includes('game gear')) return 'https://myrient.erista.me/files/No-Intro/Sega%20-%20Game%20Gear/';
-    if (s.includes('atari 2600')) return 'https://myrient.erista.me/files/No-Intro/Atari%20-%202600/';
-    if (s.includes('atari 7800')) return 'https://myrient.erista.me/files/No-Intro/Atari%20-%207800/';
-    if (s.includes('lynx')) return 'https://myrient.erista.me/files/No-Intro/Atari%20-%20Lynx/';
-    if (s.includes('pc engine') || s.includes('turbografx')) return 'https://myrient.erista.me/files/No-Intro/NEC%20-%20PC%20Engine%20-%20TurboGrafx%2016/';
-    if (s.includes('wonderswan')) return 'https://myrient.erista.me/files/No-Intro/Bandai%20-%20WonderSwan/';
-    if (s.includes('ngp')) return 'https://myrient.erista.me/files/No-Intro/SNK%20-%20Neo%20Geo%20Pocket/';
-    return null;
   }
 }

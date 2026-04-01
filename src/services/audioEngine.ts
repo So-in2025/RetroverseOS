@@ -225,7 +225,7 @@ export class AudioEngine {
     
     osc.type = 'sawtooth';
     osc.frequency.setValueAtTime(220, now);
-    osc.frequency.linearRampToValueAtTime(110, now + 0.2);
+    osc.frequency.linearRampToValueAtTime(110, now + 0.3);
     
     gain.gain.setValueAtTime(0.1, now);
     gain.gain.linearRampToValueAtTime(0, now + 0.3);
@@ -235,6 +235,68 @@ export class AudioEngine {
     
     osc.start(now);
     osc.stop(now + 0.3);
+  }
+
+  public static playUnboxingShakeSound() {
+    this.init();
+    if (!this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(110, now);
+    osc.frequency.exponentialRampToValueAtTime(55, now + 0.1);
+    
+    gain.gain.setValueAtTime(0.05, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+    
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    
+    osc.start(now);
+    osc.stop(now + 0.1);
+  }
+
+  public static playUnboxingRevealSound(rarity: string = 'Common') {
+    this.init();
+    if (!this.ctx || !this.sfxGain) return;
+    const now = this.ctx.currentTime;
+    
+    const frequencies = rarity === 'Legendary' ? [523.25, 659.25, 783.99, 1046.50, 1318.51] :
+                       rarity === 'Epic' ? [440, 554.37, 659.25, 880] :
+                       [329.63, 392, 440, 523.25];
+
+    frequencies.forEach((freq, i) => {
+      const osc = this.ctx!.createOscillator();
+      const gain = this.ctx!.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + i * 0.05);
+      
+      gain.gain.setValueAtTime(0, now + i * 0.05);
+      gain.gain.linearRampToValueAtTime(0.2, now + i * 0.05 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.05 + 0.5);
+      
+      osc.connect(gain);
+      gain.connect(this.sfxGain!);
+      osc.start(now + i * 0.05);
+      osc.stop(now + i * 0.05 + 0.5);
+    });
+
+    if (rarity === 'Legendary' || rarity === 'Epic') {
+      // Add a sub-bass thump for high rarity
+      const sub = this.ctx.createOscillator();
+      const subGain = this.ctx.createGain();
+      sub.type = 'sine';
+      sub.frequency.setValueAtTime(60, now);
+      sub.frequency.exponentialRampToValueAtTime(30, now + 0.4);
+      subGain.gain.setValueAtTime(0.3, now);
+      subGain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+      sub.connect(subGain);
+      subGain.connect(this.sfxGain);
+      sub.start(now);
+      sub.stop(now + 0.4);
+    }
   }
 
   public static toggleBGM() {

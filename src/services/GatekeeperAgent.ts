@@ -2,7 +2,7 @@ import { ROMCandidate, GatekeeperAgent } from './AgenticROMDiscovery';
 
 export class ROMGatekeeperAgent implements GatekeeperAgent {
   async validate(candidate: ROMCandidate): Promise<boolean> {
-    console.log(`[Gatekeeper] Validando ${candidate.url}...`);
+    // console.log(`[Gatekeeper] Validando ${candidate.url}...`);
     
     try {
       // Usamos el proxy para evitar CORS y problemas de red directos
@@ -18,19 +18,19 @@ export class ROMGatekeeperAgent implements GatekeeperAgent {
       });
       
       if (!response.ok) {
-        console.warn(`[Gatekeeper] URL muerta o inaccesible: ${candidate.url} (Status: ${response.status})`);
+        // console.warn(`[Gatekeeper] URL muerta o inaccesible: ${candidate.url} (Status: ${response.status})`);
         return false;
       }
 
       const text = await response.text();
       if (text.trim().toLowerCase().startsWith('<') || text.toLowerCase().includes('<!doctype html>')) {
-        console.warn(`[Gatekeeper] URL devuelve HTML en lugar de binario: ${candidate.url}`);
+        // console.warn(`[Gatekeeper] URL devuelve HTML en lugar de binario: ${candidate.url}`);
         return false;
       }
 
       return true;
     } catch (e) {
-      console.error(`[Gatekeeper] Error validando ${candidate.url}:`, e);
+      // console.error(`[Gatekeeper] Error validando ${candidate.url}:`, e);
       return false;
     }
   }

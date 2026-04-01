@@ -464,7 +464,7 @@ export class ROMFetchService {
         
         // Define system-specific extensions to prioritize
         const systemExts: Record<string, string[]> = {
-          'nes': ['.nes'],
+          'nes': ['.nes', '.fds'],
           'snes': ['.sfc', '.smc'],
           'sega_genesis': ['.md', '.gen', '.bin'],
           'gba': ['.gba'],
@@ -484,22 +484,23 @@ export class ROMFetchService {
 
         const preferredExts = system && systemExts[system] ? systemExts[system] : [];
         
-        // Special case for PSX: if it's a zip with .cue and .bin, don't extract if we only find .cue
+        // Special case for CD-based systems: if it's a zip with .cue and .bin, don't extract if we only find .cue
         // because the emulator needs the .bin files too.
-        if (system === 'psx') {
+        if (system === 'psx' || system === 'PlayStation' || system === 'ps1' || system === 'sega_cd' || system === 'Sega CD' || system === 'pcengine' || system === 'PC Engine CD') {
           const hasChd = files.some(f => f.toLowerCase().endsWith('.chd'));
           const hasIso = files.some(f => f.toLowerCase().endsWith('.iso'));
           const hasCue = files.some(f => f.toLowerCase().endsWith('.cue'));
           
           if (!hasChd && !hasIso && hasCue) {
-            console.log('[ROM Fetch] PSX multi-file set detected (.cue/.bin). Returning original ZIP.');
+            console.log(`[ROM Fetch] CD-based multi-file set detected (.cue/.bin) for ${system}. Returning original ZIP.`);
             return resolve(zipBlob);
           }
         }
 
-        // 1. Try to find a file with a preferred extension
+        // 1. Try to find a file with a preferred extension (respecting order of priority)
         let bestFile = '';
         let bestSize = 0;
+        let bestExtIndex = Infinity;
 
         for (const file of files) {
           const lowerFile = file.toLowerCase();
@@ -509,8 +510,12 @@ export class ROMFetchService {
           if (file.endsWith('/') || data.length === 0) continue;
           if (lowerFile.includes('readme') || lowerFile.includes('license') || lowerFile.includes('metadata')) continue;
 
-          if (preferredExts.some(ext => lowerFile.endsWith(ext))) {
-            if (data.length > bestSize) {
+          const extIndex = preferredExts.findIndex(ext => lowerFile.endsWith(ext));
+          if (extIndex !== -1) {
+            // If this extension has higher priority (lower index) than what we found,
+            // or it's the same priority but the file is larger, pick it.
+            if (extIndex < bestExtIndex || (extIndex === bestExtIndex && data.length > bestSize)) {
+              bestExtIndex = extIndex;
               bestSize = data.length;
               bestFile = file;
             }

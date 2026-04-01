@@ -1,3 +1,5 @@
+import localforage from 'localforage';
+
 export interface SaveState {
   id: string;
   gameId: string;
@@ -440,6 +442,15 @@ export class StorageService {
       request.onsuccess = () => resolve();
       request.onerror = () => reject(request.error);
     });
+  }
+
+  async clearCoverCache(): Promise<void> {
+    const coverStore = localforage.createInstance({
+      name: 'retroverse-covers',
+      storeName: 'blobs'
+    });
+    await coverStore.clear();
+    console.log('[Storage] Cover cache cleared');
   }
 
   async saveCatalogGame(game: any): Promise<void> {

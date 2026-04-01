@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Gamepad2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import localforage from 'localforage';
 import { CoverService } from '../../services/coverService';
-// import { ImageCache } from '../../services/imageCache';
+import { cacheManager } from '../../services/cacheManager';
 
-// Configurar localforage para covers
-const coverStore = localforage.createInstance({
-  name: 'retroverse-covers',
-  storeName: 'resolved-urls'
-});
+// Cache en memoria para URLs de objetos (evita recrear URLs para el mismo juego en la misma sesión)
+const objectUrlCache = new Map<string, string>();
 
 interface GameCoverProps {
   gameId: string;
@@ -23,7 +19,7 @@ interface GameCoverProps {
 }
 
 /**
- * GameCover con Cascada de Fuentes y Cache Local Persistente
+ * GameCover con Cascada de Fuentes y Cache Local Persistente (LRU)
  */
 export const GameCover: React.FC<GameCoverProps> = ({
   gameId,
@@ -45,14 +41,44 @@ export const GameCover: React.FC<GameCoverProps> = ({
     return CoverService.getCoverSources(title, systemId, archiveId || gameId, primaryUrl);
   }, [title, systemId, archiveId, gameId, primaryUrl]);
 
+  const [isVisible, setIsVisible] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // IntersectionObserver para lazy loading
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => { isMounted.current = false; };
+  }, []);
+
   const prevGameId = useRef(gameId);
 
-  // Cargar desde cache al montar
+  // Cargar desde cache al montar y ser visible
   useEffect(() => {
-    if (prevGameId.current === gameId) return;
+    if (!isVisible) return;
+    if (prevGameId.current === gameId && currentSrc) return;
     prevGameId.current = gameId;
 
-    let isMounted = true;
+    let isMountedLocal = true;
     
     // Reset state immediately when gameId changes to avoid showing old data
     setSourceIndex(0);
@@ -62,14 +88,33 @@ export const GameCover: React.FC<GameCoverProps> = ({
     
     const checkCache = async () => {
       try {
-        const cachedUrl = await coverStore.getItem<string>(gameId);
-        if (cachedUrl && isMounted) {
-          // Ensure cached URL is also proxied for COEP compatibility
-          const proxiedUrl = (cachedUrl.startsWith('blob:') || cachedUrl.startsWith('/')) 
-            ? cachedUrl 
-            : `/api/tunnel?url=${encodeURIComponent(cachedUrl)}`;
-          
-          setCurrentSrc(proxiedUrl);
+        // Check if we need to clear cache due to version bump
+        const CATALOG_VERSION = '27'; // Incrementado para forzar migración a blobs optimizados
+        const lastVersion = localStorage.getItem('cover_cache_version');
+        if (lastVersion !== CATALOG_VERSION) {
+          console.log('[CoverCache] Version mismatch or upgrade, clearing cover cache...');
+          await cacheManager.clearAll();
+          localStorage.setItem('cover_cache_version', CATALOG_VERSION);
+          return false;
+        }
+
+        // Primero revisar cache en memoria (rápido)
+        if (objectUrlCache.has(gameId)) {
+          const url = objectUrlCache.get(gameId)!;
+          setCurrentSrc(url);
+          setStatus('success');
+          setIsCached(true);
+          // Record access in background
+          cacheManager.recordAccess(gameId);
+          return true;
+        }
+
+        // Luego revisar IndexedDB via cacheManager
+        const cachedBlob = await cacheManager.getCover(gameId);
+        if (cachedBlob && isMountedLocal) {
+          const url = URL.createObjectURL(cachedBlob);
+          objectUrlCache.set(gameId, url);
+          setCurrentSrc(url);
           setStatus('success');
           setIsCached(true);
           return true;
@@ -81,90 +126,123 @@ export const GameCover: React.FC<GameCoverProps> = ({
     };
 
     checkCache().then(found => {
-      if (!found && isMounted) {
-        setStatus('loading');
+      if (!found && isMountedLocal) {
+        // Si no está en cache, iniciamos la carga por red
+        loadFromNetwork();
       }
     });
 
-    return () => { isMounted = false; };
-  }, [gameId]); // Removed title, only gameId should trigger reset
+    return () => { isMountedLocal = false; };
+  }, [gameId, isVisible]);
 
-  useEffect(() => {
-    // Si ya cargamos de cache, no hacemos nada
+  const loadFromNetwork = async () => {
     if (isCached || status === 'success') return;
 
     if (!sources || sources.length === 0) {
-      console.warn(`[Cover] No sources generated for ${title}`);
       setStatus('error');
       return;
     }
 
-    if (sourceIndex >= sources.length) {
-      setStatus('error');
-      return;
-    }
+    let currentIndex = sourceIndex;
+    let success = false;
 
-    const url = sources[sourceIndex];
-    console.log(`[Cover] Attempting load for ${title} (ID: ${gameId}) - Source ${sourceIndex + 1}/${sources.length}: ${url}`);
+    while (currentIndex < sources.length && !success && isMounted.current) {
+      const url = sources[currentIndex];
+      
+      const proxiedUrl = (url.startsWith('blob:') || url.startsWith('/')) 
+        ? url 
+        : `/api/tunnel?url=${encodeURIComponent(url)}`;
 
-    // Use proxy for all external loads to satisfy COEP/CORP requirements
-    // BUT: Skip our tunnel if the URL is already an image proxy (wsrv.nl, weserv.nl, bing.net)
-    // as these proxies already handle CORS and resizing, and double-proxying adds latency and risk.
-    const isAlreadyProxied = url.includes('wsrv.nl') || url.includes('weserv.nl') || url.includes('tse2.mm.bing.net');
-    
-    const proxiedUrl = (url.startsWith('blob:') || url.startsWith('/') || isAlreadyProxied) 
-      ? url 
-      : `/api/tunnel?url=${encodeURIComponent(url)}`;
-    
-    setCurrentSrc(proxiedUrl);
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // Aumentado a 8s
 
-    // Timeout de seguridad: si una imagen tarda más de 15s en cargar o fallar, forzamos el siguiente intento
-    const timeout = setTimeout(() => {
-      if (status === 'loading') {
-        console.warn(`[Cover] Timeout (15s) for ${title} at source ${sourceIndex + 1}: ${url}`);
-        handleError();
+        console.log(`[Cover] Attempting source ${currentIndex + 1}/${sources.length} for ${title}: ${url}`);
+        
+        // Intentar cargar la URL original primero si es una URL de github/archive
+        const originalUrl = url.replace('https://wsrv.nl/?url=', '').split('&')[0];
+        const decodedUrl = decodeURIComponent(originalUrl);
+        
+        // Intentar cargar la versión proxyzada (wsrv.nl)
+        const response = await fetch(proxiedUrl, { 
+          signal: controller.signal,
+          referrerPolicy: 'no-referrer'
+        });
+        
+        // Si falla, intentar la URL original directamente
+        let finalResponse = response;
+        if (!response.ok) {
+          console.warn(`[Cover] Proxy failed for ${title}, trying original: ${decodedUrl}`);
+          finalResponse = await fetch(decodedUrl, { 
+            signal: controller.signal,
+            referrerPolicy: 'no-referrer'
+          });
+        }
+
+        clearTimeout(timeoutId);
+
+        if (finalResponse.status === 429) {
+          console.warn(`[Cover] Rate limited for ${title}`);
+          throw new Error('Rate limited');
+        }
+
+        if (!finalResponse.ok) {
+          console.warn(`[Cover] HTTP ${finalResponse.status} for ${title}`);
+          throw new Error(`HTTP ${finalResponse.status}`);
+        }
+
+        const blob = await finalResponse.blob();
+        if (!blob.type.startsWith('image/')) {
+          console.warn(`[Cover] Not an image for ${title}`);
+          throw new Error('Not an image');
+        }
+
+        // Persistir en cache via cacheManager (LRU)
+        await cacheManager.putCover(gameId, blob);
+        
+        if (!isMounted.current) {
+          URL.revokeObjectURL(URL.createObjectURL(blob));
+          return;
+        }
+
+        // Crear URL para mostrar
+        const objectUrl = URL.createObjectURL(blob);
+        objectUrlCache.set(gameId, objectUrl);
+        
+        setCurrentSrc(objectUrl);
+        setStatus('success');
+        setIsCached(true);
+        success = true;
+        console.log(`[Cover] Successfully loaded ${title} from source ${currentIndex + 1}`);
+      } catch (e: any) {
+        if (e.message === 'Rate limited') {
+          setStatus('error');
+          return;
+        }
+        console.warn(`[Cover] Failed source ${currentIndex + 1} for ${title}:`, e);
+        currentIndex++;
+        if (isMounted.current) setSourceIndex(currentIndex);
       }
-    }, 15000);
-
-    return () => clearTimeout(timeout);
-  }, [sourceIndex, sources, isCached, status, title]);
-
-  const handleError = () => {
-    const failedUrl = sources[sourceIndex];
-    console.warn(`[Cover] Failed to load source ${sourceIndex + 1}/${sources.length} for ${title}: ${failedUrl}`);
-
-    // Si falló una URL que estaba en cache, la borramos y reiniciamos cascada
-    if (isCached) {
-      console.debug(`[Cover] Cached URL failed, clearing cache for ${gameId}`);
-      coverStore.removeItem(gameId);
-      setIsCached(false);
-      setSourceIndex(0);
-      setStatus('loading');
-      return;
     }
 
-    if (sourceIndex < sources.length - 1) {
-      console.log(`[Cover] Trying next source for ${title}`);
-      setSourceIndex(prev => prev + 1);
-    } else {
-      console.error(`[Cover] All ${sources.length} sources failed for ${title}`);
+    if (!success) {
       setStatus('error');
     }
   };
 
-  const handleLoad = () => {
-    console.log(`[Cover] Successfully loaded source for ${title}: ${sources[sourceIndex]}`);
-    if (status !== 'success') {
-      setStatus('success');
-      
-      // Guardar URL exitosa en cache persistente (la URL original, no el blob)
-      const originalUrl = sources[sourceIndex];
-      if (originalUrl && !isCached) {
-        coverStore.setItem(gameId, originalUrl).catch(e => {
-          console.error('[CoverCache] Error saving to cache:', e);
-        });
-      }
+  const handleError = () => {
+    if (isCached) {
+      // If cached image fails, it might be corrupted
+      cacheManager.clearAll(); // Or just remove this one
+      objectUrlCache.delete(gameId);
+      setIsCached(false);
+      setStatus('loading');
+      loadFromNetwork();
     }
+  };
+
+  const handleLoad = () => {
+    setStatus('success');
   };
 
   const aspectClasses = {
@@ -174,7 +252,7 @@ export const GameCover: React.FC<GameCoverProps> = ({
   };
 
   return (
-    <div className={`relative overflow-hidden bg-zinc-900/50 group shadow-2xl ${aspectClasses[aspectRatio]} ${className}`}>
+    <div ref={containerRef} className={`relative overflow-hidden bg-zinc-900/50 group shadow-2xl ${aspectClasses[aspectRatio]} ${className}`}>
       {/* Reflection Effect */}
       <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none z-10" />
       
@@ -247,6 +325,7 @@ export const GameCover: React.FC<GameCoverProps> = ({
             transition={{ duration: 0.3 }}
             onLoad={handleLoad}
             onError={handleError}
+            loading="lazy"
             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
             referrerPolicy="no-referrer"
             crossOrigin="anonymous"

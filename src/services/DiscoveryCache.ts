@@ -9,12 +9,13 @@ export class DiscoveryCache {
     
     if (candidate && candidate.url) {
       const url = candidate.url.toLowerCase();
-      // Filtrar URLs malformadas o colecciones ZIP que se hayan colado en el caché
+      // Filtrar URLs malformadas, colecciones ZIP o dominios caídos (Myrient)
       const isCollection = (url.endsWith('/nes.zip') || url.endsWith('/gb.zip') || url.endsWith('/gba.zip')) && !url.includes('nointro');
       const isMalformed = url.includes('f:/') || url.includes('c:/') || url.includes('d:/');
+      const isMyrient = url.includes('myrient.erista.me');
       
-      if (isCollection || isMalformed) {
-        console.warn(`[Cache] Descartando URL inválida del caché para ${gameId}: ${candidate.url}`);
+      if (isCollection || isMalformed || isMyrient) {
+        console.warn(`[Cache] Descartando URL inválida o dominio caído del caché para ${gameId}: ${candidate.url}`);
         delete cache[`${system}:${gameId}`];
         localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
         return null;

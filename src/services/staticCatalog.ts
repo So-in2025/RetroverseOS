@@ -4,11 +4,10 @@ const getUrls = (sys: string, title: string) => {
   const eSys = sys.replace(/ /g, '_');
   // Libretro thumbnails replace : with _ and / with _
   const cleanTitle = title.replace(/[:\/]/g, '_');
-  // Use encodeURI instead of encodeURIComponent to keep ( ) , & etc.
-  const eTitle = encodeURI(cleanTitle);
+  // Return raw title, GameCover will handle encoding for the proxy
   return {
-    cover: `https://raw.githubusercontent.com/libretro-thumbnails/${eSys}/master/Named_Boxarts/${eTitle}.png`,
-    art: `https://raw.githubusercontent.com/libretro-thumbnails/${eSys}/master/Named_Snaps/${eTitle}.png`
+    cover: `https://raw.githubusercontent.com/libretro-thumbnails/${eSys}/master/Named_Boxarts/${cleanTitle}.png`,
+    art: `https://raw.githubusercontent.com/libretro-thumbnails/${eSys}/master/Named_Snaps/${cleanTitle}.png`
   };
 };
 
@@ -20,14 +19,15 @@ const N64 = 'Nintendo - Nintendo 64';
 const PSX = 'Sony - PlayStation';
 const ARCADE = 'FBNeo - Arcade Games';
 
-// Myrient Base URLs
-const MYRIENT_NES = 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Nintendo%20Entertainment%20System%20%28Headered%29';
-const MYRIENT_SNES = 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Super%20Nintendo%20Entertainment%20System';
-const MYRIENT_GEN = 'https://myrient.erista.me/files/No-Intro/Sega%20-%20Mega%20Drive%20-%20Genesis';
-const MYRIENT_GBA = 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Game%20Boy%20Advance';
-const MYRIENT_N64 = 'https://myrient.erista.me/files/No-Intro/Nintendo%20-%20Nintendo%2064%20%28BigEndian%29';
-const MYRIENT_PSX = 'https://myrient.erista.me/files/Redump/Sony%20-%20PlayStation';
-const MYRIENT_ARCADE = 'https://myrient.erista.me/files/MAME/MAME%200.78%20ROMs%20%28Merged%29';
+// Myrient Base URLs (Replaced with Archive.org collections due to Myrient shutdown)
+// These URLs act as fallbacks, but the DiscoveryBrain will usually find a better mirror.
+const MYRIENT_NES = 'https://archive.org/download/nointro.nes';
+const MYRIENT_SNES = 'https://archive.org/download/nointro.snes';
+const MYRIENT_GEN = 'https://archive.org/download/nointro.md';
+const MYRIENT_GBA = 'https://archive.org/download/nointro.gba';
+const MYRIENT_N64 = 'https://archive.org/download/n64-roms';
+const MYRIENT_PSX = 'https://archive.org/download/chd_psx';
+const MYRIENT_ARCADE = 'https://archive.org/download/mame078_202403';
 
 export const STATIC_CORE_CATALOG: GameObject[] = [
   // NES
@@ -2573,8 +2573,8 @@ export const STATIC_CORE_CATALOG: GameObject[] = [
     developer: 'Compile',
     players: 2,
     rom_url: `${MYRIENT_SNES}/Puyo%20Puyo%20%28Japan%29.zip`,
-    cover_url: getUrls(SNES, 'Puyo Puyo (Japan) (En,Ja)').cover,
-    artwork_url: getUrls(SNES, 'Puyo Puyo (Japan) (En,Ja)').art,
+    cover_url: getUrls(SNES, 'Puyo Puyo (Japan)').cover,
+    artwork_url: getUrls(SNES, 'Puyo Puyo (Japan)').art,
     rom_size: 524288,
     emulator_core: 'snes9x',
     compatibility_status: 'verified',
@@ -2649,8 +2649,8 @@ export const STATIC_CORE_CATALOG: GameObject[] = [
     developer: 'Konami',
     players: 2,
     rom_url: `${MYRIENT_ARCADE}/gradius.zip`,
-    cover_url: getUrls(ARCADE, 'Gradius').cover,
-    artwork_url: getUrls(ARCADE, 'Gradius').art,
+    cover_url: getUrls(ARCADE, 'Gradius (Japan, ROM version)').cover,
+    artwork_url: getUrls(ARCADE, 'Gradius (Japan, ROM version)').art,
     rom_size: 500000,
     emulator_core: 'mame2003_plus',
     compatibility_status: 'verified',

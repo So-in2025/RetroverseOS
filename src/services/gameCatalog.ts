@@ -46,7 +46,7 @@ class GameCatalogService {
       }
       
       // Force refresh for OMEGA SET 50K update
-      const CATALOG_VERSION = '21'; // Bumped from 20 to force refresh
+      const CATALOG_VERSION = '26'; // Bumped from 25 to fix cover encoding and titles again
       const currentVersion = localStorage.getItem('catalog_version');
       
       if (currentVersion !== CATALOG_VERSION) {

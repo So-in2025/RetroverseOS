@@ -172,6 +172,7 @@ class SentinelService {
             const duration = performance.now() - start;
             
             if (!response.ok) {
+              if (this.report.networkFailures.length > 50) this.report.networkFailures.shift();
               this.report.networkFailures.push({
                 url,
                 status: response.status,
@@ -184,6 +185,7 @@ class SentinelService {
             return response;
           } catch (error) {
             const duration = performance.now() - start;
+            if (this.report.networkFailures.length > 50) this.report.networkFailures.shift();
             this.report.networkFailures.push({
               url,
               error: String(error),
@@ -231,6 +233,7 @@ class SentinelService {
 
     img.addEventListener('error', () => {
       const duration = performance.now() - start;
+      if (this.report.imageFailures.length > 50) this.report.imageFailures.shift();
       this.report.imageFailures.push({
         src: img.src,
         duration,

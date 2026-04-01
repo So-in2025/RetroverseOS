@@ -1,18 +1,26 @@
-const CACHE_NAME = 'retroos-shell-v2';
+const CACHE_NAME = 'retroos-shell-v3';
 const ROM_CACHE = 'retroos-roms-v1';
 const IMAGE_CACHE = 'retroos-images-v1';
+const STATIC_CACHE = 'retroos-static-v1';
 
-const ASSETS_TO_CACHE = [
+const ASSETS_TO_PRECACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/sw.js'
+  '/sw.js',
+  // UI Critical Assets (Icons, Fonts, Sounds)
+  '/icons/icon-192x192.png',
+  '/icons/icon-512x512.png',
+  '/fonts/inter-var.woff2',
+  '/sounds/boot.mp3',
+  '/sounds/ui-click.mp3',
+  '/sounds/unboxing.mp3'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+      return cache.addAll(ASSETS_TO_PRECACHE);
     })
   );
   self.skipWaiting();
@@ -25,7 +33,7 @@ self.addEventListener('activate', (event) => {
       caches.keys().then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
-            if (cacheName !== CACHE_NAME && cacheName !== ROM_CACHE && cacheName !== IMAGE_CACHE && cacheName.startsWith('retroos')) {
+            if (![CACHE_NAME, ROM_CACHE, IMAGE_CACHE, STATIC_CACHE].includes(cacheName) && cacheName.startsWith('retroos')) {
               return caches.delete(cacheName);
             }
           })
@@ -38,11 +46,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // Helper to add COOP/COEP headers to any response
+  // Helper to add COOP/COEP headers
   const addHeaders = (response) => {
-    if (!response) return response;
-    // We can only add headers to responses we construct or clone if they are not opaque
-    if (response.type === 'opaque') return response;
+    if (!response || response.type === 'opaque') return response;
     
     const newHeaders = new Headers(response.headers);
     newHeaders.set('Cross-Origin-Embedder-Policy', 'require-corp');
@@ -56,19 +62,25 @@ self.addEventListener('fetch', (event) => {
     });
   };
 
-  // Handle ROMs (usually .zip, .sfc, .nes, etc. from specific domains or paths)
+  // 1. ROMs: Cache-First
   if (url.pathname.includes('/roms/') || url.href.includes('archive.org')) {
     event.respondWith(handleCacheFirst(ROM_CACHE, event.request).then(addHeaders));
     return;
   }
 
-  // Handle Images (Covers, Artworks)
-  if (url.href.includes('unsplash.com') || url.href.includes('picsum.photos') || url.href.includes('libretro.com')) {
-    event.respondWith(handleCacheFirst(IMAGE_CACHE, event.request).then(addHeaders));
+  // 2. Images: Stale-While-Revalidate
+  if (url.href.includes('unsplash.com') || url.href.includes('picsum.photos') || url.href.includes('libretro.com') || url.pathname.includes('/api/tunnel')) {
+    event.respondWith(handleStaleWhileRevalidate(IMAGE_CACHE, event.request).then(addHeaders));
     return;
   }
 
-  // Default: Network first with Cache fallback for Shell
+  // 3. Static Assets (Fonts, Sounds): Cache-First
+  if (url.pathname.match(/\.(woff2|mp3|png|jpg|svg)$/)) {
+    event.respondWith(handleCacheFirst(STATIC_CACHE, event.request).then(addHeaders));
+    return;
+  }
+
+  // 4. Default: Network First with Cache Fallback
   event.respondWith(
     fetch(event.request).then((networkResponse) => {
       if (event.request.method === 'GET' && networkResponse && networkResponse.status === 200) {
@@ -103,4 +115,18 @@ async function handleCacheFirst(cacheName, request) {
   } catch (e) {
     return null;
   }
+}
+
+async function handleStaleWhileRevalidate(cacheName, request) {
+  const cache = await caches.open(cacheName);
+  const cachedResponse = await cache.match(request);
+  
+  const fetchPromise = fetch(request).then((networkResponse) => {
+    if (networkResponse && networkResponse.status === 200) {
+      cache.put(request, networkResponse.clone());
+    }
+    return networkResponse;
+  });
+
+  return cachedResponse || fetchPromise;
 }

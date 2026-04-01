@@ -23,8 +23,6 @@ export default async function handler(req: Request) {
     'cdn.libretro.com',
     'jsdelivr.net',
     'cdn.jsdelivr.net',
-    'erista.me',
-    'myrient.erista.me',
     'bing.net',
     'bing.com',
     'wsrv.nl',
@@ -61,8 +59,6 @@ export default async function handler(req: Request) {
 
   while (attempt < maxRetries) {
     const controller = new AbortController();
-    // Edge functions don't have the same strict wall-clock limits for streaming,
-    // but we still want a timeout for the initial connection.
     const timeoutId = setTimeout(() => controller.abort(), 30000); 
     
     try {
@@ -92,6 +88,12 @@ export default async function handler(req: Request) {
       if (!response.ok) {
         const status = response.status;
         if (status === 404) return new Response('Target not found', { status: 404 });
+        
+        // Handle 403 specifically: Archive.org might be rate-limiting
+        if (status === 403) {
+           throw new Error('Forbidden (403)');
+        }
+
         if ([503, 429, 408, 500, 502, 504].includes(status)) {
           throw new Error(`Target returned ${status}`);
         }
@@ -123,8 +125,10 @@ export default async function handler(req: Request) {
       attempt++;
       
       if (attempt < maxRetries) {
-        // Simple wait before retry
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Exponential backoff: 1s, 2s, 4s...
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        console.log(`[Tunnel] Retrying in ${delay}ms... (Attempt ${attempt})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       } else {
         break;

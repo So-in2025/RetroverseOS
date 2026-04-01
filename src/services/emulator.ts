@@ -33,6 +33,7 @@ export interface EmulatorConfig {
 }
 
 const BIOS_MAP: Record<string, { filename: string, url: string }[]> = {
+  'nes': [{ filename: 'disksys.rom', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/disksys.rom' }],
   'gba': [{ filename: 'gba_bios.bin', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/gba_bios.bin' }],
   'psx': [
     { filename: 'scph5501.bin', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/scph5501.bin' },
@@ -43,7 +44,9 @@ const BIOS_MAP: Record<string, { filename: string, url: string }[]> = {
   'sega_cd': [{ filename: 'bios_CD_U.bin', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/bios_CD_U.bin' }],
   'atari_7800': [{ filename: '7800 BIOS (U).rom', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/7800%20BIOS%20(U).rom' }],
   'lynx': [{ filename: 'lynxboot.img', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/lynxboot.img' }],
-  'pcengine': [{ filename: 'syscard3.pce', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/syscard3.pce' }]
+  'pcengine': [{ filename: 'syscard3.pce', url: 'https://raw.githubusercontent.com/archtaurus/RetroPieBIOS/master/BIOS/syscard3.pce' }],
+  'neogeo': [{ filename: 'neogeo.zip', url: 'https://archive.org/download/neogeo_202008/neogeo.zip' }],
+  'mame': [{ filename: 'neogeo.zip', url: 'https://archive.org/download/neogeo_202008/neogeo.zip' }]
 };
 
 const isMobileDevice = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -143,8 +146,8 @@ export class EmulatorService {
         }
       }
 
-      // 1. Handle BIOS if needed - Nostalgist expects an array of { fileName, fileContent }
-      const biosFiles: { fileName: string, fileContent: Blob }[] = [];
+      // 1. Handle BIOS if needed
+      const biosFiles: File[] = [];
       const requiredBios = BIOS_MAP[config.system || ''];
       
       if (requiredBios) {
@@ -153,7 +156,8 @@ export class EmulatorService {
         for (const bios of requiredBios) {
           try {
             const biosBlob = await ROMFetchService.fetchBios(bios.filename, bios.url, onProgress);
-            biosFiles.push({ fileName: bios.filename, fileContent: biosBlob });
+            console.log(`[Emulator] BIOS loaded: ${bios.filename} (${biosBlob.size} bytes)`);
+            biosFiles.push(new File([biosBlob], bios.filename));
           } catch (e) {
             console.error(`[Emulator] Failed to load BIOS: ${bios.filename}`, e);
           }
@@ -164,40 +168,59 @@ export class EmulatorService {
       const romBlob = await ROMFetchService.fetchRom(config.gameId, config.romUrl, onProgress, config.system);
 
       // 3. Convert Blob to File with proper extension
-      const magic = await romBlob.slice(0, 4).arrayBuffer();
+      const magic = await romBlob.slice(0, 16).arrayBuffer();
       const magicView = new Uint8Array(magic);
+      console.log(`[Emulator] ROM Magic Bytes: ${Array.from(magicView.slice(0, 8)).map(b => b.toString(16).padStart(2, '0')).join(' ')}`);
+      
       const isZip = magicView[0] === 0x50 && magicView[1] === 0x4B; // PK
       const isChd = magicView[0] === 0x4D && magicView[1] === 0x43 && magicView[2] === 0x6F && magicView[3] === 0x6D; // MCom
 
       let extension = 'bin';
       if (isZip) {
-         // If it's STILL a zip here, it means extractMainFileFromZip failed or was skipped.
-         // We MUST pass it as .zip to Nostalgist, otherwise it will try to read a zip as a raw ROM.
          extension = 'zip';
       } else if (isChd) {
          extension = 'chd';
-      } else if (config.system === 'nes') extension = 'nes';
-      else if (config.system === 'snes') extension = 'sfc';
-      else if (config.system === 'sega_genesis') extension = 'md';
-      else if (config.system === 'gba') extension = 'gba';
-      else if (config.system === 'gbc') extension = 'gbc';
-      else if (config.system === 'gb') extension = 'gb';
-      else if (config.system === 'psx') extension = 'chd';
-      else if (config.system === 'n64') {
-        // N64 requires the correct extension for byte order detection
-        if (magicView[0] === 0x80 && magicView[1] === 0x37 && magicView[2] === 0x12 && magicView[3] === 0x40) {
-          extension = 'z64'; // Big Endian
-        } else if (magicView[0] === 0x37 && magicView[1] === 0x80 && magicView[2] === 0x40 && magicView[3] === 0x12) {
-          extension = 'v64'; // Byte Swapped
-        } else {
-          extension = 'n64'; // Little Endian or fallback
-        }
+      } else if (magicView[0] === 0x80 && magicView[1] === 0x37 && magicView[2] === 0x12 && magicView[3] === 0x40) {
+         extension = 'z64'; // N64 Big Endian
+      } else if (magicView[0] === 0x37 && magicView[1] === 0x80 && magicView[2] === 0x40 && magicView[3] === 0x12) {
+         extension = 'v64'; // N64 Byte Swapped
+      } else if (magicView[0] === 0x40 && magicView[1] === 0x12 && magicView[2] === 0x37 && magicView[3] === 0x80) {
+         extension = 'n64'; // N64 Little Endian
+      } else if (magicView[0] === 0x4E && magicView[1] === 0x45 && magicView[2] === 0x53 && magicView[3] === 0x1A) {
+         extension = 'nes'; // iNES
+      } else if (magicView[0] === 0x46 && magicView[1] === 0x44 && magicView[2] === 0x53 && magicView[3] === 0x1A) {
+         extension = 'fds'; // Famicom Disk System
+      } else if (magicView[0] === 0x55 && magicView[1] === 0x4E && magicView[2] === 0x49 && magicView[3] === 0x46) {
+         extension = 'nes'; // UNIF
+      } else if (magicView[4] === 0x24 && magicView[5] === 0xFF && magicView[6] === 0xAE && magicView[7] === 0x51) {
+         extension = 'gba'; // GBA
       }
-      else if (config.romUrl.includes('.n64') || config.romUrl.includes('.z64') || config.romUrl.includes('.v64')) extension = 'n64';
-      else if (config.romUrl.includes('.iso')) extension = 'iso';
-      else if (config.romUrl.includes('.chd')) extension = 'chd';
+      // System-based fallbacks
+      else if (config.system === 'nes') extension = 'nes';
+      else if (config.system === 'snes' || config.system === 'Super Nintendo') extension = 'sfc';
+      else if (config.system === 'sega_genesis' || config.system === 'megadrive' || config.system === 'Genesis') extension = 'md';
+      else if (config.system === 'gba' || config.system === 'Game Boy Advance') extension = 'gba';
+      else if (config.system === 'gbc' || config.system === 'Game Boy Color') extension = 'gbc';
+      else if (config.system === 'gb' || config.system === 'Game Boy') extension = 'gb';
+      else if (config.system === 'psx' || config.system === 'PlayStation' || config.system === 'ps1') extension = 'chd';
+      else if (config.system === 'n64' || config.system === 'Nintendo 64') extension = 'z64';
+      // URL-based fallbacks
+      else if (config.romUrl.toLowerCase().includes('.n64') || config.romUrl.toLowerCase().includes('.z64') || config.romUrl.toLowerCase().includes('.v64')) extension = 'n64';
+      else if (config.romUrl.toLowerCase().includes('.fds')) extension = 'fds';
+      else if (config.romUrl.toLowerCase().includes('.iso')) extension = 'iso';
+      else if (config.romUrl.toLowerCase().includes('.chd')) extension = 'chd';
+      else if (config.romUrl.toLowerCase().includes('.sfc')) extension = 'sfc';
+      else if (config.romUrl.toLowerCase().includes('.smc')) extension = 'smc';
+      else if (config.romUrl.toLowerCase().includes('.md')) extension = 'md';
+      else if (config.romUrl.toLowerCase().includes('.gen')) extension = 'gen';
+      else if (config.romUrl.toLowerCase().includes('.gba')) extension = 'gba';
+      else if (config.romUrl.toLowerCase().includes('.gbc')) extension = 'gbc';
+      else if (config.romUrl.toLowerCase().includes('.gb')) extension = 'gb';
+      else if (config.romUrl.toLowerCase().includes('.nes')) extension = 'nes';
 
-      let fileName = `${config.gameId}.${extension}`;
+
+      let safeGameId = config.gameId.replace(/[^a-zA-Z0-9]/g, '_');
+      let fileName = `${safeGameId}.${extension}`;
       
       onProgress?.('Launching engine...');
       
@@ -238,7 +261,11 @@ export class EmulatorService {
       const nostalgistOptions: any = {
         element: config.canvas,
         core: finalCore,
-        rom: { fileName, fileContent: romBlob },
+        rom: new File([romBlob], fileName), // Use File object with sanitized name
+        resolveCoreJs: (core: string) => `https://cdn.jsdelivr.net/npm/nostalgist/dist/cores/${core}.js`,
+        resolveCoreWasm: (core: string) => `https://cdn.jsdelivr.net/npm/nostalgist/dist/cores/${core}.wasm`,
+
+
         bios: biosFiles.length > 0 ? biosFiles : undefined,
         retroarchConfig: {
           video_aspect_ratio_auto: videoSettings.aspectRatio === 'Original',
@@ -246,9 +273,6 @@ export class EmulatorService {
           video_shader_enable: videoSettings.crtFilter && !isMobile,
           video_threaded: !hasLowLatency, // Threaded video adds 1 frame of lag but improves performance
           audio_latency: hasLowLatency ? 64 : (isMobile ? 128 : 96), // Increased slightly for stability
-          directory_system: '/home/web_user/retroarch/system',
-          directory_savefile: '/home/web_user/retroarch/saves',
-          directory_savestate: '/home/web_user/retroarch/states',
           video_vsync: videoSettings.vsync ?? true, // Default to true for smoother scrolling
           video_hard_sync: hasLowLatency,
           threaded_data_runloop_enable: true,

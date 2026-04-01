@@ -103,27 +103,14 @@ export class CoverService {
     if (!str) return '';
     
     // Libretro naming rules for special characters:
-    // & -> _
-    // * -> _
-    // / -> _
-    // : -> _
-    // < -> _
-    // > -> _
-    // ? -> _
-    // | -> _
-    // " -> _
-    // # -> _
-    const libretroClean = str.replace(/[&*/:`<>?\|"#]/g, '_');
-
-    return encodeURIComponent(libretroClean)
-      .replace(/%20/g, '%20') 
-      .replace(/%28/g, '(')
-      .replace(/%29/g, ')')
-      .replace(/%2C/g, ',')
-      .replace(/%27/g, "'")
-      .replace(/%5B/g, '[')
-      .replace(/%5D/g, ']')
-      .replace(/%2B/g, '+');
+    // Replace forbidden chars with _ but keep spaces and parentheses for final encoding
+    // Forbidden in Libretro filenames: & * / : ` < > ? | " #
+    const cleaned = str.replace(/[&*/:`<>?\|"#]/g, '_');
+    
+    // We return the cleaned string with literal spaces.
+    // The GameCover component will encode the entire URL for the tunnel,
+    // and the server's new URL() constructor will handle the final encoding.
+    return cleaned;
   }
 
   /**
@@ -139,98 +126,53 @@ export class CoverService {
 
     const libretroSystem = LIBRETRO_SYSTEM_MAP[system] || system.replace(/\s+/g, '_');
     const libretroBase = `https://raw.githubusercontent.com/libretro-thumbnails/${libretroSystem}/master/Named_Boxarts`;
-    const libretroOldBase = `https://raw.githubusercontent.com/libretro/libretro-thumbnails/master/${libretroSystem}/Named_Boxarts`;
-    const libretroTitlesBase = `https://raw.githubusercontent.com/libretro-thumbnails/${libretroSystem}/master/Named_Titles`;
-    const libretroSnapsBase = `https://raw.githubusercontent.com/libretro-thumbnails/${libretroSystem}/master/Named_Snaps`;
     const libretroCdnBase = `https://cdn.libretro.com/thumbnails/${libretroSystem}/Named_Boxarts`;
+
+    // Fallback for Arcade (FBNeo often shares thumbnails with MAME)
+    const isArcade = system === 'fbneo' || system === 'mame' || system === 'arcade' || system === 'FBNeo - Arcade Games';
+    const arcadeFallbackBase = isArcade ? `https://raw.githubusercontent.com/libretro-thumbnails/MAME/master/Named_Boxarts` : null;
 
     // 1. Libretro thumbnails (GitHub CDN)
     const titleWithoutExt = title.replace(/\.(nes|sfc|smc|bin|iso|gba|gbc|gb|gen|md|a26|a78|lnx|n64|z64|zip|7z|chd|cue)$/i, '').trim();
     
     // Try exact title from Archive.org (often contains (USA) etc)
     sources.push(`${libretroBase}/${this.safeEncode(titleWithoutExt)}.png`);
-    sources.push(`${libretroCdnBase}/${this.safeEncode(titleWithoutExt)}.png`);
-    sources.push(`${libretroOldBase}/${this.safeEncode(titleWithoutExt)}.png`);
-    sources.push(`${libretroTitlesBase}/${this.safeEncode(titleWithoutExt)}.png`);
+    if (arcadeFallbackBase) sources.push(`${arcadeFallbackBase}/${this.safeEncode(titleWithoutExt)}.png`);
     
     // Try clean title (without tags)
     const cleanTitle = titleWithoutExt.replace(/\s*[(\[].*?[)\]]/g, '').trim();
-    
-    // Try common region variations
-    const regions = [' (USA)', ' (World)', ' (Europe)', ' (Japan) (En)', ' (Japan)', ''];
-    regions.forEach(region => {
-      sources.push(`${libretroBase}/${this.safeEncode(cleanTitle + region)}.png`);
-      sources.push(`${libretroCdnBase}/${this.safeEncode(cleanTitle + region)}.png`);
-      sources.push(`${libretroOldBase}/${this.safeEncode(cleanTitle + region)}.png`);
-      sources.push(`${libretroTitlesBase}/${this.safeEncode(cleanTitle + region)}.png`);
-    });
-
-    // Try normalized title
-    const normalizedTitle = this.normalizeTitle(title);
-    sources.push(`${libretroBase}/${this.safeEncode(normalizedTitle)}.png`);
-    sources.push(`${libretroBase}/${this.safeEncode(normalizedTitle + ' (USA)')}.png`);
-    
-    // Try with " - " replacement (some games use ":" which Libretro replaces with " - ")
-    if (titleWithoutExt.includes(':')) {
-      const dashTitle = titleWithoutExt.replace(/:/g, ' -');
-      sources.push(`${libretroBase}/${this.safeEncode(dashTitle)}.png`);
+    if (cleanTitle !== titleWithoutExt) {
+      sources.push(`${libretroBase}/${this.safeEncode(cleanTitle)}.png`);
+      sources.push(`${libretroBase}/${this.safeEncode(cleanTitle)} (USA).png`);
     }
 
     // 2. Archive.org
-    const archiveId = archiveIdentifier || ARCHIVE_SYSTEM_MAP[system];
-    if (archiveId) {
-      // Archive.org auto-generated thumb (usually the best fallback)
-      if (archiveIdentifier) {
-        sources.push(`https://archive.org/services/img/${archiveIdentifier}`);
-      }
-      
-      // Try specific common filenames in the item
-      const archiveTitle = normalizedTitle.replace(/\s+/g, '_');
-      sources.push(`https://archive.org/download/${archiveId}/${archiveTitle}.png`);
-      sources.push(`https://archive.org/download/${archiveId}/${this.safeEncode(titleWithoutExt)}.png`);
-      sources.push(`https://archive.org/download/${archiveId}/cover.jpg`);
-      sources.push(`https://archive.org/download/${archiveId}/boxart.jpg`);
-      sources.push(`https://archive.org/download/${archiveId}/front.jpg`);
-      
-      // Try the __ia_thumb.jpg which is almost always present
-      if (archiveIdentifier) {
-        sources.push(`https://archive.org/download/${archiveIdentifier}/__ia_thumb.jpg`);
-      }
+    if (archiveIdentifier) {
+      sources.push(`https://archive.org/services/img/${archiveIdentifier}`);
+      sources.push(`https://archive.org/download/${archiveIdentifier}/__ia_thumb.jpg`);
     }
 
-    // 3. Alternative CDN (Libretro official)
-    sources.push(`https://cdn.libretro.com/thumbnails/${libretroSystem}/Named_Boxarts/${this.safeEncode(cleanTitle)} (USA).png`);
-    sources.push(`https://cdn.libretro.com/thumbnails/${libretroSystem}/Named_Boxarts/${this.safeEncode(titleWithoutExt)}.png`);
-    sources.push(`${libretroSnapsBase}/${this.safeEncode(cleanTitle)}.png`);
+    // 3. Bing Image Search Fallback (Highly reliable for missing covers)
+    const bingQuery = `${titleWithoutExt} ${system} game cover art`;
+    sources.push(`https://tse2.mm.bing.net/th?q=${encodeURIComponent(bingQuery)}&w=400&h=600&c=7&rs=1&p=0&dpr=1&pid=1.7&mkt=en-US&adlt=moderate`);
 
-    // 4. Bing Image Search Fallback (Highly reliable for missing covers)
-    const bingQuery = `${titleWithoutExt} ${system} game cover`;
-    sources.push(`https://tse2.mm.bing.net/th?q=${encodeURIComponent(bingQuery)}`);
-
-    // 5. OpenGameArt / IGDB Proxy
-    // Use wsrv.nl to proxy and resize everything for better performance and CORS bypass
+    // 4. Proxy everything via wsrv.nl for performance (but only for the best candidates)
     const finalSources: string[] = [];
-    
-    // Add original sources but wrapped in wsrv.nl for CORS and speed
     sources.forEach(src => {
       if (src && src.startsWith('http')) {
-        // Avoid double-proxying or proxying already proxied URLs
-        if (src.includes('wsrv.nl') || src.includes('images.weserv.nl') || src.includes('tse2.mm.bing.net')) {
-          finalSources.push(src);
-          return;
-        }
-
-        if (src.includes('githubusercontent.com') || src.includes('archive.org') || src.includes('libretro.com') || src.includes('cdn.libretro.com')) {
+        // Use wsrv.nl for GitHub and Archive.org to get WebP and resizing
+        if (src.includes('githubusercontent.com') || src.includes('archive.org') || src.includes('libretro.com')) {
           finalSources.push(`https://wsrv.nl/?url=${encodeURIComponent(src)}&w=400&output=webp&n=-1`);
-          finalSources.push(src); // Fallback to raw URL
-        } else {
-          finalSources.push(src);
         }
+        finalSources.push(src); // Always keep the raw URL as fallback
       }
     });
 
-    // Return all unique sources to ensure fallbacks like Bing are included
-    return [...new Set(finalSources.filter(Boolean))];
+    const result = [...new Set(finalSources.filter(Boolean))];
+    if (result.length === 0) {
+        console.warn(`[CoverService] No sources found for ${title} (${system})`);
+    }
+    return result;
   }
 
   /**

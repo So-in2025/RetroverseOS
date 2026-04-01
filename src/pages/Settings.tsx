@@ -152,6 +152,7 @@ export default function Settings() {
   const [showRepairModal, setShowRepairModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
   const [repairResult, setRepairResult] = useState<string | null>(null);
+  const [showCoverClearSuccess, setShowCoverClearSuccess] = useState(false);
 
   const handleDeleteGame = async (gameId: string) => {
     setShowDeleteModal(gameId);
@@ -182,6 +183,7 @@ export default function Settings() {
   const executePurge = async () => {
     await storage.clearCatalog();
     await storage.clearAllRoms();
+    await storage.clearCoverCache();
     window.location.reload();
   };
 
@@ -673,9 +675,22 @@ export default function Settings() {
                     <div className="p-5 bg-black/20 rounded-xl border border-white/5">
                       <h3 className="font-retro text-xs uppercase tracking-widest text-white mb-2 flex items-center gap-2"><Trash2 className="w-4 h-4 text-red-500" /> Limpiar Caché</h3>
                       <p className="text-[10px] text-zinc-500 mb-4">Libera espacio local eliminando los recursos descargados.</p>
-                      <button onClick={handleClearCatalog} className="px-4 py-2.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg font-retro text-[10px] uppercase tracking-widest w-full hover:bg-red-500/20 transition-colors">
-                        PURGAR AHORA
-                      </button>
+                      <div className="flex flex-col gap-2">
+                        <button onClick={handleClearCatalog} className="px-4 py-2.5 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg font-retro text-[10px] uppercase tracking-widest w-full hover:bg-red-500/20 transition-colors">
+                          PURGAR TODO
+                        </button>
+                        <button 
+                          onClick={async () => {
+                            await storage.clearCoverCache();
+                            setShowCoverClearSuccess(true);
+                            setTimeout(() => setShowCoverClearSuccess(false), 3000);
+                          }} 
+                          className="px-4 py-2.5 bg-zinc-800 text-zinc-400 border border-white/5 rounded-lg font-retro text-[10px] uppercase tracking-widest w-full hover:bg-zinc-700 hover:text-white transition-colors flex items-center justify-center gap-2"
+                        >
+                          {showCoverClearSuccess ? <Check className="w-4 h-4 text-emerald-500" /> : null}
+                          {showCoverClearSuccess ? 'Caché Limpiada' : 'Limpiar solo Portadas'}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="p-5 bg-black/20 rounded-xl border border-white/5">

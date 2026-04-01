@@ -21,16 +21,19 @@ export const UnboxingModal: React.FC<UnboxingModalProps> = ({ isOpen, onClose, b
       { id: 'coins_500', type: 'coins', value: 500, name: '500 CR', icon: <Hexagon className="w-12 h-12 text-emerald-400" />, rarity: 'Common' },
       { id: 'boost_xp', type: 'boost', value: 'double_xp_1h', name: 'Double XP (1h)', icon: <Zap className="w-12 h-12 text-blue-400" />, rarity: 'Rare' },
       { id: 'sticker_retro', type: 'item', value: 'sticker_retro', name: 'Retro Sticker', icon: <Star className="w-12 h-12 text-zinc-400" />, rarity: 'Common' },
+      { id: 'coins_1000', type: 'coins', value: 1000, name: '1000 CR', icon: <Hexagon className="w-12 h-12 text-emerald-400" />, rarity: 'Rare' },
     ],
     'box-2': [
       { id: 'coins_2000', type: 'coins', value: 2000, name: '2000 CR', icon: <Hexagon className="w-12 h-12 text-emerald-400" />, rarity: 'Rare' },
       { id: 'avatar_glitch', type: 'item', value: 'avatar_glitch', name: 'Glitch Entity Avatar', icon: <Sparkles className="w-12 h-12 text-purple-400" />, rarity: 'Epic' },
       { id: 'bezel_arcade', type: 'item', value: 'bezel_arcade', name: 'Classic Arcade Bezel', icon: <Trophy className="w-12 h-12 text-yellow-400" />, rarity: 'Rare' },
+      { id: 'console_gb_gold', type: 'item', value: 'console_gb_gold', name: 'Gold GB Edition', icon: <Crown className="w-12 h-12 text-yellow-500" />, rarity: 'Legendary' },
     ],
     'box-3': [
       { id: 'coins_5000', type: 'coins', value: 5000, name: '5000 CR', icon: <Hexagon className="w-12 h-12 text-emerald-400" />, rarity: 'Epic' },
       { id: 'voice_zephyr', type: 'item', value: 'voice_zephyr', name: 'Tactical Voice: Zephyr', icon: <Crown className="w-12 h-12 text-yellow-400" />, rarity: 'Epic' },
       { id: 'theme_neon', type: 'item', value: 'theme_neon', name: 'Neon Cyberpunk Theme', icon: <Sparkles className="w-12 h-12 text-pink-500" />, rarity: 'Epic' },
+      { id: 'feature_neural_engine_pro', type: 'item', value: 'feature_neural_engine', name: 'Neural Engine Pro', icon: <Zap className="w-12 h-12 text-cyan-400" />, rarity: 'Legendary' },
     ]
   };
 
@@ -40,19 +43,45 @@ export const UnboxingModal: React.FC<UnboxingModalProps> = ({ isOpen, onClose, b
       AudioEngine.playSelectSound();
       haptics.medium();
       
+      // Shake sound interval
+      const shakeInterval = setInterval(() => {
+        AudioEngine.playUnboxingShakeSound();
+        haptics.light();
+      }, 300);
+
       const timer = setTimeout(() => {
+        clearInterval(shakeInterval);
         const possibleItems = items[boxType];
-        const randomItem = possibleItems[Math.floor(Math.random() * possibleItems.length)];
+        
+        // Weighted random selection based on rarity
+        const rarityWeights: Record<string, number> = {
+          'Common': 100,
+          'Rare': 40,
+          'Epic': 15,
+          'Legendary': 3
+        };
+        
+        const weightedItems = possibleItems.flatMap(item => 
+          Array(rarityWeights[item.rarity] || 1).fill(item)
+        );
+        
+        const randomItem = weightedItems[Math.floor(Math.random() * weightedItems.length)];
+        
         setRevealedItem(randomItem);
         setStep('reveal');
+        
+        AudioEngine.playUnboxingRevealSound(randomItem.rarity);
         haptics.success();
-        AudioEngine.playSelectSound();
+        
         if (onReveal) {
           onReveal(randomItem);
         }
-      }, 2000);
+      }, 2500);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        clearInterval(shakeInterval);
+      };
     } else {
       setStep('idle');
       setRevealedItem(null);
@@ -65,6 +94,15 @@ export const UnboxingModal: React.FC<UnboxingModalProps> = ({ isOpen, onClose, b
       case 'Epic': return 'text-purple-400 shadow-purple-500/50';
       case 'Rare': return 'text-blue-400 shadow-blue-500/50';
       default: return 'text-zinc-400 shadow-zinc-500/50';
+    }
+  };
+
+  const getRarityGlow = (rarity: string) => {
+    switch(rarity) {
+      case 'Legendary': return 'shadow-[0_0_100px_rgba(250,204,21,0.4)] border-yellow-400/50';
+      case 'Epic': return 'shadow-[0_0_80px_rgba(192,38,211,0.3)] border-purple-400/50';
+      case 'Rare': return 'shadow-[0_0_60px_rgba(59,130,246,0.2)] border-blue-400/50';
+      default: return 'shadow-[0_0_40px_rgba(161,161,170,0.1)] border-white/10';
     }
   };
 
@@ -170,9 +208,32 @@ export const UnboxingModal: React.FC<UnboxingModalProps> = ({ isOpen, onClose, b
                   <motion.div
                     animate={{ y: [0, -10, 0] }}
                     transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                    className={`p-8 rounded-3xl bg-black/40 border-2 border-white/10 shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] mb-6 ${getRarityColor(revealedItem.rarity)}`}
+                    className={`p-8 rounded-3xl bg-black/40 border-2 backdrop-blur-md mb-6 ${getRarityColor(revealedItem.rarity)} ${getRarityGlow(revealedItem.rarity)}`}
                   >
                     {revealedItem.icon}
+                    
+                    {/* Extra particles for high rarity */}
+                    {(revealedItem.rarity === 'Legendary' || revealedItem.rarity === 'Epic') && (
+                      <div className="absolute inset-0 pointer-events-none">
+                        {[...Array(12)].map((_, i) => (
+                          <motion.div
+                            key={i}
+                            animate={{
+                              scale: [0, 1, 0],
+                              x: [0, Math.cos(i * 30 * Math.PI / 180) * 100],
+                              y: [0, Math.sin(i * 30 * Math.PI / 180) * 100],
+                              opacity: [0, 1, 0]
+                            }}
+                            transition={{
+                              duration: 2,
+                              repeat: Infinity,
+                              delay: i * 0.1
+                            }}
+                            className={`absolute top-1/2 left-1/2 w-1.5 h-1.5 rounded-full ${revealedItem.rarity === 'Legendary' ? 'bg-yellow-400' : 'bg-purple-400'}`}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </motion.div>
 
                   {/* Item Details */}

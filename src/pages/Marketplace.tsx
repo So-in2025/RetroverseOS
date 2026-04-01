@@ -279,6 +279,51 @@ export default function Marketplace() {
             </button>
           </div>
         </div>
+        
+        {/* Loot Boxes Section */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-3">
+            <Gift className="w-5 h-5 text-purple-500" />
+            <h2 className="text-xl font-retro text-white">Cajas de Botín</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {[
+              { id: 'box-1', name: 'Caja Básica', price: 1000, color: 'from-zinc-700 to-zinc-900', icon: Sparkles, rarity: 'Common' },
+              { id: 'box-2', name: 'Caja Avanzada', price: 2500, color: 'from-blue-600 to-blue-900', icon: Zap, rarity: 'Rare' },
+              { id: 'box-3', name: 'Caja Maestra', price: 5000, color: 'from-purple-600 to-purple-900', icon: Crown, rarity: 'Epic' },
+            ].map((box) => (
+              <motion.div
+                key={box.id}
+                whileHover={{ y: -5 }}
+                className="relative group cursor-pointer"
+                onClick={() => handleOpenBox(box)}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-br ${box.color} rounded-2xl blur-xl opacity-20 group-hover:opacity-40 transition-opacity`} />
+                <div className="relative bg-zinc-900/80 border border-white/10 rounded-2xl p-6 overflow-hidden">
+                  <div className={`absolute top-0 right-0 w-24 h-24 bg-gradient-to-br ${box.color} opacity-10 -mr-8 -mt-8 rounded-full blur-2xl`} />
+                  
+                  <div className="flex items-start justify-between mb-6">
+                    <div className={`p-3 rounded-xl bg-gradient-to-br ${box.color} shadow-lg`}>
+                      <box.icon className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-black/40 px-3 py-1 rounded-full border border-white/5">
+                      <Hexagon className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400/20" />
+                      <span className="text-sm font-mono font-bold text-white">{box.price}</span>
+                    </div>
+                  </div>
+                  
+                  <h3 className="text-lg font-retro text-white mb-1">{box.name}</h3>
+                  <p className="text-xs text-zinc-500 mb-4">Contiene 1 objeto aleatorio o RetroCoins.</p>
+                  
+                  <button className="w-full py-2.5 bg-white/5 hover:bg-white/10 text-white text-xs font-retro rounded-lg transition-colors border border-white/5">
+                    ABRIR CAJA
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
 
         {/* Item Grid */}
         <motion.div 

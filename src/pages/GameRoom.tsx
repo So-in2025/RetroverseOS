@@ -485,16 +485,32 @@ export default function GameRoom() {
     } catch (err: any) {
       console.error(`Failed to start emulator with core ${currentCore}:`, err);
       
+      const isBadRomError = err.message?.includes('Sector de Datos Dañado') || err.message?.includes('too small');
+      
+      if (isBadRomError) {
+        console.warn('[GameRoom] Bad ROM detected, clearing DiscoveryCache for this game.');
+        const { DiscoveryCache } = await import('../services/DiscoveryCache');
+        await DiscoveryCache.clear(gameId, gameData.system_id);
+      }
+
       if (retries < MAX_RETRIES && mountedRef.current) {
-        const altCore = getAlternativeCore(gameData.system, currentCore);
-        if (altCore) {
-          currentCore = altCore;
-          retries++;
-          setLoadingStatus(`Sector de Datos Dañado. Protocolo de recuperación ${retries}/${MAX_RETRIES}...`);
-          // Wait 1.5s before hot-swap
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          continue;
+        // If it's a bad ROM, we cleared the cache, so we can retry with the SAME core to fetch a new ROM
+        // If it's a core issue, we try an alternative core
+        if (!isBadRomError) {
+          const altCore = getAlternativeCore(gameData.system, currentCore);
+          if (altCore) {
+            currentCore = altCore;
+          } else {
+            // No alternative core, break and show error
+            break;
+          }
         }
+        
+        retries++;
+        setLoadingStatus(isBadRomError ? `Buscando fuente alternativa de ROM ${retries}/${MAX_RETRIES}...` : `Cambiando motor de emulación ${retries}/${MAX_RETRIES}...`);
+        // Wait 1.5s before hot-swap
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        continue;
       }
       
       if (mountedRef.current) {
