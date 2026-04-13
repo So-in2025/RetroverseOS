@@ -29,7 +29,7 @@ export interface CachedRomMetadata {
 }
 
 const DB_NAME = 'RetroverseDB';
-const DB_VERSION = 6; // Incremented to add credits and achievements stores
+const DB_VERSION = 10; // Bumped to ensure all stores are created
 
 // Stores requested by Critical Directive
 const STORE_GAMES = 'games';
@@ -38,6 +38,7 @@ const STORE_SAVES = 'saves';
 const STORE_BIOS = 'bios';
 const STORE_SETTINGS = 'settings';
 const STORE_CREDITS = 'credits';
+const STORE_XP = 'xp';
 const STORE_ACHIEVEMENTS = 'achievements';
 const STORE_RECENT = 'recent_games';
 const STORE_SRAM = 'sram_saves'; // Keeping this as it wasn't explicitly renamed but needed for functionality
@@ -57,54 +58,80 @@ export class StorageService {
 
   private initDB(): Promise<void> {
     return new Promise((resolve, reject) => {
+      let resolved = false;
       const timeoutId = setTimeout(() => {
+        if (resolved) return;
         console.error('[Storage] IndexedDB initialization timed out');
+        resolved = true;
         resolve(); 
       }, 5000);
 
-      const request = indexedDB.open(DB_NAME, DB_VERSION + 1); // Increment version
+      const openRequest = () => {
+        try {
+          const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-      request.onerror = () => {
-        clearTimeout(timeoutId);
-        console.error('[Storage] Failed to open IndexedDB');
-        reject(request.error);
-      };
-
-      request.onsuccess = () => {
-        clearTimeout(timeoutId);
-        this.db = request.result;
-        resolve();
-      };
-
-      request.onupgradeneeded = (event) => {
-        const db = (event.target as IDBOpenDBRequest).result;
-        
-        // ... (existing stores) ...
-        const stores = [
-          { name: STORE_GAMES, key: 'game_id' },
-          { name: STORE_ROMS, key: 'gameId', index: 'lastAccessed' },
-          { name: STORE_SAVES, key: 'id', indices: ['gameId', 'timestamp'] },
-          { name: STORE_BIOS, key: 'filename' },
-          { name: STORE_SETTINGS, key: 'key' },
-          { name: STORE_CREDITS, key: 'id' },
-          { name: STORE_ACHIEVEMENTS, key: 'id' },
-          { name: STORE_RECENT, key: 'gameId' },
-          { name: STORE_STATS, key: 'gameId' },
-          { name: STORE_SRAM, key: 'gameId' },
-          { name: STORE_GCTS, key: 'gameId' },
-          { name: STORE_PARTIAL_ROMS, key: 'gameId', index: 'timestamp' }
-        ];
-
-        stores.forEach(s => {
-          if (!db.objectStoreNames.contains(s.name)) {
-            const store = db.createObjectStore(s.name, { keyPath: s.key });
-            if (s.index) store.createIndex(s.index, s.index, { unique: false });
-            if (s.indices) {
-              s.indices.forEach(idx => store.createIndex(idx, idx, { unique: false }));
+          request.onerror = () => {
+            if (resolved) return;
+            clearTimeout(timeoutId);
+            console.error('[Storage] Failed to open IndexedDB:', request.error);
+            
+            // If it's a version error or something unrecoverable, we might want to delete and retry
+            if (request.error?.name === 'VersionError') {
+              console.warn('[Storage] Version error detected. Attempting to delete and recreate database...');
+              indexedDB.deleteDatabase(DB_NAME);
             }
-          }
-        });
+            
+            resolved = true;
+            reject(request.error || new Error('Failed to open IndexedDB'));
+          };
+
+          request.onsuccess = () => {
+            if (resolved) return;
+            clearTimeout(timeoutId);
+            this.db = request.result;
+            resolved = true;
+            resolve();
+          };
+
+          request.onupgradeneeded = (event) => {
+            const db = (event.target as IDBOpenDBRequest).result;
+            
+            const stores = [
+              { name: STORE_GAMES, key: 'game_id' },
+              { name: STORE_ROMS, key: 'gameId', index: 'lastAccessed' },
+              { name: STORE_SAVES, key: 'id', indices: ['gameId', 'timestamp'] },
+              { name: STORE_BIOS, key: 'filename' },
+              { name: STORE_SETTINGS, key: 'key' },
+              { name: STORE_CREDITS, key: 'id' },
+              { name: STORE_XP, key: 'id' },
+              { name: STORE_ACHIEVEMENTS, key: 'id' },
+              { name: STORE_RECENT, key: 'gameId' },
+              { name: STORE_STATS, key: 'gameId' },
+              { name: STORE_SRAM, key: 'gameId' },
+              { name: STORE_GCTS, key: 'gameId' },
+              { name: STORE_PARTIAL_ROMS, key: 'gameId', index: 'timestamp' }
+            ];
+
+            stores.forEach(s => {
+              if (!db.objectStoreNames.contains(s.name)) {
+                const store = db.createObjectStore(s.name, { keyPath: s.key });
+                if (s.index) store.createIndex(s.index, s.index, { unique: false });
+                if (s.indices) {
+                  s.indices.forEach(idx => store.createIndex(idx, idx, { unique: false }));
+                }
+              }
+            });
+          };
+        } catch (e) {
+          if (resolved) return;
+          clearTimeout(timeoutId);
+          console.error('[Storage] Critical error opening IndexedDB:', e);
+          resolved = true;
+          reject(e);
+        }
       };
+
+      openRequest();
     });
   }
 
@@ -581,6 +608,34 @@ export class StorageService {
       const transaction = this.db!.transaction(STORE_CREDITS, 'readwrite');
       const store = transaction.objectStore(STORE_CREDITS);
       const request = store.put({ id: 'player_credits', amount: newValue });
+      request.onsuccess = () => resolve(newValue);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // --- XP ---
+
+  async getXP(): Promise<number> {
+    await this.initPromise;
+    if (!this.db) return 0;
+    return new Promise((resolve) => {
+      const transaction = this.db!.transaction(STORE_XP, 'readonly');
+      const store = transaction.objectStore(STORE_XP);
+      const request = store.get('player_xp');
+      request.onsuccess = () => resolve(request.result?.amount || 0);
+      request.onerror = () => resolve(0);
+    });
+  }
+
+  async addXP(amount: number): Promise<number> {
+    const current = await this.getXP();
+    const newValue = current + amount;
+    await this.initPromise;
+    if (!this.db) return newValue;
+    return new Promise((resolve, reject) => {
+      const transaction = this.db!.transaction(STORE_XP, 'readwrite');
+      const store = transaction.objectStore(STORE_XP);
+      const request = store.put({ id: 'player_xp', amount: newValue });
       request.onsuccess = () => resolve(newValue);
       request.onerror = () => reject(request.error);
     });

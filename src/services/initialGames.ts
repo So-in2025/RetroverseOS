@@ -190,5 +190,43 @@ export const INITIAL_GAMES: GameObject[] = [
     rom_size: 16777216,
     compatibility_status: 'verified',
     checksum: null
+  },
+  {
+    game_id: 'PitfallAtari2600',
+    title: 'Pitfall!',
+    system: 'Atari 2600',
+    system_id: 'atari_2600',
+    rom_url: 'https://archive.org/download/Atari_2600_Library/Pitfall%21%20%281982%29%20%28Activision%2C%20David%20Crane%29%20%28AX-018%29%20%7E.bin',
+    cover_url: 'https://raw.githubusercontent.com/libretro/libretro-thumbnails/master/Atari_-_2600/Named_Boxarts/Pitfall!%20(USA).png',
+    artwork_url: 'https://raw.githubusercontent.com/libretro/libretro-thumbnails/master/Atari_-_2600/Named_Snaps/Pitfall!%20(USA).png',
+    description: 'Guide Pitfall Harry through a maze-like jungle in an attempt to recover 32 treasures.',
+    year: 1982,
+    publisher: 'Activision',
+    developer: 'Activision',
+    players: 1,
+    emulator_core: 'stella',
+    playable: true,
+    rom_size: 4096,
+    compatibility_status: 'verified',
+    checksum: null
+  },
+  {
+    game_id: 'AsteroidsAtari7800',
+    title: 'Asteroids',
+    system: 'Atari 7800',
+    system_id: 'atari_7800',
+    rom_url: 'https://archive.org/download/Atari_7800_Library/Asteroids%20%281987%29%20%28Atari%29%20%28CX7801%29%20%7E.a78',
+    cover_url: 'https://raw.githubusercontent.com/libretro/libretro-thumbnails/master/Atari_-_7800/Named_Boxarts/Asteroids%20(USA).png',
+    artwork_url: 'https://raw.githubusercontent.com/libretro/libretro-thumbnails/master/Atari_-_7800/Named_Snaps/Asteroids%20(USA).png',
+    description: 'Destroy asteroids and flying saucers while avoiding collisions.',
+    year: 1987,
+    publisher: 'Atari',
+    developer: 'Atari',
+    players: 2,
+    emulator_core: 'prosystem',
+    playable: true,
+    rom_size: 16384,
+    compatibility_status: 'verified',
+    checksum: null
   }
 ];

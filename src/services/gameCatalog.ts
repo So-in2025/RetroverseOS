@@ -184,18 +184,39 @@ class GameCatalogService {
     
     await this.loadIngestionState();
 
-    // Run immediately
-    this.runIngestionCycle();
+    const scheduleNext = () => {
+      if (!this.ingestionInterval) return;
+      
+      const run = async () => {
+        await this.runIngestionCycle();
+        if (this.ingestionInterval) {
+          this.ingestionInterval = setTimeout(() => {
+            if ('requestIdleCallback' in window) {
+              (window as any).requestIdleCallback(scheduleNext);
+            } else {
+              scheduleNext();
+            }
+          }, 15000); // Increased to 15s for better background politeness
+        }
+      };
 
-    // Then run every 10 seconds for MASS INGESTION
-    this.ingestionInterval = setInterval(() => {
-      this.runIngestionCycle();
-    }, 10000);
+      run();
+    };
+
+    // Start the cycle
+    this.ingestionInterval = true; // Use as a flag
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(scheduleNext);
+    } else {
+      scheduleNext();
+    }
   }
 
   public stopAutonomousIngestion() {
     if (this.ingestionInterval) {
-      clearInterval(this.ingestionInterval);
+      if (typeof this.ingestionInterval === 'number' || typeof this.ingestionInterval === 'object') {
+        clearTimeout(this.ingestionInterval);
+      }
       this.ingestionInterval = null;
       console.log('[Autonomous Engine] PAUSED.');
     }

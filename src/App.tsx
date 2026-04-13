@@ -27,6 +27,7 @@ const Leaderboard = lazy(() => import('./pages/competitive/Leaderboard'));
 const Matchmaking = lazy(() => import('./pages/competitive/Matchmaking'));
 const Tournaments = lazy(() => import('./pages/competitive/Tournaments'));
 const Login = lazy(() => import('./pages/Login'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import NotificationSystem from './components/NotificationSystem';
 
@@ -89,18 +90,11 @@ function Layout() {
   }, [setSearchModal, setDebugPanel, debugPanelOpen, navigate]);
 
   useEffect(() => {
-    // Start Sentinel Engine in background (Only in Dev)
-    if (import.meta.env.DEV) {
-      SentinelEngine.startBackgroundWorker();
-    }
-    
-    // Start Sentinel Auditing
+    // Start Sentinel Auditing (Passive)
     sentinel.start();
 
     return () => {
-      if (import.meta.env.DEV) {
-        SentinelEngine.stopBackgroundWorker();
-      }
+      // Cleanup if needed
     };
   }, []);
 
@@ -134,6 +128,7 @@ import { recommendationEngine } from './services/recommendationEngine';
 import BootAnimation from './components/layout/BootAnimation';
 import { motion, AnimatePresence } from 'motion/react';
 import { economy } from './services/economy';
+import { economyService } from './services/economyService';
 import { customization } from './services/customization';
 import { achievements } from './services/achievements';
 
@@ -149,28 +144,51 @@ function AppContent() {
     const checkOnboarding = async () => {
       console.log('🚀 [App] Starting initialization sequence...');
       try {
-        await economy.init();
-        console.log('✅ [App] Economy initialized');
+        // Initialize services sequentially but with individual error handling
+        try {
+          await economy.init();
+          console.log('✅ [App] Economy initialized');
+        } catch (e) {
+          console.warn('⚠️ [App] Economy init failed:', e);
+        }
         
-        await customization.init();
-        console.log('✅ [App] Customization initialized');
+        try {
+          await customization.init();
+          console.log('✅ [App] Customization initialized');
+        } catch (e) {
+          console.warn('⚠️ [App] Customization init failed:', e);
+        }
         
-        await gameCatalog.init(); // Initialize game catalog once
-        console.log('✅ [App] Game Catalog initialized');
+        try {
+          await gameCatalog.init();
+          console.log('✅ [App] Game Catalog initialized');
+        } catch (e) {
+          console.warn('⚠️ [App] Game Catalog init failed:', e);
+        }
         
-        const completed = await storage.getSetting('onboarding_completed');
-        console.log('ℹ️ [App] Onboarding status:', completed);
+        let completed = false;
+        try {
+          completed = await economyService.getSetting('onboarding_completed', user?.id);
+          console.log('ℹ️ [App] Onboarding status:', completed);
+        } catch (e) {
+          console.warn('⚠️ [App] Failed to fetch onboarding status:', e);
+        }
         
         if (!completed) {
           setShowOnboarding(true);
           setInitialized(true);
         } else {
-          await recommendationEngine.init(user?.id);
-          console.log('✅ [App] Recommendation Engine initialized');
+          try {
+            await recommendationEngine.init(user?.id);
+            console.log('✅ [App] Recommendation Engine initialized');
+          } catch (e) {
+            console.warn('⚠️ [App] Recommendation Engine init failed:', e);
+          }
           setInitialized(true);
         }
       } catch (error) {
-        console.error('❌ [App] Initialization failed:', error);
+        const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
+        console.error('❌ [App] Critical initialization failure:', errorMsg || 'Unknown error');
         // We still set initialized to true to allow the app to render even in a degraded state
         setInitialized(true);
       }
@@ -179,8 +197,13 @@ function AppContent() {
   }, [user]);
 
   const handleOnboardingComplete = async () => {
+    console.log('✅ [App] Onboarding complete handler triggered');
     setShowOnboarding(false);
-    await recommendationEngine.init(user?.id);
+    try {
+      await recommendationEngine.init(user?.id);
+    } catch (e) {
+      console.error('Failed to init recommendations after onboarding:', e);
+    }
     setInitialized(true);
     // Force a re-render or notify components that recommendations are ready
     window.dispatchEvent(new CustomEvent('recommendations_updated'));
@@ -217,6 +240,7 @@ function AppContent() {
                 <Route path="/competitive/leaderboard" element={<Leaderboard />} />
                 <Route path="/competitive/matchmaking" element={<Matchmaking />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/admin/hive" element={<AdminDashboard />} />
               </Route>
             </Route>
           </Routes>

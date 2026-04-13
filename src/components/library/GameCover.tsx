@@ -42,16 +42,41 @@ export const GameCover: React.FC<GameCoverProps> = ({
   }, [title, systemId, archiveId, gameId, primaryUrl]);
 
   const isMounted = useRef(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     isMounted.current = true;
     return () => { isMounted.current = false; };
   }, []);
 
+  // Intersection Observer for Lazy Loading
+  useEffect(() => {
+    setIsVisible(false); // Reset visibility when gameId changes
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '200px' } // Load a bit before it comes into view
+    );
+
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [gameId]);
+
   const prevGameId = useRef(gameId);
 
   // Cargar desde cache al montar
   useEffect(() => {
+    if (!isVisible) return;
+    
     if (prevGameId.current === gameId && currentSrc) return;
     prevGameId.current = gameId;
 
@@ -110,7 +135,7 @@ export const GameCover: React.FC<GameCoverProps> = ({
     });
 
     return () => { isMountedLocal = false; };
-  }, [gameId]);
+  }, [gameId, isVisible]);
 
   const loadFromNetwork = async () => {
     if (isCached || status === 'success') return;
@@ -204,7 +229,7 @@ export const GameCover: React.FC<GameCoverProps> = ({
   };
 
   return (
-    <div className={`relative overflow-hidden bg-zinc-900/50 group shadow-2xl ${aspectClasses[aspectRatio]} ${className}`}>
+    <div ref={containerRef} className={`relative overflow-hidden bg-zinc-900/50 group shadow-2xl ${aspectClasses[aspectRatio]} ${className}`}>
       {/* Reflection Effect */}
       <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent pointer-events-none z-10" />
       

@@ -23,8 +23,6 @@ export default async function handler(req: Request) {
     'cdn.libretro.com',
     'jsdelivr.net',
     'cdn.jsdelivr.net',
-    'erista.me',
-    'myrient.erista.me',
     'bing.net',
     'bing.com',
     'wsrv.nl',
@@ -61,17 +59,20 @@ export default async function handler(req: Request) {
 
   while (attempt < maxRetries) {
     const controller = new AbortController();
-    // Edge functions don't have the same strict wall-clock limits for streaming,
-    // but we still want a timeout for the initial connection.
     const timeoutId = setTimeout(() => controller.abort(), 30000); 
     
     try {
       const fetchHeaders: Record<string, string> = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
-        'Accept': '*/*',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'Accept-Language': 'en-US,en;q=0.9',
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
       };
 
       if (isArchive) {
@@ -92,6 +93,12 @@ export default async function handler(req: Request) {
       if (!response.ok) {
         const status = response.status;
         if (status === 404) return new Response('Target not found', { status: 404 });
+        
+        // Handle 403 specifically: Archive.org might be rate-limiting
+        if (status === 403) {
+           throw new Error('Forbidden (403)');
+        }
+
         if ([503, 429, 408, 500, 502, 504].includes(status)) {
           throw new Error(`Target returned ${status}`);
         }
@@ -123,8 +130,10 @@ export default async function handler(req: Request) {
       attempt++;
       
       if (attempt < maxRetries) {
-        // Simple wait before retry
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Exponential backoff: 1s, 2s, 4s...
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        console.log(`[Tunnel] Retrying in ${delay}ms... (Attempt ${attempt})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       } else {
         break;

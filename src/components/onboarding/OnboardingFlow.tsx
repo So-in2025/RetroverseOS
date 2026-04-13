@@ -233,7 +233,7 @@ const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) => {
           
           {step < steps.length - 1 ? (
             <button
-              disabled={step === 1 && preferences.genres.length < 2}
+              disabled={step === 2 && preferences.genres.length < 2}
               onClick={() => setStep(s => s + 1)}
               className="flex-1 bg-white text-black px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-zinc-200 transition-all flex items-center justify-center gap-2 disabled:opacity-30 disabled:cursor-not-allowed"
             >

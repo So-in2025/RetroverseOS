@@ -1,51 +1,85 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: global_catalog
+// Document ID: {gameId}
+// Fields:
+//   - gameId: string (required)
+//   - status: string (required, enum: compatible, unstable, broken, untested)
+//   - lastVerifiedAt: timestamp (required)
+//   - romUrl: string (optional)
+//   - emulatorCore: string (optional)
+//   - successCount: number (optional)
+//   - failureCount: number (optional)
+//
+// Collection: telemetry
+// Document ID: {reportId}
+// Fields:
+//   - userId: string (required)
+//   - timestamp: timestamp (required)
+//   - type: string (required, enum: error, performance, navigation, rom_fetch, emulator)
+//   - details: map (optional)
+//
+// Collection: config
+// Document ID: global
+// Fields:
+//   - masterArchiveId: string (optional)
+//   - maintenanceMode: bool (optional)
+//
+// ===============================================================
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // ===============================================================
     // Helper Functions
     // ===============================================================
+    
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "jg.hardcore.builds@gmail.com" && request.auth.token.email_verified == true);
     }
-    
-    function hasRequiredFields(fields) {
-      return request.resource.data.keys().hasAll(fields);
+
+    function isValidStatus(status) {
+      return status in ['compatible', 'unstable', 'broken', 'untested'];
+    }
+
+    function isValidTelemetryType(type) {
+      return type in ['error', 'performance', 'navigation', 'rom_fetch', 'emulator'];
     }
 
     // ===============================================================
-    // Rules
+    // Collection Rules
     // ===============================================================
 
-    // User Profiles: Only owners can read/write their own profile
-    match /user_profiles/{userId} {
-      allow read, write: if isOwner(userId);
+    // Global Catalog: Read for all, Write for Admin
+    match /global_catalog/{gameId} {
+      allow read: if true; // Publicly readable for the ecosystem
+      allow write: if isAdmin();
     }
 
-    // Game Sessions: Authenticated users can read/create/update
-    match /game_sessions/{sessionId} {
-      allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.host_id == request.auth.uid;
-      allow update: if isAuthenticated() && (
-        resource.data.host_id == request.auth.uid || 
-        request.resource.data.opponent_id == request.auth.uid
-      );
+    // Telemetry: Create for authenticated users, Read for Admin
+    match /telemetry/{reportId} {
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid &&
+        isValidTelemetryType(request.resource.data.type);
+      allow read: if isAdmin();
+      allow update, delete: if false; // Telemetry is immutable
     }
 
-    // Community Tips: Anyone can read, only authenticated can create
-    match /community_tips/{tipId} {
+    // Global Config: Read for all, Write for Admin
+    match /config/{configId} {
       allow read: if true;
-      allow create: if isAuthenticated() && request.resource.data.user_id == request.auth.uid;
-      allow update: if isAuthenticated() && (
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['upvotes'])
-      );
+      allow write: if isAdmin();
     }
-    
-    // Default deny
+
+    // Default Deny
     match /{document=**} {
       allow read, write: if false;
     }

@@ -9,6 +9,13 @@ export interface FeedItem {
   timestamp: string;
   likes: number;
   comments: number;
+  type?: 'post' | 'time_capsule';
+  capsuleData?: {
+    gameId: string;
+    gameTitle: string;
+    stateId: string;
+    screenshotUrl?: string;
+  };
 }
 
 export interface Tournament {
@@ -93,7 +100,7 @@ class CommunityService {
     return stored || this.defaultFeed;
   }
 
-  async postToFeed(user: string, avatar: string, content: string): Promise<FeedItem> {
+  async postToFeed(user: string, avatar: string, content: string, type: 'post' | 'time_capsule' = 'post', capsuleData?: any): Promise<FeedItem> {
     const feed = await this.getFeed();
     const newItem: FeedItem = {
       id: Math.random().toString(36).substr(2, 9),
@@ -102,7 +109,9 @@ class CommunityService {
       content,
       timestamp: 'Justo ahora',
       likes: 0,
-      comments: 0
+      comments: 0,
+      type,
+      capsuleData
     };
     const updatedFeed = [newItem, ...feed];
     await storage.saveSetting(this.FEED_KEY, updatedFeed);

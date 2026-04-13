@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Settings, Monitor, Volume2, Sliders, X, Zap, ShieldAlert, Gamepad2, Save, RotateCcw, Check, Keyboard } from 'lucide-react';
+import { Settings, Monitor, Volume2, Sliders, X, Zap, ShieldAlert, Gamepad2, Save, RotateCcw, Check, Keyboard, Trophy, Coins } from 'lucide-react';
 import { haptics } from '../../services/haptics';
 import { storage } from '../../services/storage';
 import { AudioEngine } from '../../services/audioEngine';
@@ -13,16 +13,20 @@ interface EmulatorSettingsPanelProps {
   onClose: () => void;
   videoSettings: any;
   onUpdateVideo: (settings: any) => void;
+  isHardcore: boolean;
+  onUpdateHardcore: (active: boolean) => void;
 }
 
 export default function EmulatorSettingsPanel({ 
   isOpen, 
   onClose, 
   videoSettings,
-  onUpdateVideo
+  onUpdateVideo,
+  isHardcore,
+  onUpdateHardcore
 }: EmulatorSettingsPanelProps) {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'video' | 'audio' | 'controls'>('video');
+  const [activeTab, setActiveTab] = useState<'video' | 'audio' | 'controls' | 'gameplay'>('video');
   const [audioSettings, setAudioSettings] = useState({
     masterVolume: 80,
     musicVolume: 60,
@@ -87,6 +91,7 @@ export default function EmulatorSettingsPanel({
     { id: 'video', label: 'Video', icon: Monitor },
     { id: 'audio', label: 'Audio', icon: Volume2 },
     { id: 'controls', label: 'Controles', icon: Gamepad2 },
+    { id: 'gameplay', label: 'Gameplay', icon: Zap },
   ];
 
   const filters = [
@@ -329,6 +334,74 @@ export default function EmulatorSettingsPanel({
                     <p className="text-[10px] text-zinc-400 font-medium">
                       Los cambios en los controles se aplicarán inmediatamente al motor de emulación.
                     </p>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* GAMEPLAY SETTINGS */}
+              {activeTab === 'gameplay' && (
+                <motion.div 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="space-y-6"
+                >
+                  <div className="p-6 bg-rose-500/5 border border-rose-500/20 rounded-2xl space-y-6">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-rose-500/20 flex items-center justify-center border border-rose-500/30">
+                        <ShieldAlert className="w-6 h-6 text-rose-500" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-black italic uppercase tracking-tighter text-white">Modo Hardcore</h3>
+                        <p className="text-[10px] text-zinc-400 uppercase tracking-widest">Para pilotos de élite</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 bg-black/40 rounded-xl border border-white/5">
+                        <div>
+                          <div className="font-bold text-white text-sm">Activar Hardcore</div>
+                          <div className="text-[10px] text-zinc-500">Desactiva Retroceso, Avance Rápido y Guardado Externo</div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            onUpdateHardcore(!isHardcore);
+                            haptics.error();
+                          }}
+                          className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors ${isHardcore ? 'bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.4)]' : 'bg-zinc-700'}`}
+                        >
+                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isHardcore ? 'translate-x-7' : 'translate-x-1'}`} />
+                        </button>
+                      </div>
+
+                      {isHardcore && (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl"
+                        >
+                          <p className="text-[10px] text-rose-400 font-bold uppercase tracking-[0.2em] leading-relaxed">
+                            ADVERTENCIA: En modo Hardcore, solo puedes guardar tu progreso usando los métodos internos del juego. El multiplicador de CR y XP se activará automáticamente.
+                          </p>
+                        </motion.div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 bg-zinc-900/50 rounded-xl border border-white/5">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Trophy className="w-4 h-4 text-yellow-500" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white">Multiplicador XP</span>
+                      </div>
+                      <p className="text-2xl font-black italic text-white">{isHardcore ? 'x2.5' : 'x1.0'}</p>
+                    </div>
+                    <div className="p-4 bg-zinc-900/50 rounded-xl border border-white/5">
+                      <div className="flex items-center gap-3 mb-2">
+                        <Coins className="w-4 h-4 text-cyan-400" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-white">Bono de Créditos</span>
+                      </div>
+                      <p className="text-2xl font-black italic text-white">{isHardcore ? '+150%' : '0%'}</p>
+                    </div>
                   </div>
                 </motion.div>
               )}

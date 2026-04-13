@@ -2,6 +2,9 @@ import { GameObject } from './metadataNormalization';
 import { gameCatalog } from './gameCatalog';
 import { ROMFetchService } from './romFetcher';
 import { useGameStore } from '../store/gameStore';
+import { ArchiveScoutAgent } from './ScoutAgent';
+import { sentinel } from './sentinel';
+import { hiveMind } from './hiveMind';
 
 export interface TestMetrics {
   loadTimeMs: number;
@@ -57,17 +60,69 @@ export class SentinelEngine {
 
       try {
         const games = await gameCatalog.getAllGames();
+        // Prioritize untested, then broken (to attempt repair)
         const untested = games.filter(g => g.compatibility_status === 'untested');
+        const broken = games.filter(g => g.compatibility_status === 'broken');
+        
+        const targetQueue = untested.length > 0 ? untested : broken;
 
-        if (untested.length > 0) {
+        if (targetQueue.length > 0) {
           this.status = 'analyzing';
           this.notify();
           
           // Process one game at a time to avoid blocking the main thread
-          const game = untested[0];
-          console.log(`[Sentinel] Testing ${game.title} (${game.game_id})...`);
+          const game = targetQueue[0];
+          const isRepair = game.compatibility_status === 'broken';
+          
+          // Check global status before testing
+          const globalStatus = await hiveMind.getGlobalStatus(game.game_id);
+          if (globalStatus && globalStatus.status === 'compatible' && !isRepair) {
+            console.log(`[Sentinel] Skipping ${game.title} - Already verified globally as compatible.`);
+            game.compatibility_status = 'compatible';
+            game.emulator_core = globalStatus.emulatorCore || game.emulator_core;
+            await gameCatalog.addGame(game);
+            return;
+          }
+
+          console.log(`[Sentinel] ${isRepair ? 'Repairing' : 'Testing'} ${game.title} (${game.game_id})...`);
           
           const result = await this.testGameWithRecovery(game);
+          
+          // Report to Hive Mind
+          await sentinel.reportGameStatus(game.game_id, result.status, {
+            metrics: result.metrics,
+            coreUsed: result.coreUsed,
+            errorLog: result.errorLog
+          });
+          
+          if (result.status === 'broken' && isRepair) {
+            // If it's still broken after recovery, try a deep scout
+            console.log(`[Sentinel] Deep scouting for ${game.title}...`);
+            const scout = new ArchiveScoutAgent();
+            const candidates = await scout.discover(game.game_id, game.system_id);
+            
+            if (candidates.length > 0) {
+              const best = candidates[0];
+              console.log(`[Sentinel] Found new candidate for ${game.title}: ${best.url}`);
+              game.rom_url = best.url;
+              game.compatibility_status = 'untested'; // Reset to re-test in next cycle
+              await gameCatalog.addGame(game);
+              
+              sentinel.logEvent('sentinel_repair_found', { gameId: game.game_id, title: game.title, newUrl: best.url });
+              
+              this.status = 'optimizing';
+              this.notify();
+            } else {
+              console.log(`[Sentinel] No new candidates found for ${game.title}. Marking as permanently broken.`);
+              game.compatibility_status = 'broken';
+              await gameCatalog.addGame(game);
+            }
+          } else {
+            // Update game in catalog with test result
+            game.compatibility_status = result.status;
+            game.emulator_core = result.coreUsed; // Save winning config
+            await gameCatalog.addGame(game);
+          }
           
           if (result.retries > 0 && result.status === 'compatible') {
             this.status = 'optimizing';
@@ -88,11 +143,6 @@ export class SentinelEngine {
             successful: stats.successful + (result.status === 'compatible' ? 1 : 0),
             repairs: stats.repairs + (result.retries > 0 && result.status === 'compatible' ? 1 : 0)
           });
-
-          // Update game in catalog
-          game.compatibility_status = result.status;
-          game.emulator_core = result.coreUsed; // Save winning config
-          await gameCatalog.addGame(game);
         }
       } catch (e) {
         console.error('[Sentinel] Worker error:', e);
@@ -169,7 +219,7 @@ export class SentinelEngine {
     
     try {
       // Headless ROM Fetch Test (< 5s requirement)
-      const fetchPromise = ROMFetchService.fetchRom(game.game_id, game.rom_url);
+      const fetchPromise = ROMFetchService.fetchRom(game.game_id, game.rom_url, undefined, game.system_id, 'low');
       
       // 15 second timeout for Sentinel (Archive.org can be slow)
       const timeoutPromise = new Promise<Blob>((_, reject) => 

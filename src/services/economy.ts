@@ -10,17 +10,23 @@ export interface Transaction {
 
 class EconomyService {
   private balance: number = 0;
+  private xp: number = 0;
   private transactions: Transaction[] = [];
-  private listeners: Set<(balance: number) => void> = new Set();
+  private listeners: Set<(balance: number, xp: number) => void> = new Set();
 
   async init() {
     this.balance = await storage.getCredits();
+    this.xp = await storage.getXP();
     const savedTransactions = await storage.getSetting('retro_coins_transactions');
     this.transactions = savedTransactions || [];
   }
 
   getBalance(): number {
     return this.balance;
+  }
+
+  getXP(): number {
+    return this.xp;
   }
 
   getTransactions(): Transaction[] {
@@ -60,6 +66,22 @@ class EconomyService {
       // We need to import achievements at the top
       import('./achievements').then(({ achievements }) => {
         achievements.unlock('capitalist');
+      });
+    }
+  }
+
+  async addXP(amount: number, reason: string) {
+    if (amount <= 0) return;
+    
+    this.xp = await storage.addXP(amount);
+    
+    // XP doesn't need transactions for now, but we could add them
+    this.notifyListeners();
+
+    // Check for level up or achievements
+    if (this.xp >= 10000) {
+      import('./achievements').then(({ achievements }) => {
+        achievements.unlock('veteran_pilot');
       });
     }
   }
@@ -119,14 +141,14 @@ class EconomyService {
     await storage.saveSetting('retro_coins_transactions', this.transactions);
   }
 
-  subscribe(listener: (balance: number) => void) {
+  subscribe(listener: (balance: number, xp: number) => void) {
     this.listeners.add(listener);
-    listener(this.balance);
+    listener(this.balance, this.xp);
     return () => this.listeners.delete(listener);
   }
 
   private notifyListeners() {
-    this.listeners.forEach(listener => listener(this.balance));
+    this.listeners.forEach(listener => listener(this.balance, this.xp));
   }
 }
 

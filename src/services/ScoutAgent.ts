@@ -1,5 +1,6 @@
 import { ROMCandidate, ScoutAgent } from './AgenticROMDiscovery';
 import { gameCatalog } from './gameCatalog';
+import { sentinel } from './sentinel';
 
 const SYSTEM_KEYWORDS: Record<string, string> = {
   'NES': '("Nintendo Entertainment System" OR "NES")',
@@ -10,7 +11,8 @@ const SYSTEM_KEYWORDS: Record<string, string> = {
   'Genesis': '("Sega Genesis" OR "Mega Drive")',
   'PS1': '("PlayStation" OR "PS1" OR "PSX")',
   'PS2': '("PlayStation 2" OR "PS2")',
-  'Atari 2600': '("Atari 2600")'
+  'Atari 2600': '("Atari 2600")',
+  'Atari 7800': '("Atari 7800")'
 };
 
 export class ArchiveScoutAgent implements ScoutAgent {
@@ -20,7 +22,7 @@ export class ArchiveScoutAgent implements ScoutAgent {
     console.log(`[Scout] Buscando candidatos para ${gameId} (${system}) en Archive.org...`);
     
     const game = gameCatalog.getGame(gameId);
-    let cleanGameId = game?.title || gameId.replace(/^(nes|snes|gba|gbc|gb|genesis|psx|ps1|ps2|n64|atari2600)_/i, '').replace(/_/g, ' ').replace(/-/g, ' ');
+    let cleanGameId = game?.title || gameId.replace(/^(nes|snes|gba|gbc|gb|genesis|psx|ps1|ps2|n64|atari2600|atari7800)_/i, '').replace(/_/g, ' ').replace(/-/g, ' ');
     
     // Remove numbers at the start if it came from ID
     if (!game?.title) {
@@ -152,10 +154,34 @@ export class ArchiveScoutAgent implements ScoutAgent {
                   // Basic validation: must have size and valid extension
                   if (size < 4096) return false; // Skip tiny files (often text files disguised as zips)
 
+                  // Exclude common metadata/garbage files
+                  if (name.includes('_meta.xml') || name.includes('_files.xml') || name.includes('_archive.torrent') || name.includes('_sqlite.db')) {
+                    return false;
+                  }
+                  
+                  // Exclude common non-game files in zips
+                  if (name.endsWith('.xml') || name.endsWith('.txt') || name.endsWith('.pdf') || name.endsWith('.jpg') || name.endsWith('.png')) {
+                    return false;
+                  }
+
                   // Evitar archivos masivos que probablemente son colecciones completas
                   // Un juego de NES/GB/GBA raramente pasa de 32MB (excepto CD-ROMs como PSX)
                   const isCD = system === 'psx' || system === 'PS1' || system === 'PS2' || system === 'segacd' || system === 'Sega CD' || system === 'Dreamcast' || system === 'saturn';
-                  if (!isCD && size > 100 * 1024 * 1024) return false; // > 100MB es sospechoso para cartuchos
+                  
+                  // System-specific size limits
+                  if (!isCD) {
+                    if ((system === 'atari_2600' || system === 'Atari 2600') && size > 128 * 1024) return false;
+                    if ((system === 'atari_7800' || system === 'Atari 7800') && size > 512 * 1024) return false;
+                    if (size > 100 * 1024 * 1024) return false; // > 100MB es sospechoso para cartuchos
+                  }
+                  
+                  // Avoid .cue/.bin for non-CD systems as they are often metadata or incorrect dumps
+                  if (!isCD && (name.endsWith('.cue') || name.endsWith('.bin'))) {
+                    // Exception: Atari 2600 often uses .bin
+                    if (system !== 'atari_2600' && system !== 'Atari 2600') {
+                      return false;
+                    }
+                  }
 
                   return name.endsWith('.zip') || 
                          name.endsWith('.nes') || name.endsWith('.fds') || name.endsWith('.sfc') || 
@@ -164,7 +190,7 @@ export class ArchiveScoutAgent implements ScoutAgent {
                          name.endsWith('.gbc') || name.endsWith('.gb') || 
                          name.endsWith('.n64') || name.endsWith('.z64') ||
                          name.endsWith('.iso') || name.endsWith('.chd') ||
-                         name.endsWith('.bin') || name.endsWith('.cue');
+                         name.endsWith('.a26') || name.endsWith('.a78');
                 });
 
                 if (romFiles.length > 0) {
@@ -201,27 +227,34 @@ export class ArchiveScoutAgent implements ScoutAgent {
                   const bestFile = romFiles[0];
                   // Use the full file name including path, but encode it properly
                   const encodedFileName = bestFile.name.split('/').map((part: string) => encodeURIComponent(part)).join('/');
+                  const archiveUrl = `https://archive.org/download/${doc.identifier}/${encodedFileName}`;
                   
-                  candidates.push({
-                    url: `https://archive.org/download/${doc.identifier}/${encodedFileName}`,
-                    source: this.name,
-                    reliabilityScore: 0.9,
-                    latency: 0,
-                    metadata: { identifier: doc.identifier, filename: bestFile.name, size: bestFile.size }
-                  });
+                  if (!sentinel.isBlacklisted(archiveUrl)) {
+                    candidates.push({
+                      url: archiveUrl,
+                      source: this.name,
+                      reliabilityScore: 0.9,
+                      latency: 0,
+                      metadata: { identifier: doc.identifier, filename: bestFile.name, size: bestFile.size }
+                    });
+                  }
 
                   // Add Myrient candidate if possible (much faster)
                   const myrientBase = this.getMyrientBaseUrl(system);
                   if (myrientBase && bestFile.name.endsWith('.zip')) {
                     // For Myrient, we DO want just the filename, as Myrient doesn't use subdirectories
                     const cleanFileName = bestFile.name.split(/[/\\]/).pop() || bestFile.name;
-                    candidates.push({
-                      url: `${myrientBase}${encodeURIComponent(cleanFileName)}`,
-                      source: 'Myrient',
-                      reliabilityScore: 0.95, // Higher reliability score to prefer Myrient
-                      latency: 0,
-                      metadata: { identifier: 'myrient', filename: cleanFileName, size: bestFile.size }
-                    });
+                    const myrientUrl = `${myrientBase}${encodeURIComponent(cleanFileName)}`;
+                    
+                    if (!sentinel.isBlacklisted(myrientUrl)) {
+                      candidates.push({
+                        url: myrientUrl,
+                        source: 'Myrient',
+                        reliabilityScore: 0.95, // Higher reliability score to prefer Myrient
+                        latency: 0,
+                        metadata: { identifier: 'myrient', filename: cleanFileName, size: bestFile.size }
+                      });
+                    }
                   }
                 }
               }

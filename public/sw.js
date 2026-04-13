@@ -48,12 +48,15 @@ self.addEventListener('fetch', (event) => {
 
   // Helper to add COOP/COEP headers
   const addHeaders = (response) => {
-    if (!response || response.type === 'opaque') return response;
+    if (!response || response.status === 0 || response.type === 'opaque') return response;
     
     const newHeaders = new Headers(response.headers);
     newHeaders.set('Cross-Origin-Embedder-Policy', 'require-corp');
     newHeaders.set('Cross-Origin-Opener-Policy', 'same-origin');
     newHeaders.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    
+    // Some browsers might need this for iframes
+    newHeaders.set('Cross-Origin-Embedder-Policy-Report-Only', 'require-corp');
     
     return new Response(response.body, {
       status: response.status,

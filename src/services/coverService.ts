@@ -3,6 +3,8 @@
  * Prioritizes Libretro Thumbnails for consistency with the emulator ecosystem.
  */
 
+import { CDNService } from './cdnService';
+
 const LIBRETRO_SYSTEM_MAP: Record<string, string> = {
   'NES': 'Nintendo_-_Nintendo_Entertainment_System',
   'nes': 'Nintendo_-_Nintendo_Entertainment_System',
@@ -156,11 +158,14 @@ export class CoverService {
     const bingQuery = `${titleWithoutExt} ${system} game cover art`;
     sources.push(`https://tse2.mm.bing.net/th?q=${encodeURIComponent(bingQuery)}&w=400&h=600&c=7&rs=1&p=0&dpr=1&pid=1.7&mkt=en-US&adlt=moderate`);
 
-    // 4. Proxy everything via wsrv.nl for performance (but only for the best candidates)
+    // 4. Proxy everything via Cloudinary (primary) or wsrv.nl (fallback)
     const finalSources: string[] = [];
     sources.forEach(src => {
       if (src && src.startsWith('http')) {
-        // Use wsrv.nl for GitHub and Archive.org to get WebP and resizing
+        // Use Cloudinary for all external images
+        finalSources.push(CDNService.optimizeCover(src));
+        
+        // Keep wsrv.nl as a secondary fallback if Cloudinary fails or for redundancy
         if (src.includes('githubusercontent.com') || src.includes('archive.org') || src.includes('libretro.com')) {
           finalSources.push(`https://wsrv.nl/?url=${encodeURIComponent(src)}&w=400&output=webp&n=-1`);
         }
@@ -168,7 +173,11 @@ export class CoverService {
       }
     });
 
-    return [...new Set(finalSources.filter(Boolean))];
+    const result = [...new Set(finalSources.filter(Boolean))];
+    if (result.length === 0) {
+        console.warn(`[CoverService] No sources found for ${title} (${system})`);
+    }
+    return result;
   }
 
   /**

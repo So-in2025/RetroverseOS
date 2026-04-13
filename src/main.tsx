@@ -11,27 +11,37 @@ if (import.meta.env.DEV) {
 }
 
 // Mock WakeLock to prevent "Access to Screen Wake Lock features is disallowed by permissions policy"
-if (typeof navigator !== 'undefined' && 'wakeLock' in navigator) {
-  try {
-    const originalRequest = navigator.wakeLock.request.bind(navigator.wakeLock);
-    navigator.wakeLock.request = async (type: 'screen') => {
-      try {
-        return await originalRequest(type);
-      } catch (err) {
-        console.warn('⚠️ [Main] WakeLock request failed (Permission Policy):', err);
-        // Return a mock sentinel to prevent crashes in libraries that expect it
-        return {
-          released: false,
-          type: 'screen',
-          release: async () => {},
-          addEventListener: () => {},
-          removeEventListener: () => {},
-          onrelease: null,
-        } as any;
-      }
-    };
-  } catch (e) {
-    console.error('❌ [Main] Failed to mock WakeLock:', e);
+if (typeof navigator !== 'undefined') {
+  // Check if wakeLock exists and if we are in an iframe
+  const isInIframe = window.self !== window.top;
+  
+  if ('wakeLock' in navigator) {
+    try {
+      const originalRequest = navigator.wakeLock.request.bind(navigator.wakeLock);
+      navigator.wakeLock.request = async (type: 'screen') => {
+        // If in iframe, don't even try to call original unless we know it's allowed
+        // Browsers often throw even on access, so we wrap everything
+        try {
+          if (isInIframe) {
+            throw new Error('WakeLock disabled in iframe context');
+          }
+          return await originalRequest(type);
+        } catch (err) {
+          console.warn('⚠️ [Main] WakeLock request suppressed:', err instanceof Error ? err.message : err);
+          // Return a mock sentinel to prevent crashes in libraries that expect it
+          return {
+            released: false,
+            type: 'screen',
+            release: async () => {},
+            addEventListener: () => {},
+            removeEventListener: () => {},
+            onrelease: null,
+          } as any;
+        }
+      };
+    } catch (e) {
+      console.warn('⚠️ [Main] Could not patch WakeLock (likely permission policy):', e);
+    }
   }
 }
 

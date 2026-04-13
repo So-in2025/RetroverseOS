@@ -2,6 +2,7 @@ import { storage } from './storage';
 import * as fflate from 'fflate';
 import { ROMValidator } from './romValidator';
 import { sentinel } from './sentinel';
+import { hiveMind } from './hiveMind';
 import { ROMDiscoveryBrain } from './DiscoveryBrain';
 
 const CORS_PROXY = "https://corsproxy.io/?";
@@ -112,7 +113,7 @@ export class ROMFetchService {
   /**
    * Fetches a ROM, either from the local IndexedDB cache or from the network.
    */
-  public static async fetchRom(gameId: string, url: string, onProgress?: (status: string) => void, system?: string): Promise<Blob> {
+  public static async fetchRom(gameId: string, url: string, onProgress?: (status: string) => void, system?: string, priority: 'high' | 'low' = 'high'): Promise<Blob> {
     // 0. Sanitizar URL de entrada
     if (url.includes('f:/') || url.includes('c:/') || url.includes('d:/')) {
       // Si la URL contiene una ruta local, intentamos extraer solo el nombre del archivo
@@ -131,6 +132,11 @@ export class ROMFetchService {
 
     while (attempt <= maxRetries) {
       try {
+        // 0. Check Blacklist
+        if (sentinel.isBlacklisted(url)) {
+          throw new Error(`La URL está en la lista negra del Sentinel por fallos previos.`);
+        }
+
         // 0. Agentic Discovery Engine (NEW)
         let finalUrl = url;
         let usedDiscovery = false;
@@ -157,6 +163,9 @@ export class ROMFetchService {
                 throw new Error(`No se pudo resolver el enlace de la ROM: ${finalUrl}`);
             }
         }
+
+        // 0. Apply HiveMind Global Redirects (Mass Replace)
+        finalUrl = hiveMind.resolveUrl(finalUrl);
 
         // 0. Auto-correct old URLs that used raw extensions instead of .zip for nointro sets
         let originalUrl = finalUrl;
@@ -213,7 +222,7 @@ export class ROMFetchService {
           };
 
           // 3. Fetch from Network with Progress
-          const response = await this.fetchWithProgress(targetUrl, onProgress);
+          const response = await this.fetchWithProgress(targetUrl, onProgress, priority);
           
           // Read stream to report progress
           const contentLength = response.headers.get('content-length');
@@ -233,7 +242,9 @@ export class ROMFetchService {
                 loaded += value.length;
                 if (total && onProgress) {
                   const percent = Math.round((loaded / total) * 100);
-                  onProgress(`Descargando... ${percent}%`);
+                  const mbLoaded = (loaded / 1024 / 1024).toFixed(2);
+                  const mbTotal = (total / 1024 / 1024).toFixed(2);
+                  onProgress(`Descargando... ${percent}% (${mbLoaded}/${mbTotal} MB)`);
                 } else if (onProgress) {
                   onProgress(`Descargando... ${(loaded / 1024 / 1024).toFixed(2)} MB`);
                 }
@@ -331,10 +342,18 @@ export class ROMFetchService {
         }
       } catch (e: any) {
         lastError = e;
+        
+        // Handle Blacklisting for fatal errors
+        const isFatal = e.message?.includes('404') || e.message?.includes('403') || e.message?.includes('Forbidden') || e.message?.includes('not found');
+        if (isFatal) {
+          sentinel.addToBlacklist(url, e.message);
+          throw e; // Don't retry fatal errors
+        }
+
         attempt++;
         if (attempt <= maxRetries) {
-          const waitTime = 2000 * attempt;
-          console.warn(`[ROM Fetch] Attempt ${attempt} failed for ${gameId}: ${e.message}. Retrying in ${waitTime}ms...`);
+          const waitTime = Math.pow(2, attempt) * 1000 + Math.random() * 1000; // Exponential backoff
+          console.warn(`[ROM Fetch] Attempt ${attempt} failed for ${gameId}: ${e.message}. Retrying in ${Math.round(waitTime)}ms...`);
           onProgress?.(`Reintentando descarga (${attempt}/${maxRetries})...`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
         }
@@ -360,30 +379,59 @@ export class ROMFetchService {
     }
   }
 
-  public static async fetchWithProgress(url: string, onProgress?: (status: string) => void): Promise<Response> {
-    let response: Response;
-    
-    // Use our own backend proxy
-    const backendProxyUrl = `/api/tunnel?url=${encodeURIComponent(url)}`;
+  public static async fetchWithProgress(url: string, onProgress?: (status: string) => void, priority: 'high' | 'low' = 'high'): Promise<Response> {
+    if (sentinel.isBlacklisted(url)) {
+      throw new Error(`La URL está en la lista negra del Sentinel.`);
+    }
 
-    try {
-        console.log(`[ROM Fetch] Tunneling via Backend: ${backendProxyUrl}`);
+    // For low priority fetches (Sentinel), we might want to wait if the network is busy
+    if (priority === 'low' && 'requestIdleCallback' in window) {
+      await new Promise(resolve => (window as any).requestIdleCallback(resolve, { timeout: 2000 }));
+    }
+
+    const proxies = [
+      `/api/tunnel?url=${encodeURIComponent(url)}`,
+      `${CORS_PROXY}${encodeURIComponent(url)}`,
+      url // Direct fetch as last resort
+    ];
+
+    let lastError: any;
+
+    for (const proxyUrl of proxies) {
+      try {
+        console.log(`[ROM Fetch] Attempting fetch via: ${proxyUrl}`);
         
-        // 120 Second Timeout for proxies (More generous for large ROMs like PSX)
+        // 300 Second Timeout for proxies (More generous for large ROMs like PSX)
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 120000);
+        const timeoutId = setTimeout(() => controller.abort(), 300000);
 
-        response = await fetch(backendProxyUrl, { signal: controller.signal });
+        const response = await fetch(proxyUrl, { 
+          signal: controller.signal,
+          headers: {
+            'Accept-Encoding': 'identity' // Try to avoid compression for better progress reporting
+          }
+        });
         clearTimeout(timeoutId);
 
-        if (!response.ok) throw new Error(`Backend proxy failed: ${response.status}`);
+        if (!response.ok) {
+          if (response.status === 403 || response.status === 404) {
+            sentinel.addToBlacklist(url, `HTTP ${response.status} en origen`);
+          }
+          throw new Error(`HTTP Error ${response.status}`);
+        }
         
         return response; // Success
-    } catch (e: any) {
-      console.error(`[ROM Fetch] Backend proxy collapsed:`, e);
-      sentinel.logRomFetch('unknown', url, 'error', { error: e.message });
-      throw new Error(`Backend proxy collapsed: ${e.message}`);
+      } catch (e: any) {
+        // Only log to console if it's the last proxy or we are in debug mode
+        if (proxyUrl === proxies[proxies.length - 1]) {
+          console.warn(`[ROM Fetch] All proxies failed for ${url}. Last error: ${e.message}`);
+        }
+        lastError = e;
+      }
     }
+
+    sentinel.logRomFetch('unknown', url, 'error', { error: lastError?.message });
+    throw new Error(`Todas las conexiones fallaron. Verifica tu conexión a internet. Último error: ${lastError?.message}`);
   }
 
   /**
@@ -452,6 +500,26 @@ export class ROMFetchService {
     }
   }
 
+  public static async extractFileFromZip(zipBlob: Blob, targetFileName: string): Promise<Blob> {
+    const buffer = await zipBlob.arrayBuffer();
+    const zipData = new Uint8Array(buffer);
+    
+    return new Promise((resolve, reject) => {
+      fflate.unzip(zipData, (err, unzipped) => {
+        if (err) return reject(err);
+        
+        const files = Object.keys(unzipped);
+        const bestFile = files.find(f => f.toLowerCase().endsWith(targetFileName.toLowerCase()));
+
+        if (bestFile) {
+          resolve(new Blob([unzipped[bestFile]]));
+        } else {
+          reject(new Error(`File ${targetFileName} not found in ZIP archive`));
+        }
+      });
+    });
+  }
+
   private static async extractMainFileFromZip(zipBlob: Blob, system?: string): Promise<Blob> {
     const buffer = await zipBlob.arrayBuffer();
     const zipData = new Uint8Array(buffer);
@@ -470,7 +538,7 @@ export class ROMFetchService {
           'gba': ['.gba'],
           'gbc': ['.gbc'],
           'gb': ['.gb'],
-          'psx': ['.chd', '.cue', '.bin', '.iso'],
+          'psx': ['.chd', '.iso', '.bin', '.cue'],
           'n64': ['.n64', '.z64', '.v64'],
           'atari_2600': ['.a26', '.bin'],
           'atari_7800': ['.a78', '.bin'],
@@ -539,7 +607,7 @@ export class ROMFetchService {
         }
 
         if (bestFile && bestSize > 0) {
-          console.log(`[ROM Fetch] Extracted main file: ${bestFile} (${(bestSize / 1024).toFixed(2)} KB)`);
+          console.log(`[ROM Fetch] Extracted main file: ${bestFile} (${(bestSize / 1024 / 1024).toFixed(2)} MB)`);
           resolve(new Blob([unzipped[bestFile]]));
         } else {
           reject(new Error('No valid ROM file found in ZIP archive'));

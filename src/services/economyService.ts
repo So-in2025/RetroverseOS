@@ -160,11 +160,15 @@ class EconomyService {
     await storage.saveSetting('audioSettings', settings);
   }
   async getSetting(key: string, userId?: string): Promise<any> {
-    if (userId) {
-      // For general settings, we might need a specific cloud method or use user_preferences
-      // For now, let's assume they are stored in user_preferences
-      const prefs = await cloudEconomyService.getUserPreferences(userId);
-      return prefs ? prefs[key] : null;
+    try {
+      if (userId) {
+        // For general settings, we might need a specific cloud method or use user_preferences
+        // For now, let's assume they are stored in user_preferences
+        const prefs = await cloudEconomyService.getUserPreferences(userId);
+        return prefs ? prefs[key] : null;
+      }
+    } catch (e) {
+      console.warn(`⚠️ [EconomyService] Cloud fetch failed for ${key}, falling back to local:`, e);
     }
     return await storage.getSetting(key);
   }

@@ -1,5 +1,7 @@
 
 import { NetplayRoom } from './netplayService';
+import { db, auth, ensureAuth, handleFirestoreError, OperationType } from '../firebase';
+import { collection, addDoc, serverTimestamp, doc, setDoc, increment } from 'firebase/firestore';
 
 export interface SentinelReport {
   timestamp: string;
@@ -13,6 +15,7 @@ export interface SentinelReport {
     fpsDrops: number;
   };
   navigationHistory: string[];
+  emulatorLogs: any[];
 }
 
 class SentinelService {
@@ -27,22 +30,100 @@ class SentinelService {
       loadTime: 0,
       fpsDrops: 0
     },
-    navigationHistory: []
+    navigationHistory: [],
+    emulatorLogs: []
   };
 
   private isEnabled = false;
+  private blacklist: Set<string> = new Set();
+  private errorAggregation: Map<string, { count: number; firstSeen: string; lastSeen: string; details: any }> = new Map();
+  private logLevel: 'debug' | 'info' | 'warn' | 'error' = 'info';
 
   constructor() {
     this.report.performance.loadTime = performance.now();
+    this.loadBlacklist();
+  }
+
+  public setLogLevel(level: 'debug' | 'info' | 'warn' | 'error') {
+    this.logLevel = level;
+  }
+
+  private aggregateError(type: string, key: string, details: any) {
+    const aggregateKey = `${type}:${key}`;
+    const now = new Date().toISOString();
+    
+    if (this.errorAggregation.has(aggregateKey)) {
+      const existing = this.errorAggregation.get(aggregateKey)!;
+      existing.count++;
+      existing.lastSeen = now;
+      existing.details = details; // Update with latest details
+    } else {
+      this.errorAggregation.set(aggregateKey, {
+        count: 1,
+        firstSeen: now,
+        lastSeen: now,
+        details
+      });
+    }
+
+    // If it's a high-frequency error, maybe auto-blacklist or take action
+    const agg = this.errorAggregation.get(aggregateKey)!;
+    if (agg.count >= 10 && type === 'network_404' && details?.url) {
+      this.addToBlacklist(details.url, 'High frequency 404');
+    }
+  }
+
+  private loadBlacklist() {
+    try {
+      const stored = localStorage.getItem('sentinel_blacklist');
+      if (stored) {
+        const urls = JSON.parse(stored);
+        this.blacklist = new Set(urls);
+        console.log(`🛡️ [SENTINEL] Blacklist cargada: ${this.blacklist.size} URLs bloqueadas.`);
+      }
+    } catch (e) {
+      console.warn('[SENTINEL] Fallo al cargar blacklist:', e);
+    }
+  }
+
+  private saveBlacklist() {
+    try {
+      localStorage.setItem('sentinel_blacklist', JSON.stringify(Array.from(this.blacklist)));
+    } catch (e) {
+      // Silent fail
+    }
+  }
+
+  public addToBlacklist(url: string, reason: string) {
+    if (!url) return;
+    if (this.blacklist.has(url)) return;
+
+    this.blacklist.add(url);
+    console.warn(`🚫 [SENTINEL] URL añadida a blacklist: ${url} (Motivo: ${reason})`);
+    this.saveBlacklist();
+    
+    this.report.errors.push({
+      type: 'blacklist_add',
+      url,
+      reason,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  public isBlacklisted(url: string): boolean {
+    if (!url) return false;
+    return this.blacklist.has(url);
   }
 
   public start() {
     if (this.isEnabled) return;
     this.isEnabled = true;
     
-    // Delay initialization to avoid blocking the main thread during boot
-    setTimeout(() => {
-      console.log('🚀 [SENTINEL] Iniciando auditoría en tiempo real...');
+    // Use requestIdleCallback if available, otherwise fallback to setTimeout
+    const scheduler = (window as any).requestIdleCallback || ((cb: any) => setTimeout(cb, 1000));
+
+    scheduler(() => {
+      console.log('🚀 [SENTINEL] Iniciando auditoría en segundo plano (Baja Prioridad)...');
       this.setupErrorCapture();
       this.setupNetworkInterception();
       this.setupImageMonitoring();
@@ -50,24 +131,53 @@ class SentinelService {
       
       // Periodic reporting (every 60s)
       setInterval(() => this.sendReport(), 60000);
-    }, 100);
+    });
   }
 
   private async sendReport() {
     if (!this.isEnabled) return;
     
+    // Convert aggregation to report format
+    const aggregatedErrors: any[] = [];
+    this.errorAggregation.forEach((val, key) => {
+      if (val.count > 1) {
+        aggregatedErrors.push({
+          type: 'aggregated_error',
+          key,
+          ...val
+        });
+      }
+    });
+
     // Only send if there's something to report
     if (this.report.errors.length === 0 && 
         this.report.networkFailures.length === 0 && 
         this.report.imageFailures.length === 0 &&
-        this.report.romFailures.length === 0) return;
+        this.report.romFailures.length === 0 &&
+        aggregatedErrors.length === 0) return;
 
     try {
-      const reportData = this.getFullReport();
-      await fetch('/api/sentinel/report', {
+      const reportData = {
+        ...this.getFullReport(),
+        aggregatedErrors,
+        userId: auth.currentUser?.uid || 'anonymous',
+        timestamp: serverTimestamp()
+      };
+
+      // 1. Send to local API (Legacy/Backup)
+      fetch('/api/sentinel/report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(reportData)
+      }).catch(() => {}); // Ignore local API failures
+      
+      // 2. Send to Firestore (Global Hive Mind)
+      await ensureAuth();
+      await addDoc(collection(db, 'telemetry'), {
+        userId: auth.currentUser?.uid,
+        timestamp: serverTimestamp(),
+        type: 'error',
+        details: reportData
       });
       
       // Clear reported items to avoid duplicates
@@ -75,6 +185,11 @@ class SentinelService {
       this.report.networkFailures = [];
       this.report.imageFailures = [];
       this.report.romFailures = [];
+      // We keep aggregation but maybe reset counts or clear old ones
+      if (aggregatedErrors.length > 0) {
+        // Optional: clear aggregation after successful report to avoid bloat
+        // this.errorAggregation.clear();
+      }
     } catch (e) {
       // Silent fail to avoid infinite loops or blocking the app
     }
@@ -149,56 +264,8 @@ class SentinelService {
   }
 
   private setupNetworkInterception() {
-    try {
-      // Check if fetch is even available and if we can modify it
-      const descriptor = Object.getOwnPropertyDescriptor(window, 'fetch');
-      if (descriptor && descriptor.configurable === false) {
-        console.warn('⚠️ [SENTINEL] fetch no es configurable, saltando interceptación.');
-        return;
-      }
-
-      const originalFetch = window.fetch;
-      if (typeof originalFetch !== 'function') return;
-
-      Object.defineProperty(window, 'fetch', {
-        configurable: true,
-        enumerable: true,
-        get: () => async (...args: any[]) => {
-          const start = performance.now();
-          const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request).url;
-          
-          try {
-            const response = await originalFetch.apply(window, args as any);
-            const duration = performance.now() - start;
-            
-            if (!response.ok) {
-              if (this.report.networkFailures.length > 50) this.report.networkFailures.shift();
-              this.report.networkFailures.push({
-                url,
-                status: response.status,
-                statusText: response.statusText,
-                duration,
-                timestamp: new Date().toISOString()
-              });
-            }
-            
-            return response;
-          } catch (error) {
-            const duration = performance.now() - start;
-            if (this.report.networkFailures.length > 50) this.report.networkFailures.shift();
-            this.report.networkFailures.push({
-              url,
-              error: String(error),
-              duration,
-              timestamp: new Date().toISOString()
-            });
-            throw error;
-          }
-        }
-      });
-    } catch (e) {
-      console.warn('⚠️ [SENTINEL] No se pudo interceptar fetch (propiedad protegida).');
-    }
+    // Disabled fetch interception as it might be breaking Nostalgist core fetching
+    return;
   }
 
   private setupImageMonitoring() {
@@ -264,8 +331,61 @@ class SentinelService {
     requestAnimationFrame(checkFps);
   }
 
+  public async reportGameStatus(gameId: string, status: 'compatible' | 'unstable' | 'broken', details?: any) {
+    try {
+      await ensureAuth();
+      const gameRef = doc(db, 'global_catalog', gameId);
+      
+      // Update global status with atomic increments for reliability scoring
+      await setDoc(gameRef, {
+        gameId,
+        status,
+        lastVerifiedAt: serverTimestamp(),
+        successCount: increment(status === 'compatible' ? 1 : 0),
+        failureCount: increment(status === 'broken' ? 1 : 0),
+        details: details || {}
+      }, { merge: true });
+
+      console.log(`[Sentinel] Global status reported for ${gameId}: ${status}`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, `global_catalog/${gameId}`);
+    }
+  }
+
+  public logEmulator(core: string, gameId: string, event: string, details?: any) {
+    const logEntry = {
+      timestamp: Date.now(),
+      core,
+      gameId,
+      event,
+      details
+    };
+
+    if (!this.report.emulatorLogs) {
+      this.report.emulatorLogs = [];
+    }
+    this.report.emulatorLogs.push(logEntry);
+
+    if (this.logLevel === 'debug' || this.logLevel === 'info') {
+      console.log(`[Sentinel][Emulator][${core}] ${gameId}: ${event}`, details || '');
+    }
+
+    // If it's a crash or critical error, aggregate it
+    if (event.toLowerCase().includes('error') || event.toLowerCase().includes('fail') || event.toLowerCase().includes('crash')) {
+      this.aggregateError('emulator_error', `${core}_${event}`, { core, gameId, ...details });
+    }
+  }
+
   public logRomFetch(gameId: string, url: string, status: 'start' | 'success' | 'error', details?: any) {
     if (status === 'error') {
+      const errorKey = details?.message || 'unknown_error';
+      this.aggregateError('rom_fetch_error', errorKey, { gameId, url, details });
+
+      // Only log to console if log level allows
+      if (this.logLevel === 'debug' || this.logLevel === 'info') {
+        console.warn(`⚠️ [SENTINEL] Fallo en descarga de ROM (${gameId}): ${errorKey}`);
+      }
+
       this.report.romFailures.push({
         gameId,
         url,

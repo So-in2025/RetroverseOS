@@ -19,6 +19,13 @@ export default function LoadingScreen({ status, progress, gameId, coverUrl, titl
     setShowCover(true);
   }, []);
 
+  const [showCancel, setShowCancel] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowCancel(true), 5000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Determine system color for radial gradient
   const getSystemColor = (sys?: string) => {
     if (!sys) return 'rgba(0, 242, 255, 0.1)'; // Default Cyan
@@ -107,6 +114,17 @@ export default function LoadingScreen({ status, progress, gameId, coverUrl, titl
               </div>
             </div>
           </div>
+          
+          {showCancel && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              onClick={() => window.location.reload()}
+              className="mt-4 text-[10px] font-mono text-white/40 hover:text-red-500 uppercase tracking-widest underline transition-colors"
+            >
+              [Cancelar Carga / Salir]
+            </motion.button>
+          )}
         </div>
       </div>
     </div>

@@ -141,6 +141,15 @@ export const ACHIEVEMENTS: Achievement[] = [
     reward: 1000
   },
   {
+    id: 'veteran_pilot',
+    title: 'Piloto Veterano',
+    description: 'Acumula 10,000 puntos de experiencia (XP).',
+    icon: 'ShieldCheck',
+    category: 'mastery',
+    rarity: 'platinum',
+    reward: 2500
+  },
+  {
     id: 'completionist',
     title: 'Completionist',
     description: 'Have 50 games in your library.',

@@ -442,7 +442,7 @@ export default function GameLibrary() {
                 {[
                   { id: 'discover', icon: Zap, label: 'DESCUBRIR' },
                   { id: 'carousel', icon: Disc, label: 'PORTADAS' },
-                  { id: 'systems', icon: Gamepad2, label: 'SISTEMAS' },
+                  { id: 'systems', icon: Gamepad2, label: 'CONSOLAS' },
                   { id: 'grid', icon: Search, label: 'TODOS' }
                 ].map((mode) => (
                   <button
@@ -537,7 +537,7 @@ export default function GameLibrary() {
           <div className="flex items-center gap-4 bg-zinc-900/80 backdrop-blur-xl border border-white/10 px-6 py-2 rounded-2xl shadow-2xl">
             <div className="flex items-center gap-2 text-zinc-500">
               <Disc className="w-4 h-4" />
-              <span className="text-[10px] font-retro uppercase tracking-widest">SISTEMA:</span>
+              <span className="text-[10px] font-retro uppercase tracking-widest">CONSOLA:</span>
             </div>
             <select
               value={selectedSystem}

@@ -25,6 +25,12 @@ export class ROMValidator {
     const headerBuffer = await blob.slice(0, headerSize).arrayBuffer();
     const view = new Uint8Array(headerBuffer);
     
+    // Check for non-ROM headers (like Archive.org metadata or corrupted downloads)
+    const isGlib = view[0] === 0x47 && view[1] === 0x4C && view[2] === 0x49 && view[3] === 0x42; // GLIB
+    if (isGlib) {
+      return { isValid: false, error: 'Downloaded file is metadata (GLIB), not a valid ROM.' };
+    }
+
     // Check for ZIP (PK\x03\x04)
     const isZip = view[0] === 0x50 && view[1] === 0x4B && view[2] === 0x03 && view[3] === 0x04;
     
@@ -114,6 +120,33 @@ export class ROMValidator {
           // Could be cue/bin, harder to validate strictly here.
           headerType = 'psx-disc';
         }
+        break;
+
+      case 'atari_7800':
+        // Atari 7800 ROMs have a 128-byte header starting with "ATARI7800"
+        const is7800 = view[0] === 0x41 && view[1] === 0x54 && view[2] === 0x41 && view[3] === 0x52 && 
+                       view[4] === 0x49 && view[5] === 0x37 && view[6] === 0x38 && view[7] === 0x30 && view[8] === 0x30;
+        if (!is7800) {
+          // If it's too small or doesn't have the header, it's likely invalid
+          if (blob.size < 16384) {
+            isValid = false;
+            errorMsg = 'Atari 7800 ROM is too small or missing header.';
+          } else {
+            console.warn('[ROM Validator] Atari 7800 ROM missing "ATARI7800" header. Proceeding anyway.');
+            headerType = 'unknown-a78';
+          }
+        } else {
+          headerType = 'a78-header';
+        }
+        break;
+
+      case 'atari_2600':
+        // Atari 2600 ROMs are raw binary. We check for common sizes (2K, 4K, 8K, 16K, 32K)
+        const validSizes = [2048, 4096, 8192, 16384, 32768, 65536];
+        if (!validSizes.includes(blob.size)) {
+          console.warn(`[ROM Validator] Atari 2600 ROM has unusual size (${blob.size} bytes). Proceeding anyway.`);
+        }
+        headerType = 'raw-bin';
         break;
     }
 

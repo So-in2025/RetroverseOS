@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { MessageSquare, Users, Calendar, Trophy, Medal, Crown, Swords, ArrowRight, Activity, ShieldAlert, TrendingUp, Cpu, Server, Share2, Send, Heart } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { MessageSquare, Users, Calendar, Trophy, Medal, Crown, Swords, ArrowRight, Activity, ShieldAlert, TrendingUp, Cpu, Server, Share2, Send, Heart, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AudioEngine } from '../services/audioEngine';
 import { haptics } from '../services/haptics';
@@ -15,6 +16,7 @@ export default function Community() {
   const location = useLocation();
   const { user } = useAuthStore();
   const { sentinelStats } = useGameStore();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'feed' | 'tournaments' | 'leaderboards' | 'mission-control'>('feed');
   const [selectedTournament, setSelectedTournament] = useState<string | null>(null);
   const [isGeneratingTournament, setIsGeneratingTournament] = useState(false);
@@ -214,6 +216,30 @@ export default function Community() {
                       </div>
                     </div>
                     <p className="text-zinc-300 mb-4 leading-relaxed text-sm md:text-base">{item.content}</p>
+                    
+                    {item.type === 'time_capsule' && item.capsuleData && (
+                      <div className="mb-4 rounded-xl overflow-hidden border border-fuchsia-500/20 bg-black/50 relative group">
+                        {item.capsuleData.screenshotUrl ? (
+                          <img src={item.capsuleData.screenshotUrl} alt="Time Capsule" className="w-full h-48 object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                        ) : (
+                          <div className="w-full h-48 bg-zinc-800 flex items-center justify-center">
+                            <span className="text-zinc-500">Sin captura</span>
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-4">
+                          <h4 className="text-fuchsia-400 font-bold text-sm md:text-base flex items-center gap-2">
+                            <Share2 className="w-4 h-4" /> Time Capsule: {item.capsuleData.gameTitle}
+                          </h4>
+                          <button 
+                            onClick={() => navigate(`/play/${item.capsuleData?.gameId}?capsule=${item.capsuleData?.stateId}`)}
+                            className="mt-2 w-full py-2 bg-fuchsia-600 hover:bg-fuchsia-500 text-white rounded-lg font-bold text-sm transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Play className="w-4 h-4" /> Jugar este Momento
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex gap-4 md:gap-6 text-zinc-500 text-xs md:text-sm">
                       <button className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors">
                         <Heart className="w-3 h-3 md:w-4 md:h-4" /> {item.likes}

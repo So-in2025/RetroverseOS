@@ -1,4 +1,5 @@
 import { CoverService } from './coverService';
+import { CDNService } from './cdnService';
 
 export interface GameObject {
   game_id: string;
@@ -562,8 +563,8 @@ export class MetadataNormalizationEngine {
         players: this.estimatePlayers(cleanTitle, rawData.description),
         rom_url: romUrl,
         cover_url: sources[0],
-        artwork_url: artworkUrl,
-        video_preview_url: videoPreviewUrl,
+        artwork_url: artworkUrl ? CDNService.optimizeArtwork(artworkUrl) : null,
+        video_preview_url: videoPreviewUrl ? CDNService.optimizeVideo(videoPreviewUrl) : null,
         description: description,
         genre: Array.isArray(rawData.subject) ? rawData.subject[0] : rawData.subject,
         rom_size: parseInt(romFile.size || '0', 10),

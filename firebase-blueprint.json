@@ -1,59 +1,58 @@
 {
   "entities": {
-    "user_profiles": {
-      "title": "User Profile",
-      "description": "Stores user-specific data, credits, and preferences.",
+    "GlobalGameStatus": {
+      "title": "Global Game Status",
+      "description": "Shared compatibility and reliability data for a specific game across all users.",
       "type": "object",
       "properties": {
-        "user_id": { "type": "string", "description": "The unique ID of the user." },
-        "credits": { "type": "number", "description": "Current balance of Retro Coins." },
-        "has_retro_pass": { "type": "boolean", "description": "Whether the user has a premium pass." },
-        "coach_voice": { "type": "string", "description": "Selected AI coach voice." },
-        "purchased_items": { "type": "array", "description": "List of purchased item IDs." },
-        "video_settings": { "type": "object", "description": "User's video preference settings." }
+        "gameId": { "type": "string", "description": "Unique ID of the game." },
+        "status": { "type": "string", "enum": ["compatible", "unstable", "broken", "untested"], "description": "Current verified status." },
+        "reliabilityScore": { "type": "number", "description": "Score from 0 to 1 based on user reports." },
+        "lastVerifiedAt": { "type": "string", "format": "date-time", "description": "Last time the status was updated." },
+        "verifiedBy": { "type": "string", "description": "UID of the admin or system that verified it." },
+        "romUrl": { "type": "string", "description": "The current working ROM URL." },
+        "emulatorCore": { "type": "string", "description": "The recommended emulator core." },
+        "successCount": { "type": "integer", "description": "Number of successful loads reported by users." },
+        "failureCount": { "type": "integer", "description": "Number of failed loads reported by users." }
       },
-      "required": ["user_id", "credits"]
+      "required": ["gameId", "status", "lastVerifiedAt"]
     },
-    "game_sessions": {
-      "title": "Game Session",
-      "description": "Represents a multiplayer game session.",
+    "TelemetryReport": {
+      "title": "Telemetry Report",
+      "description": "Aggregated error reports and events sent by users.",
       "type": "object",
       "properties": {
-        "game_id": { "type": "string" },
-        "host_id": { "type": "string" },
-        "opponent_id": { "type": "string" },
-        "status": { "type": "string", "enum": ["waiting", "playing", "finished"] },
-        "room_id": { "type": "string" }
+        "userId": { "type": "string", "description": "UID of the reporting user." },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "type": { "type": "string", "enum": ["error", "performance", "navigation", "rom_fetch", "emulator"], "description": "Type of the report." },
+        "details": { "type": "object", "description": "Flexible JSON object with error details." },
+        "appVersion": { "type": "string" }
       },
-      "required": ["game_id", "host_id", "status"]
+      "required": ["timestamp", "type"]
     },
-    "community_tips": {
-      "title": "Community Tip",
-      "description": "A tip shared by a user for a specific game.",
+    "AdminConfig": {
+      "title": "Admin Configuration",
+      "description": "Global settings for the RetroVerse OS ecosystem.",
       "type": "object",
       "properties": {
-        "game_id": { "type": "string" },
-        "user_id": { "type": "string" },
-        "user_name": { "type": "string" },
-        "content": { "type": "string" },
-        "upvotes": { "type": "number" },
-        "created_at": { "type": "string", "format": "date-time" }
-      },
-      "required": ["game_id", "user_id", "content"]
+        "masterArchiveId": { "type": "string", "description": "The primary Archive.org collection ID." },
+        "maintenanceMode": { "type": "boolean" },
+        "minAppVersion": { "type": "string", "description": "Minimum version required to use the app." }
+      }
     }
   },
   "firestore": {
-    "/user_profiles/{userId}": {
-      "schema": "user_profiles",
-      "description": "User profile data."
+    "/global_catalog/{gameId}": {
+      "schema": "GlobalGameStatus",
+      "description": "The master registry of game compatibility."
     },
-    "/game_sessions/{sessionId}": {
-      "schema": "game_sessions",
-      "description": "Active and past game sessions."
+    "/telemetry/{reportId}": {
+      "schema": "TelemetryReport",
+      "description": "User-submitted telemetry data."
     },
-    "/community_tips/{tipId}": {
-      "schema": "community_tips",
-      "description": "Tips shared by the community."
+    "/config/global": {
+      "schema": "AdminConfig",
+      "description": "Global application configuration."
     }
   }
 }

@@ -96,6 +96,10 @@ export class InputManager {
     storage.saveSetting('controls', mapping);
   }
 
+  public getButtonStates(): Record<RetroButton, boolean> {
+    return { ...this.buttonStates };
+  }
+
   public start() {
     if (this.isListening) return;
     

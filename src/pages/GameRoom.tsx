@@ -1,7 +1,7 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import React from 'react';
-import { Share2, Users, MessageSquare, Send, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video, Bot, Cloud, Zap, Target, Shield, Cpu, Settings, Trophy } from 'lucide-react';
+import { Share2, Users, MessageSquare, Send, Loader2, Volume2, VolumeX, Save, X, Maximize, Minimize, MonitorPlay, Play, Pause, Coins, AlertTriangle, Menu, Video, Bot, Cloud, Zap, Target, Shield, Cpu, Settings, Trophy, ExternalLink, RefreshCw } from 'lucide-react';
 import { emulator } from '../services/emulator';
 import { multiplayer } from '../services/multiplayer';
 import { inputManager, RetroButton } from '../services/inputManager';
@@ -40,11 +40,16 @@ import { telemetry } from '../services/telemetry';
 import { supabase } from '../services/supabase';
 import { competitiveGuard, ViolationType } from '../competitive/competitiveGuard';
 
+import { communityService } from '../services/communityService';
+import { db, auth } from '../firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+
 export default function GameRoom() {
   const { gameId } = useParams();
   const [searchParams] = useSearchParams();
   const urlRoomId = searchParams.get('roomId');
   const urlOpponentId = searchParams.get('opponentId');
+  const capsuleId = searchParams.get('capsule');
   const navigate = useNavigate();
   const { user } = useAuth();
   const { ownedItems, isRetroPassActive } = useCustomization();
@@ -56,6 +61,7 @@ export default function GameRoom() {
   const [messages, setMessages] = useState<{user: string, text: string}[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [gameState, setGameState] = useState<'loading' | 'waiting' | 'playing' | 'paused' | 'error'>('loading');
+  const [currentGameData, setCurrentGameData] = useState<any>(null);
   const gameStateRef = useRef(gameState);
 
   useEffect(() => {
@@ -96,11 +102,69 @@ export default function GameRoom() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isRecordingClip, setIsRecordingClip] = useState(false);
   const [showPerformanceHUD, setShowPerformanceHUD] = useState(false);
+  const [isHardcore, setIsHardcore] = useState(false);
   const [isRewinding, setIsRewinding] = useState(false);
   const [isFastForwarding, setIsFastForwarding] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [hasReportedResult, setHasReportedResult] = useState(false);
   const [isReporting, setIsReporting] = useState(false);
+
+  const [isCreatingCapsule, setIsCreatingCapsule] = useState(false);
+
+  const handleCreateTimeCapsule = async () => {
+    if (!user) {
+      alert('Debes iniciar sesión para crear una Time Capsule.');
+      return;
+    }
+    
+    setIsCreatingCapsule(true);
+    handlePause(); // Pause the game
+    
+    try {
+      // 1. Capture Screenshot
+      let screenshotUrl = '';
+      if (canvasRef.current) {
+        screenshotUrl = canvasRef.current.toDataURL('image/jpeg', 0.8);
+      }
+      
+      // 2. Capture Save State
+      const state = await emulator.saveState('manual');
+      if (!state) throw new Error('No se pudo capturar el estado.');
+      
+      // 3. Prompt user for description
+      const desc = prompt('Describe este momento épico para la comunidad:', '¡A punto de vencer al jefe!');
+      if (desc === null) {
+        setIsCreatingCapsule(false);
+        handleResume();
+        return;
+      }
+      
+      // 4. Save to Firestore (We store the state ID, the actual state is in IndexedDB for now)
+      const capsuleData = {
+        gameId: gameId || 'unknown',
+        gameTitle: currentGameData?.title || 'Unknown Game',
+        stateId: state.id,
+        screenshotUrl
+      };
+      
+      await communityService.postToFeed(
+        user.user_metadata?.name || user.email?.split('@')[0] || 'Player',
+        `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.id}`,
+        desc,
+        'time_capsule',
+        capsuleData
+      );
+      
+      notify({ title: 'Time Capsule Creada', message: '¡Momento compartido con la comunidad!', type: 'system' });
+      
+    } catch (e) {
+      console.error(e);
+      notify({ title: 'Error', message: 'No se pudo crear la Time Capsule.', type: 'system' });
+    } finally {
+      setIsCreatingCapsule(false);
+      handleResume();
+    }
+  };
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -243,14 +307,14 @@ export default function GameRoom() {
   }, []);
 
   const handleRewind = async (active: boolean) => {
-    if (gameStateRef.current !== 'playing') return;
+    if (gameStateRef.current !== 'playing' || isHardcore) return;
     setIsRewinding(active);
     await emulator.setRewind(active);
     if (active) haptics.light();
   };
 
   const handleFastForward = async (active: boolean) => {
-    if (gameStateRef.current !== 'playing') return;
+    if (gameStateRef.current !== 'playing' || isHardcore) return;
     setIsFastForwarding(active);
     await emulator.setFastForward(active);
     if (active) haptics.light();
@@ -318,10 +382,39 @@ export default function GameRoom() {
   }, [voiceEnabled]);
 
   useEffect(() => {
+    const loadSettings = async () => {
+      const savedHardcore = await storage.getSetting('hardcore_mode_enabled');
+      if (savedHardcore !== null) setIsHardcore(savedHardcore);
+    };
+    loadSettings();
+  }, []);
+
+  const handleUpdateHardcore = async (active: boolean) => {
+    setIsHardcore(active);
+    await storage.saveSetting('hardcore_mode_enabled', active);
+    
+    if (active) {
+      // If turning on, stop any active rewind/FF
+      setIsRewinding(false);
+      setIsFastForwarding(false);
+      await emulator.setRewind(false);
+      await emulator.setFastForward(false);
+    }
+  };
+
+  useEffect(() => {
     let interval: NodeJS.Timeout;
     if (gameState === 'playing') {
       interval = setInterval(async () => {
-        await economy.addCoins(100, 'Recompensa por Tiempo de Juego');
+        const baseCredits = 100;
+        const baseXP = 50;
+        
+        const multiplier = isHardcore ? 2.5 : 1.0;
+        const creditsReward = Math.floor(baseCredits * multiplier);
+        const xpReward = Math.floor(baseXP * multiplier);
+
+        await economy.addCoins(creditsReward, isHardcore ? 'Recompensa Hardcore (Tiempo)' : 'Recompensa por Tiempo de Juego');
+        await economy.addXP(xpReward, 'Experiencia de Vuelo');
         
         const currentPlaytime = (await storage.getSetting('total_playtime_minutes')) || 0;
         const newPlaytime = currentPlaytime + 5;
@@ -333,7 +426,7 @@ export default function GameRoom() {
       }, 5 * 60 * 1000);
     }
     return () => clearInterval(interval);
-  }, [gameState]);
+  }, [gameState, isHardcore]);
 
   const initializedRef = useRef(false);
 
@@ -350,6 +443,8 @@ export default function GameRoom() {
         setErrorMessage('Juego no encontrado en el catálogo.');
         return;
       }
+      
+      setCurrentGameData(gameData);
 
       achievements.unlock('first_match');
       
@@ -385,11 +480,14 @@ export default function GameRoom() {
         if (!mountedRef.current) return;
 
         // Check for SharedArrayBuffer (required for N64/PSX)
-        if ((gameData.system_id === 'n64' || gameData.system_id === 'psx') && typeof SharedArrayBuffer === 'undefined') {
+        const is3DGame = gameData.system_id === 'n64' || gameData.system_id === 'psx';
+        const isSABMissing = typeof SharedArrayBuffer === 'undefined' || !window.crossOriginIsolated;
+
+        if (is3DGame && isSABMissing) {
           console.error('[GameRoom] SharedArrayBuffer is not available. This is required for N64/PSX emulation.');
           if (!mountedRef.current) return;
           setGameState('error');
-          setErrorMessage('Tu navegador no soporta SharedArrayBuffer, necesario para N64/PSX. Por favor, usa Chrome o Edge.');
+          setErrorMessage('SAB_REQUIRED'); // Special error code
           return;
         }
 
@@ -462,7 +560,7 @@ export default function GameRoom() {
               setGameState('waiting');
               
               // Load Cloud Save if available
-              if (user && gameId) {
+              if (user && gameId && !capsuleId) {
                 try {
                   const cloudSave = await saveService.downloadSave(user.id, gameId);
                   if (cloudSave) {
@@ -476,6 +574,24 @@ export default function GameRoom() {
               }
             }
           }, 800);
+
+          // Load Time Capsule if present
+          if (capsuleId) {
+            try {
+              console.log(`[TimeCapsule] Loading capsule state: ${capsuleId}`);
+              setLoadingStatus('Cargando Time Capsule...');
+              const states = await storage.getStates(gameId);
+              const capsuleState = states.find(s => s.id === capsuleId);
+              if (capsuleState) {
+                await emulator.loadState(capsuleState.id);
+                notify({ title: 'Time Capsule', message: '¡Momento cargado con éxito!', type: 'system' });
+              } else {
+                notify({ title: 'Time Capsule', message: 'No se encontró el estado en el dispositivo local.', type: 'system' });
+              }
+            } catch (e) {
+              console.error('Failed to load capsule:', e);
+            }
+          }
 
           if (gameData.compatibility_status !== 'compatible') {
         gameData.compatibility_status = 'compatible';
@@ -515,18 +631,22 @@ export default function GameRoom() {
       
       if (mountedRef.current) {
         setGameState('error');
-        const isNetworkError = err.message?.includes('fetch') || err.message?.includes('Network');
-        const isCacheError = err.message?.includes('Cache') || err.message?.includes('IndexedDB');
+        const errorMsg = err.message || '';
+        const isNetworkError = errorMsg.includes('fetch') || errorMsg.includes('Network') || errorMsg.includes('conexiones fallaron');
+        const isCacheError = errorMsg.includes('Cache') || errorMsg.includes('IndexedDB');
+        const isRomError = errorMsg.includes('Sector de Datos Dañado') || errorMsg.includes('ROM Validation Failed');
         
         if (isNetworkError) {
-          setErrorMessage('Error de red: No se pudo descargar la ROM. Verifica tu conexión.');
+          setErrorMessage('Error de conexión: No se pudo descargar el juego. Por favor, verifica tu conexión a internet e intenta nuevamente.');
         } else if (isCacheError) {
-          setErrorMessage('Error de almacenamiento: El caché local está dañado.');
+          setErrorMessage('Error de almacenamiento: El caché local parece estar corrupto. Haz clic en "Reparar Enlace" para solucionarlo.');
+        } else if (isRomError) {
+          setErrorMessage('Archivo corrupto: El juego descargado está dañado o incompleto. Haz clic en "Reparar Enlace" para buscar una versión alternativa.');
         } else {
-          setErrorMessage(`Fallo crítico: ${err.message || 'Error desconocido'}`);
+          setErrorMessage(`Fallo de emulación: ${errorMsg || 'Error desconocido'}`);
         }
         
-        telemetry.trackGameError(gameId, err.message || 'Unknown error', currentCore);
+        telemetry.trackGameError(gameId, errorMsg || 'Unknown error', currentCore);
         
         if (gameData.compatibility_status !== 'broken') {
           gameData.compatibility_status = 'broken';
@@ -968,6 +1088,21 @@ export default function GameRoom() {
     try {
       // Clear cache for this specific game to force re-download
       await storage.deleteCachedRom(gameId);
+      
+      // Clear discovery cache as well to force finding a new URL
+      const { DiscoveryCache } = await import('../services/DiscoveryCache');
+      const gameData = gameCatalog.getGame(gameId);
+      if (gameData) {
+        await DiscoveryCache.clear(gameId, gameData.system_id);
+      }
+
+      // Stop emulator to free memory before reload
+      try {
+        await emulator.stop();
+      } catch (e) {
+        console.warn('Emulator stop failed during retry:', e);
+      }
+
       initializedRef.current = false;
       // The useEffect will trigger again because initializedRef is false
       // But we need to manually call it or trigger a re-render
@@ -982,7 +1117,10 @@ export default function GameRoom() {
   return (
     <div ref={containerRef} className="fixed inset-0 bg-carbon flex flex-col overflow-hidden z-50">
       {/* Performance HUD */}
-      <PerformanceHUD isVisible={showPerformanceHUD} />
+      <PerformanceHUD 
+        isVisible={showPerformanceHUD} 
+        coreName={currentGameData?.emulator_core}
+      />
 
       {/* Rewind/Fast-Forward HUD Indicators */}
       <AnimatePresence>
@@ -1033,17 +1171,35 @@ export default function GameRoom() {
 
             <h2 className="text-3xl font-black text-white uppercase tracking-tighter mb-4 italic">Fallo de Sistema</h2>
             <p className="text-zinc-400 mb-10 leading-relaxed font-medium">
-              {errorMessage || 'Se ha detectado una anomalía crítica en el sector de datos.'}
+              {errorMessage === 'SAB_REQUIRED' ? (
+                <>
+                  Este juego (N64/PSX) requiere <span className="text-cyan-400 font-bold">SharedArrayBuffer</span> para funcionar. 
+                  Debido a restricciones de seguridad del navegador en el modo vista previa (iframe), 
+                  debes abrir la aplicación en una pestaña nueva para habilitar esta función.
+                </>
+              ) : (
+                errorMessage || 'Se ha detectado una anomalía crítica en el sector de datos.'
+              )}
             </p>
 
             <div className="flex flex-col gap-4">
-              <button
-                onClick={handleRetry}
-                className="w-full py-5 bg-rose-500 hover:bg-rose-600 text-white font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(244,63,94,0.3)] group"
-              >
-                <Zap className="w-6 h-6 group-hover:animate-pulse" />
-                Reparar Enlace (Limpieza Forzada)
-              </button>
+              {errorMessage === 'SAB_REQUIRED' ? (
+                <button
+                  onClick={() => window.open(window.location.href, '_blank')}
+                  className="w-full py-5 bg-cyan-500 hover:bg-cyan-600 text-black font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(6,182,212,0.3)] group"
+                >
+                  <ExternalLink className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                  Abrir en Nueva Pestaña
+                </button>
+              ) : (
+                <button
+                  onClick={handleRetry}
+                  className="w-full py-5 bg-rose-500 hover:bg-rose-600 text-white font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(244,63,94,0.3)] group"
+                >
+                  <Zap className="w-6 h-6 group-hover:animate-pulse" />
+                  Reparar Enlace (Limpieza Forzada)
+                </button>
+              )}
               <button
                 onClick={() => navigate('/')}
                 className="w-full py-5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-black uppercase tracking-widest rounded-2xl transition-all active:scale-95 border border-white/5"
@@ -1383,8 +1539,20 @@ export default function GameRoom() {
           <button 
             onClick={() => setIsSavePanelOpen(true)}
             className="p-2 md:p-4 rounded-2xl bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white transition-all border border-transparent hover:border-white/10"
+            title="Guardar/Cargar"
           >
             <Save className="w-4 h-4 md:w-6 md:h-6" />
+          </button>
+
+          <button 
+            onClick={handleCreateTimeCapsule}
+            disabled={isCreatingCapsule}
+            className={`p-2 md:p-4 rounded-2xl transition-all border ${
+              isCreatingCapsule ? 'bg-fuchsia-500/10 text-fuchsia-500 border-fuchsia-500/20 animate-pulse' : 'bg-white/5 hover:bg-white/10 text-zinc-400 hover:text-white border-transparent hover:border-white/10'
+            }`}
+            title="Crear Time Capsule (Compartir Momento)"
+          >
+            <Share2 className="w-4 h-4 md:w-6 md:h-6" />
           </button>
 
           <button 
@@ -1487,6 +1655,8 @@ export default function GameRoom() {
         onClose={() => setShowSettingsPanel(false)}
         videoSettings={videoSettings}
         onUpdateVideo={setVideoSettings}
+        isHardcore={isHardcore}
+        onUpdateHardcore={handleUpdateHardcore}
       />
       )}
 

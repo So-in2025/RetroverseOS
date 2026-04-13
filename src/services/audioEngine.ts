@@ -66,36 +66,68 @@ export class AudioEngine {
   }
 
   private static init() {
+    if (typeof window === 'undefined') return;
+    
     if (!this.ctx) {
-      this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      
-      // SFX Routing (Direct, punchy)
-      this.sfxGain = this.ctx.createGain();
-      this.sfxGain.gain.value = 0.15;
-      this.sfxGain.connect(this.ctx.destination);
+      try {
+        this.ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        console.log('🎵 [AudioEngine] Contexto creado. Estado:', this.ctx.state);
+        
+        // SFX Routing (Direct, punchy)
+        this.sfxGain = this.ctx.createGain();
+        this.sfxGain.gain.value = 0.15;
+        this.sfxGain.connect(this.ctx.destination);
 
-      // BGM Routing (Warm, atmospheric)
-      this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = 0.12; // Lower volume for background
+        // BGM Routing (Warm, atmospheric)
+        this.masterGain = this.ctx.createGain();
+        this.masterGain.gain.value = 0.12; // Lower volume for background
 
-      this.filterNode = this.ctx.createBiquadFilter();
-      this.filterNode.type = 'lowpass';
-      this.filterNode.frequency.value = 1800; // Warm analog feel
+        this.filterNode = this.ctx.createBiquadFilter();
+        this.filterNode.type = 'lowpass';
+        this.filterNode.frequency.value = 1800; // Warm analog feel
 
-      this.delayNode = this.ctx.createDelay();
-      this.delayNode.delayTime.value = 0.3; // Will be updated per tempo
-      const feedback = this.ctx.createGain();
-      feedback.gain.value = 0.35;
-      this.delayNode.connect(feedback);
-      feedback.connect(this.delayNode);
+        this.delayNode = this.ctx.createDelay();
+        this.delayNode.delayTime.value = 0.3; // Will be updated per tempo
+        const feedback = this.ctx.createGain();
+        feedback.gain.value = 0.35;
+        this.delayNode.connect(feedback);
+        feedback.connect(this.delayNode);
 
-      // Connect BGM chain
-      this.filterNode.connect(this.masterGain);
-      this.delayNode.connect(this.masterGain);
-      this.masterGain.connect(this.ctx.destination);
+        // Connect BGM chain
+        this.filterNode.connect(this.masterGain);
+        this.delayNode.connect(this.masterGain);
+        this.masterGain.connect(this.ctx.destination);
+
+        // Auto-resume on first interaction
+        const resume = () => {
+          if (this.ctx?.state === 'suspended') {
+            this.ctx.resume().then(() => {
+              console.log('🎵 [AudioEngine] Contexto activado por gesto de usuario');
+              window.removeEventListener('click', resume);
+              window.removeEventListener('keydown', resume);
+              window.removeEventListener('touchstart', resume);
+            });
+          }
+        };
+        window.addEventListener('click', resume);
+        window.addEventListener('keydown', resume);
+        window.addEventListener('touchstart', resume);
+      } catch (e) {
+        console.warn('❌ [AudioEngine] Fallo al inicializar AudioContext:', e);
+      }
     }
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
+    
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {
+        // Expected if no user gesture yet
+      });
+    }
+  }
+
+  public static async resumeContext() {
+    this.init();
+    if (this.ctx && this.ctx.state === 'suspended') {
+      await this.ctx.resume();
     }
   }
 

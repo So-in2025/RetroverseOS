@@ -31,6 +31,21 @@ async function startServer() {
   app.use((req, res, next) => {
     res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    
+    // Content Security Policy (CSP) - Allow necessary Google and external domains
+    // We use a relatively permissive policy for development to avoid blocking legitimate resources
+    const csp = [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://*.gstatic.com https://*.google.com https://*.googletagmanager.com https://apis.google.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "img-src 'self' data: blob: https://* http://*",
+      "font-src 'self' https://fonts.gstatic.com",
+      "connect-src 'self' blob: data: https://* wss://*.run.app",
+      "worker-src 'self' blob:",
+      "frame-src 'self' https://*"
+    ].join('; ');
+    
+    res.setHeader('Content-Security-Policy', csp);
     next();
   });
 
@@ -223,7 +238,9 @@ async function startServer() {
       'google.com',
       'googleusercontent.com',
       'images.unsplash.com',
-      'libretro.com'
+      'libretro.com',
+      'erista.me',
+      'myrient.erista.me'
     ];
     let parsedTarget: URL;
     try {
@@ -290,6 +307,16 @@ async function startServer() {
           fetchHeaders['Origin'] = 'https://archive.org';
         }
 
+        // Myrient requires Referer to allow downloads
+        if (targetUrl.includes('erista.me')) {
+          fetchHeaders['Referer'] = 'https://myrient.erista.me/';
+        }
+
+        // Add a generic browser-like Referer if none set
+        if (!fetchHeaders['Referer']) {
+          fetchHeaders['Referer'] = parsedTarget.origin + '/';
+        }
+
         if (range) {
           fetchHeaders['Range'] = range;
         }
@@ -312,12 +339,15 @@ async function startServer() {
         
         if (!response.ok) {
           const status = response.status;
-          console.warn(`[Tunnel] Target returned status ${status} for ${targetUrl} (Attempt ${attempt + 1})`);
           
           if (status === 404) return res.status(404).send('Target not found');
           
           // If we get a 401/403, it might be a temporary block or anti-bot
           if (status === 401 || status === 403 || [503, 429, 408, 500, 502, 504].includes(status)) {
+            // Only log if it's the last attempt
+            if (attempt === maxRetries - 1) {
+              console.warn(`[Tunnel] Final attempt failed with status ${status} for ${targetUrl}`);
+            }
             const waitTime = 3000 * (attempt + 1) + Math.random() * 3000; // Increased wait time
             await new Promise(resolve => setTimeout(resolve, waitTime));
             throw new Error(`Target returned ${status}`);

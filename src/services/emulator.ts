@@ -5,6 +5,7 @@ import { ROMFetchService } from './romFetcher';
 import { AudioEngine } from './audioEngine';
 import { achievements } from './achievements';
 import { customization } from './customization';
+import { sentinel } from './sentinel';
 
 // Track AudioContexts created by Nostalgist/RetroArch to forcefully close them on exit
 const createdAudioContexts: AudioContext[] = [];
@@ -53,7 +54,7 @@ const isMobileDevice = () => /iPhone|iPad|iPod|Android/i.test(navigator.userAgen
 const hasSAB = () => typeof SharedArrayBuffer !== 'undefined';
 
 const getCoreMap = (): Record<string, string> => ({
-  'atari_2600': 'stella',
+  'atari_2600': 'stella2014',
   'atari_7800': 'prosystem',
   'lynx': 'handy',
   'nes': 'fceumm',
@@ -123,6 +124,7 @@ export class EmulatorService {
       config.canvas.setAttribute('data-emulator-active', 'true');
 
       const core = getCoreMap()[(config.system || '').toLowerCase()] || config.core;
+      sentinel.logEmulator(core, config.gameId, 'init_start', { system: config.system });
       console.log(`[Emulator] Initializing core: ${core} for system: ${config.system}`);
       onProgress?.(`Preparing ${core}...`);
 
@@ -147,7 +149,7 @@ export class EmulatorService {
       }
 
       // 1. Handle BIOS if needed
-      const biosFiles: File[] = [];
+      const biosFiles: any[] = [];
       const requiredBios = BIOS_MAP[config.system || ''];
       
       if (requiredBios) {
@@ -157,7 +159,7 @@ export class EmulatorService {
           try {
             const biosBlob = await ROMFetchService.fetchBios(bios.filename, bios.url, onProgress);
             console.log(`[Emulator] BIOS loaded: ${bios.filename} (${biosBlob.size} bytes)`);
-            biosFiles.push(new File([biosBlob], bios.filename));
+            biosFiles.push({ fileName: bios.filename, fileContent: biosBlob });
           } catch (e) {
             console.error(`[Emulator] Failed to load BIOS: ${bios.filename}`, e);
           }
@@ -204,6 +206,14 @@ export class EmulatorService {
       else if (config.system === 'gb' || config.system === 'Game Boy') extension = 'gb';
       else if (config.system === 'psx' || config.system === 'PlayStation' || config.system === 'ps1') extension = 'chd';
       else if (config.system === 'n64' || config.system === 'Nintendo 64') extension = 'z64';
+      else if (config.system === 'atari_2600') extension = 'a26';
+      else if (config.system === 'atari_7800') extension = 'a78';
+      else if (config.system === 'lynx') extension = 'lnx';
+      else if (config.system === 'mastersystem') extension = 'sms';
+      else if (config.system === 'gamegear') extension = 'gg';
+      else if (config.system === 'pcengine') extension = 'pce';
+      else if (config.system === 'wonderswan') extension = 'ws';
+      else if (config.system === 'ngp') extension = 'ngp';
       // URL-based fallbacks
       else if (config.romUrl.toLowerCase().includes('.n64') || config.romUrl.toLowerCase().includes('.z64') || config.romUrl.toLowerCase().includes('.v64')) extension = 'n64';
       else if (config.romUrl.toLowerCase().includes('.fds')) extension = 'fds';
@@ -247,25 +257,25 @@ export class EmulatorService {
 
       let finalCore: any = core;
       
-      // Map cores to available versions in Nostalgist's default CDN
-      if (core === 'stella') {
+      // Map cores to available versions in Nostalgist's default CDN or retroemu
+      if (core === 'stella' || core === 'atari_2600') {
         finalCore = 'stella2014';
+      } else if (core === 'prosystem' || core === 'atari_7800') {
+        finalCore = 'prosystem';
       } else if (core === 'mednafen_psx') {
         finalCore = 'pcsx_rearmed';
-      } else if (core === 'prosystem') {
-        finalCore = 'prosystem';
       } else if (core === 'parallel_n64') {
         finalCore = 'mupen64plus_next';
+      } else if (core === 'mednafen_pce_fast') {
+        finalCore = 'beetle_pce_fast';
+      } else if (core === 'snes9x') {
+        finalCore = 'snes9x'; // Explicitly keep as snes9x
       }
       
       const nostalgistOptions: any = {
         element: config.canvas,
         core: finalCore,
-        rom: new File([romBlob], fileName), // Use File object with sanitized name
-        resolveCoreJs: (core: string) => `https://cdn.jsdelivr.net/npm/nostalgist/dist/cores/${core}.js`,
-        resolveCoreWasm: (core: string) => `https://cdn.jsdelivr.net/npm/nostalgist/dist/cores/${core}.wasm`,
-
-
+        rom: { fileName: fileName, fileContent: romBlob },
         bios: biosFiles.length > 0 ? biosFiles : undefined,
         retroarchConfig: {
           video_aspect_ratio_auto: videoSettings.aspectRatio === 'Original',
@@ -290,26 +300,99 @@ export class EmulatorService {
           // GBA (mGBA)
           'mgba_video_scale': isUltraRes ? '4' : (isHighRes ? '3' : '1'),
 
-          // N64 (ParaLLEl N64)
+          // N64 (ParaLLEl N64 & Mupen64Plus-Next)
           'parallel-n64-gfxplugin': 'glide64',
           'parallel-n64-rspplugin': 'hle',
           'parallel-n64-screensize': '640x480',
-          'parallel-n64-polyoffset-factor': '-3.0',
-          'parallel-n64-polyoffset-units': '-3.0',
+          'mupen64plus-next-cpucore': 'dynamic_recompiler',
+          'mupen64plus-next-rsp-plugin': 'hle',
+          'mupen64plus-next-gfx-plugin': 'glide64',
+          'mupen64plus-next-resolution': '640x480',
+          'mupen64plus-next-threaded-video': 'enabled',
+          'mupen64plus-next-vulkan-renderer': 'disabled', // Vulkan is not well supported in Emscripten yet
         }
       };
 
+      nostalgistOptions.resolveCoreJs = async (c: string) => {
+        // Atari cores are not in arianrhodsandlot, use retroemu with ESM fix
+        if (c === 'stella2014' || c === 'prosystem') {
+          const url = `https://cdn.jsdelivr.net/npm/retroemu@0.3.0/cores/${c}_libretro.js`;
+          const jsBlob = await ROMFetchService.fetchCoreFile(url, 'JS', onProgress);
+          const jsText = await jsBlob.text();
+          
+          // ESM Fix: Strip export and make the creator function global
+          // The cores look like: async function create_XXX(...) { ... } export { create_XXX as default };
+          // Or: export default create_XXX;
+          let fixedJs = jsText
+            .replace(/export\s+default\s+([a-zA-Z0-9_]+);/g, 'window.$1 = $1;')
+            .replace(/export\s+\{\s*([a-zA-Z0-9_]+)\s*as\s+default\s*\};/g, 'window.$1 = $1;')
+            .replace(/export\s+async\s+function\s+([a-zA-Z0-9_]+)/g, 'async function $1')
+            .replace(/export\s+function\s+([a-zA-Z0-9_]+)/g, 'function $1');
+          
+          // Handle import.meta.url which is not available in non-module scripts
+          fixedJs = fixedJs.replace(/import\.meta\.url/g, `"${url}"`);
+          
+          // Also handle the internal 'await import' which fails in some environments if not handled
+          fixedJs = fixedJs.replace(/const\s*\{\s*createRequire\s*\}\s*=\s*await\s*import\(['"]module['"]\);/g, 'const createRequire = () => ({});');
+          
+          // Ensure we have a global creator function
+          if (!fixedJs.includes('window.')) {
+            const match = jsText.match(/async\s+function\s+([a-zA-Z0-9_]+_libretro)/);
+            if (match) {
+              fixedJs += `\nwindow.${match[1]} = ${match[1]};`;
+            }
+          }
+
+          console.log(`[Emulator] Fixed JS for ${c}: length=${fixedJs.length}, endsWith=${fixedJs.substring(fixedJs.length - 50)}`);
+          return new Blob([fixedJs], { type: 'application/javascript' });
+        }
+
+        // Use the standard Nostalgist source but tunneled and from ZIP to avoid 404s and ESM issues
+        const zipUrl = `https://cdn.jsdelivr.net/gh/arianrhodsandlot/retroarch-emscripten-build@v1.22.2/retroarch/${c}_libretro.zip`;
+        const zipBlob = await ROMFetchService.fetchCoreFile(zipUrl, 'JS', onProgress);
+        return await ROMFetchService.extractFileFromZip(zipBlob, `${c}_libretro.js`);
+      };
+      
+      nostalgistOptions.resolveCoreWasm = async (c: string) => {
+        // Atari cores are not in arianrhodsandlot, use retroemu
+        if (c === 'stella2014' || c === 'prosystem') {
+          const url = `https://cdn.jsdelivr.net/npm/retroemu@0.3.0/cores/${c}_libretro.wasm`;
+          const wasmBlob = await ROMFetchService.fetchCoreFile(url, 'WASM', onProgress);
+          return await wasmBlob.arrayBuffer();
+        }
+
+        // Use the standard Nostalgist source but tunneled and from ZIP to avoid 404s and ESM issues
+        const zipUrl = `https://cdn.jsdelivr.net/gh/arianrhodsandlot/retroarch-emscripten-build@v1.22.2/retroarch/${c}_libretro.zip`;
+        const zipBlob = await ROMFetchService.fetchCoreFile(zipUrl, 'WASM', onProgress);
+        const wasmBlob = await ROMFetchService.extractFileFromZip(zipBlob, `${c}_libretro.wasm`);
+        return await wasmBlob.arrayBuffer();
+      };
+
       console.log(`[Emulator] Launching with core: ${core}, ROM: ${fileName}`);
+      console.log(`[Emulator] Cross-Origin Isolated: ${window.crossOriginIsolated}`);
+      
       if (nostalgistOptions.core && typeof nostalgistOptions.core !== 'string') {
         const coreObj = nostalgistOptions.core as any;
         console.log(`[Emulator] Core Blobs - JS: ${coreObj.js?.size} bytes, WASM: ${coreObj.wasm?.size} bytes`);
       }
       onProgress?.('Iniciando motor de emulación...');
-      this.nostalgist = await Nostalgist.launch(nostalgistOptions);
-      
-      this.isRunning = true;
-      console.log(`[Emulator] Core loaded and running.`);
-    } catch (error) {
+      try {
+        this.nostalgist = await Nostalgist.launch(nostalgistOptions);
+        this.isRunning = true;
+        sentinel.logEmulator(core, config.gameId, 'launch_success', { core: finalCore });
+        sentinel.reportGameStatus(config.gameId, 'compatible', { core: finalCore });
+        console.log(`[Emulator] Core loaded and running.`);
+      } catch (launchError: any) {
+        sentinel.logEmulator(core, config.gameId, 'launch_error', { error: launchError.message });
+        sentinel.reportGameStatus(config.gameId, 'broken', { error: launchError.message, core });
+        console.error('[Emulator] Nostalgist.launch failed:', launchError);
+        if (launchError?.message?.includes('Unexpected end of input')) {
+          console.error('[Emulator] Syntax error in core JS. Check ESM fix.');
+        }
+        throw launchError;
+      }
+    } catch (error: any) {
+      sentinel.logEmulator(config.core, config.gameId, 'critical_error', { error: error.message });
       console.error('[Emulator] Failed to launch:', error);
       throw error;
     } finally {
