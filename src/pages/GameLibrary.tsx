@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { Search, AlertTriangle, Loader2, Trash2, Coins, Trophy, Play, Star, Disc, Gamepad2, Volume2, VolumeX, Heart, Zap, User, Users, Radio, Download, LayoutGrid, LayoutList, Columns } from 'lucide-react';
 import { gameCatalog } from '../services/gameCatalog';
@@ -19,6 +19,7 @@ import { romPreloader } from '../services/romPreloader';
 import { useResizeObserver } from '../hooks/useResizeObserver';
 import { useKeyboardNavigation } from '../hooks/useKeyboardNavigation';
 import SystemDiagnostics from '../components/game/SystemDiagnostics';
+import { LobbyList } from '../components/library/LobbyList';
 
 const SYSTEM_FILTERS = [
   { id: 'All', name: 'TODAS', systems: [] },
@@ -31,8 +32,6 @@ const SYSTEM_FILTERS = [
   { id: 'atari', name: 'ATARI', systems: ['atari_2600', 'atari_7800', 'lynx'] },
   { id: 'otras', name: 'OTRAS CONSOLAS', systems: ['pcengine', 'wonderswan', 'ngp'] },
 ];
-
-import { LobbyList } from '../components/library/LobbyList';
 
 export default function GameLibrary() {
   const navigate = useNavigate();

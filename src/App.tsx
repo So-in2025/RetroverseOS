@@ -43,6 +43,17 @@ import { useUIStore } from './store/uiStore';
 import { SentinelEngine } from './services/gcts';
 
 import { sentinel } from './services/sentinel';
+import { gameCatalog } from './services/gameCatalog';
+import { AuthProvider, useAuth } from './services/AuthContext';
+import { storage } from './services/storage';
+import OnboardingFlow from './components/onboarding/OnboardingFlow';
+import { recommendationEngine } from './services/recommendationEngine';
+import BootAnimation from './components/layout/BootAnimation';
+import { motion, AnimatePresence } from 'motion/react';
+import { economy } from './services/economy';
+import { economyService } from './services/economyService';
+import { customization } from './services/customization';
+import { achievements } from './services/achievements';
 
 function Layout() {
   const location = useLocation();
@@ -119,18 +130,6 @@ function Layout() {
     </>
   );
 }
-
-import { gameCatalog } from './services/gameCatalog';
-import { AuthProvider, useAuth } from './services/AuthContext';
-import { storage } from './services/storage';
-import OnboardingFlow from './components/onboarding/OnboardingFlow';
-import { recommendationEngine } from './services/recommendationEngine';
-import BootAnimation from './components/layout/BootAnimation';
-import { motion, AnimatePresence } from 'motion/react';
-import { economy } from './services/economy';
-import { economyService } from './services/economyService';
-import { customization } from './services/customization';
-import { achievements } from './services/achievements';
 
 function AppContent() {
   const { user, loading } = useAuth();
